@@ -27,6 +27,7 @@ import com.amazonaws.services.ec2.model.CreateKeyPairRequest;
 import com.amazonaws.services.ec2.model.CreateSecurityGroupRequest;
 import com.amazonaws.services.ec2.model.DescribeInstancesRequest;
 import com.amazonaws.services.ec2.model.DescribeSecurityGroupsRequest;
+import com.amazonaws.services.ec2.model.IamInstanceProfileSpecification;
 import com.amazonaws.services.ec2.model.Instance;
 import com.amazonaws.services.ec2.model.IpPermission;
 import com.amazonaws.services.ec2.model.IpRange;
@@ -34,6 +35,22 @@ import com.amazonaws.services.ec2.model.KeyPair;
 import com.amazonaws.services.ec2.model.RunInstancesRequest;
 import com.amazonaws.services.ec2.model.TerminateInstancesRequest;
 import com.amazonaws.services.ec2.model.TerminateInstancesResult;
+import com.amazonaws.services.identitymanagement.AmazonIdentityManagement;
+import com.amazonaws.services.identitymanagement.AmazonIdentityManagementClientBuilder;
+import com.amazonaws.services.identitymanagement.model.AddRoleToInstanceProfileRequest;
+import com.amazonaws.services.identitymanagement.model.AttachRolePolicyRequest;
+import com.amazonaws.services.identitymanagement.model.CreateInstanceProfileRequest;
+import com.amazonaws.services.identitymanagement.model.CreatePolicyRequest;
+import com.amazonaws.services.identitymanagement.model.CreateRoleRequest;
+import com.amazonaws.services.identitymanagement.model.GetRoleRequest;
+import com.amazonaws.services.identitymanagement.model.GetRoleResult;
+import com.amazonaws.services.identitymanagement.model.InstanceProfile;
+import com.amazonaws.services.identitymanagement.model.Policy;
+import com.amazonaws.services.identitymanagement.model.Role;
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import com.amazonaws.services.s3.model.PutObjectRequest;
+import com.amazonaws.util.StringInputStream;
 import com.jcraft.jsch.Channel;
 import com.jcraft.jsch.ChannelExec;
 import com.jcraft.jsch.JSch;
@@ -41,19 +58,22 @@ import com.jcraft.jsch.JSchException;
 import com.jcraft.jsch.Session;
 import com.simiacryptus.util.FastRandom;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
+import org.apache.commons.io.output.CloseShieldOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.SequenceInputStream;
 import java.nio.charset.Charset;
 import java.util.Arrays;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
@@ -69,19 +89,20 @@ public class EC2Util {
     String imageId = "ami-346b9c49";
     String instanceType = "t1.micro";
     String username = "ubuntu";
+    String bucket = "simiacryptus";
     try {
       String consoleLog = run(ec2, imageId, instanceType, username, session -> {
         try {
           File file = new File("test.txt");
           FileUtils.write(file, "Hello World", charset);
           scp(session, file, file.getName());
-          String exec = new EC2Util().exec(session, "cat test.txt");
+          String exec = EC2Util.exec(session, "cat test.txt");
           shell(session);
           return exec;
         } catch (IOException e) {
           throw new RuntimeException(e);
         }
-      }, 22, 80);
+      }, bucket, 1319, 22, 80);
       logger.info(String.format("Result: %s", consoleLog));
     } finally {
       if (Thread.interrupted()) logger.info("Interupted");
@@ -93,66 +114,105 @@ public class EC2Util {
       }
     }
   }
+
+  @Nonnull
+  public static void stage(final Session session, final File file, final String remote, String bucket, String cacheNamespace) {
+    AmazonS3 s3 = AmazonS3ClientBuilder.standard().build();
+    String key = cacheNamespace + remote;
+    if (!s3.doesObjectExist(bucket, key)) {
+      s3.putObject(new PutObjectRequest(bucket, key, file));
+    }
+    logger.info("Pulling from s3: " + exec(session, String.format("aws s3api get-object --bucket %s --key %s %s", bucket, key, remote)));
+  }
+  
   
   @Nonnull
-  public static String scp(final Session session, final File file, final String remote) {
+  public static String scp(final Session session, final File file, final String remote) {return scp(session, file, remote, 2);}
+  
+  @Nonnull
+  public static String scp(final Session session, final File file, final String remote, final int retries) {
     try {
+      assert file.exists();
       ChannelExec channel = (ChannelExec) session.openChannel("exec");
       channel.setCommand(String.format("scp -t %s", remote));
-      ByteArrayOutputStream outBuffer = new ByteArrayOutputStream();
+      ByteArrayOutputStream out = new ByteArrayOutputStream();
+      channel.setOutputStream(out);
+      channel.setExtOutputStream(new CloseShieldOutputStream(System.err));
+      String header = String.format("C0644 %d %s\n", file.length(), Arrays.stream(remote.split("/")).reduce((a, b) -> b).get());
+      channel.setInputStream(Arrays.asList(
+        new StringInputStream(header),
+        new FileInputStream(file),
+        new ByteArrayInputStream(new byte[]{0})
+      ).stream().reduce((a, b) -> new SequenceInputStream(a, b)).get());
       channel.connect();
-      OutputStream outputStream = channel.getOutputStream();
-      IOUtils.write(String.format("C0644 %d %s\n", file.length(), remote), outputStream, charset);
-      IOUtils.copy(new FileInputStream(file), outputStream);
-      outputStream.close();
+      join((Channel) channel);
       int exitStatus = channel.getExitStatus();
       if (0 != exitStatus) {
-        throw new AssertionError("Exit Status: " + exitStatus);
+        String msg = String.format("Error Exit Code %d while copying %s to %s; log: %s", exitStatus, file, remote, new String(out.toByteArray(), charset));
+        logger.warn(msg);
+        if (retries > 0) return scp(session, file, remote, retries - 1);
+        throw new RuntimeException(msg);
       }
-      return new String(outBuffer.toByteArray(), charset);
-    } catch (IOException | JSchException e) {
+      return new String(out.toByteArray(), charset);
+    } catch (Throwable e) {
+      if (retries > 0) return scp(session, file, remote, retries - 1);
       throw new RuntimeException(e);
     }
   }
   
   @Nullable
-  public static void shell(final Session session) {
+  public static int shell(final Session session) {
     try {
       Channel channel = session.openChannel("shell");
-      channel.setOutputStream(System.out);
-      channel.setExtOutputStream(System.err);
+      channel.setOutputStream(new CloseShieldOutputStream(System.out));
+      channel.setExtOutputStream(new CloseShieldOutputStream(System.err));
       channel.setInputStream(System.in);
       channel.connect();
-      while (!channel.isClosed()) {
-        Thread.sleep(100);
-      }
+      join(channel);
       int exitStatus = channel.getExitStatus();
       if (0 != exitStatus) {
-        throw new AssertionError("Exit Status: " + exitStatus);
+        logger.warn("Shell Exit Status: " + exitStatus);
       }
+      return exitStatus;
     } catch (InterruptedException | JSchException e) {
       throw new RuntimeException(e);
     }
   }
   
-  public static <T> T run(final AmazonEC2 ec2, final String imageId, final String instanceType, final String username, Function<Session, T> task, final int... ports) {
-    return start(ec2, imageId, instanceType, username, ports).runAndTerminate(task);
+  public static void join(final Channel channel) throws InterruptedException {
+    while (!channel.isClosed()) {
+      Thread.sleep(100);
+    }
+  }
+  
+  public static <T> T run(final AmazonEC2 ec2, final String imageId, final String instanceType, final String username, Function<Session, T> task, final String bucket, final int localControlPort, final int... ports) {
+    return start(ec2, imageId, instanceType, username, AmazonIdentityManagementClientBuilder.defaultClient(), bucket, localControlPort, ports).runAndTerminate(task);
   }
   
   @Nonnull
-  public static EC2Node start(final AmazonEC2 ec2, final String imageId, final String instanceType, final String username, final int... ports) {
-    return start(ec2, imageId, instanceType, username, getKeyPair(ec2), newSecurityGroup(ec2, ports));
+  public static EC2Node start(final AmazonEC2 ec2, final String imageId, final String instanceType, final String username, final AmazonIdentityManagement iam, final String bucket, final int localControlPort, final int... ports) {
+    return start(ec2, imageId, instanceType, username, newIamRole(iam, bucket), localControlPort, ports);
+  }
+  
+  @Nonnull
+  public static EC2Node start(final AmazonEC2 ec2, final String imageId, final String instanceType, final String username, final InstanceProfile iam, final int localControlPort, final int... ports) {
+    return start(ec2, imageId, instanceType, username, getKeyPair(ec2), newSecurityGroup(ec2, ports), iam, localControlPort);
   }
   
   @Nullable
-  public static EC2Node start(final AmazonEC2 ec2, final String imageId, final String instanceType, final String username, final KeyPair keyPair, final String groupId) {
-    Instance instance = start(ec2, imageId, instanceType, groupId, keyPair);
+  public static EC2Node start(final AmazonEC2 ec2, final String imageId, final String instanceType, final String username, final KeyPair keyPair, final String groupId, final InstanceProfile role, final int localControlPort) {
+    Instance instance = start(ec2, imageId, instanceType, groupId, keyPair, role);
     try {
-      return new EC2Node(ec2, connect(keyPair, username, instance), instance.getInstanceId());
+      return new EC2Node(ec2, connect(keyPair, username, instance, localControlPort), instance.getInstanceId());
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       return null;
     }
+  }
+  
+  @Nullable
+  public static EC2Node start(final AmazonEC2 ec2, final String imageId, final String instanceType, final String username, final KeyPair keyPair, final String groupId, final AmazonIdentityManagement iam, final String bucket) {
+    return start(ec2, imageId, instanceType, username, keyPair, groupId, newIamRole(iam, bucket), 1319);
   }
   
   @Nonnull
@@ -170,6 +230,53 @@ public class EC2Util {
       }
     }
     return keyPair;
+  }
+  
+  public static InstanceProfile newIamRole(AmazonIdentityManagement iam, final String bucket) {
+    String initialDocument = "{\n" +
+      "               \"Version\" : \"2012-10-17\",\n" +
+      "               \"Statement\": [ {\n" +
+      "                  \"Effect\": \"Allow\",\n" +
+      "                  \"Principal\": {\n" +
+      "                     \"Service\": [ \"ec2.amazonaws.com\" ]\n" +
+      "                  },\n" +
+      "                  \"Action\": [ \"sts:AssumeRole\" ]\n" +
+      "               } ]\n" +
+      "            }";
+    Role role = iam.createRole(new CreateRoleRequest()
+      .withRoleName("role_" + randomHex())
+      .withAssumeRolePolicyDocument(initialDocument)
+    ).getRole();
+    while (!getRole(iam, role.getRoleName()).isPresent()) sleep(10000);
+    String policyDocument = ("{\n" +
+      "  \"Version\": \"2012-10-17\",\n" +
+      "  \"Statement\": [\n" +
+      "    {\n" +
+      "      \"Action\": \"s3:*\",\n" +
+      "      \"Effect\": \"Allow\",\n" +
+      "      \"Resource\": \"arn:aws:s3:::BUCKET*\"\n" +
+      "    }\n" +
+      "  ]\n" +
+      "}").replaceAll("BUCKET", bucket);
+    Policy policy = iam.createPolicy(new CreatePolicyRequest()
+      .withPolicyDocument(policyDocument.replaceAll("ROLEARN", role.getArn()))
+      .withPolicyName("policy-" + randomHex())
+    ).getPolicy();
+    iam.attachRolePolicy(new AttachRolePolicyRequest().withPolicyArn(policy.getArn()).withRoleName(role.getRoleName()));
+    InstanceProfile instanceProfile = iam.createInstanceProfile(new CreateInstanceProfileRequest().withInstanceProfileName("runpol-" + randomHex())).getInstanceProfile();
+    iam.addRoleToInstanceProfile(new AddRoleToInstanceProfileRequest()
+      .withInstanceProfileName(instanceProfile.getInstanceProfileName())
+      .withRoleName(role.getRoleName())
+    );
+    return instanceProfile;
+  }
+  
+  public static Optional<GetRoleResult> getRole(final AmazonIdentityManagement iam, final String roleName) {
+    try {
+      return Optional.of(iam.getRole(new GetRoleRequest().withRoleName(roleName)));
+    } catch (Throwable e) {
+      return Optional.empty();
+    }
   }
   
   public static String newSecurityGroup(final AmazonEC2 ec2, int... ports) {
@@ -196,31 +303,51 @@ public class EC2Util {
   }
   
   @Nonnull
-  public static Session connect(final KeyPair keyPair, final String username, final Instance ec2instance) throws InterruptedException {
+  public static Session connect(final KeyPair keyPair, final String username, final Instance ec2instance, final int localControlPort) throws InterruptedException {
     long timeout = System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(10);
     while (true) {
       String state = ec2instance.getState().getName();
       if (!state.equals("running")) throw new RuntimeException("Illegal State: " + state);
       if (System.currentTimeMillis() > timeout) throw new RuntimeException("Timeout");
+      Session session = null;
       try {
         JSch jSch = new JSch();
         jSch.addIdentity(username, keyPair.getKeyMaterial().getBytes(charset), keyPair.getKeyFingerprint().getBytes(charset), null);
-        Session session = jSch.getSession(username, ec2instance.getPublicIpAddress());
+        session = jSch.getSession(username, ec2instance.getPublicIpAddress());
         session.setConfig("StrictHostKeyChecking", "no");
+        if (0 < localControlPort) session.setPortForwardingL(localControlPort, "127.0.0.1", 1318);
         session.connect((int) TimeUnit.SECONDS.toMillis(15));
         return session;
       } catch (JSchException e) {
-        logger.info("Awaiting instance connection", e);
+        logger.info("Awaiting instance connection: " + e.getMessage());
+        if (null != session) {
+          try {
+            if (0 < localControlPort) session.delPortForwardingL(localControlPort);
+          } catch (JSchException e1) {
+            throw new RuntimeException(e1);
+          }
+          session.disconnect();
+          session = null;
+        }
         Thread.sleep(10000);
       }
     }
   }
   
-  public static Instance start(final AmazonEC2 ec2, final String ami, final String instanceType, final String groupId, final KeyPair keyPair) {
+  public static Instance start(final AmazonEC2 ec2, final String ami, final String instanceType, final String groupId, final KeyPair keyPair, final AmazonIdentityManagement iam, final String bucket) {
+    return start(ec2, ami, instanceType, groupId, keyPair, newIamRole(iam, bucket));
+  }
+  
+  public static Instance start(final AmazonEC2 ec2, final String ami, final String instanceType, final String groupId, final KeyPair keyPair, final InstanceProfile role) {
     final AtomicReference<Instance> instance = new AtomicReference<>();
+    
     instance.set(ec2.runInstances(new RunInstancesRequest()
       .withImageId(ami)
       .withInstanceType(instanceType)
+        .withIamInstanceProfile(new IamInstanceProfileSpecification()
+            .withArn(role.getArn())
+//        .withName(role.getInstanceProfileName())
+        )
       .withMinCount(1)
       .withMaxCount(1)
       .withKeyName(keyPair.getKeyName())
@@ -260,26 +387,38 @@ public class EC2Util {
   }
   
   @Nonnull
-  public String exec(final Session session, final String script) {
+  public static String exec(final Session session, final String script) {
     try {
-      ChannelExec channel = (ChannelExec) session.openChannel("exec");
-      channel.setCommand(script);
-      ByteArrayOutputStream outBuffer = new ByteArrayOutputStream();
-      channel.setOutputStream(outBuffer);
-      channel.setExtOutputStream(System.err);
-      channel.connect();
-      while (!(channel.isClosed() || channel.isEOF())) {
-        Thread.sleep(100);
-      }
-      String output = new String(outBuffer.toByteArray(), charset);
-      int exitStatus = channel.getExitStatus();
+      logger.info("Executing: " + script);
+      Process process = execAsync(session, script);
+      join(process.getChannel());
+      String output = new String(process.getOutBuffer().toByteArray(), charset);
+      int exitStatus = process.getChannel().getExitStatus();
       if (0 != exitStatus) {
         logger.info(String.format("Exit Status: %d; Output:\n%s", exitStatus, output));
         throw new AssertionError("Exit Status: " + exitStatus);
       }
       return output;
-    } catch (InterruptedException | JSchException e) {
+    } catch (InterruptedException e) {
       throw new RuntimeException(e);
+    }
+  }
+  
+  @Nonnull
+  public static Process execAsync(final Session session, final String script) {return execAsync(session, script, new ByteArrayOutputStream());}
+  
+  @Nonnull
+  public static Process execAsync(final Session session, final String script, final OutputStream outBuffer) {
+    try {
+      return new Process(session, script, outBuffer);
+    } catch (JSchException e) {
+      throw new RuntimeException(e);
+    }
+  }
+  
+  public static void join(final ChannelExec channel) throws InterruptedException {
+    while (!(channel.isClosed() || channel.isEOF())) {
+      Thread.sleep(100);
     }
   }
   
@@ -318,9 +457,61 @@ public class EC2Util {
     public void close() {
       terminate();
     }
+  
+    public int shell() {
+      return EC2Util.shell(getConnection());
+    }
+  
+    public String scp(final File local, final String remote) {
+      return EC2Util.scp(getConnection(), local, remote);
+    }
+  
+    public String exec(final String command) {
+      return EC2Util.exec(getConnection(), command);
+    }
+  
+    public Process execAsync(final String command) {
+      return EC2Util.execAsync(getConnection(), command);
+    }
+  
+    public void stage(final File entryFile, final String remote, final String bucket, final String keyspace) {
+      EC2Util.stage(getConnection(), entryFile, remote, bucket, keyspace);
+    }
+  }
+  
+  public static class Process {
+    private final ChannelExec channel;
+    private final OutputStream outBuffer;
     
-    public void shell() {
-      EC2Util.shell(getConnection());
+    public Process(final Session session, final String script, final OutputStream outBuffer) throws JSchException {
+      channel = (ChannelExec) session.openChannel("exec");
+      channel.setCommand(script);
+      this.outBuffer = outBuffer;
+      channel.setOutputStream(this.outBuffer);
+      channel.setExtOutputStream(new CloseShieldOutputStream(System.err));
+      channel.connect();
+    }
+    
+    public ChannelExec getChannel() {
+      return channel;
+    }
+    
+    public ByteArrayOutputStream getOutBuffer() {
+      return (ByteArrayOutputStream) outBuffer;
+    }
+    
+    public String join() {
+      try {
+        EC2Util.join(channel);
+        return getOutput();
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+    }
+    
+    @Nonnull
+    public String getOutput() {
+      return new String(getOutBuffer().toByteArray(), charset);
     }
   }
 }
