@@ -19,7 +19,9 @@
 
 package com.simiacryptus.aws;
 
+import com.amazonaws.services.s3.AmazonS3;
 import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.serializers.ClosureSerializer;
 import com.esotericsoftware.kryo.serializers.JavaSerializer;
 import com.esotericsoftware.kryonet.Client;
 import com.esotericsoftware.kryonet.Connection;
@@ -29,6 +31,7 @@ import com.esotericsoftware.kryonet.rmi.ObjectSpace;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.CloseShieldOutputStream;
+import org.jetbrains.annotations.NotNull;
 import org.objenesis.strategy.StdInstantiatorStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,12 +44,14 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
+import java.lang.invoke.SerializedLambda;
 import java.net.InetSocketAddress;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.Executor;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -65,7 +70,7 @@ public class Tendril {
       configure(server.getKryo());
       ObjectSpace.registerClasses(server.getKryo());
       ObjectSpace objectSpace = new ObjectSpace();
-      objectSpace.register(1318, new LocalTendrilNode());
+      objectSpace.register(1318, new TendrilLinkImpl());
       server.addListener(new Listener() {
         @Override
         public void connected(final Connection connection) {
@@ -87,26 +92,27 @@ public class Tendril {
   }
   
   @Nullable
-  public static TendrilNode startRemoteJvm(final EC2Node node, final String javaOpts, final String programArguments, final String libPrefix, final String keyspace, final String bucket, final int localControlPort, final Predicate<String> classpathFilter) {
+  public static TendrilControl startRemoteJvm(final EC2Node node, final int localControlPort, final String javaOpts, final String programArguments, final String libPrefix, final String keyspace, final Predicate<String> classpathFilter, final AmazonS3 s3, final String bucket) {
     String localClasspath = System.getProperty("java.class.path");
     logger.info("Java Local Classpath: " + localClasspath);
-    String remoteClasspath = stageRemoteClasspath(node, libPrefix, keyspace, bucket, classpathFilter, localClasspath, true);
+    String remoteClasspath = stageRemoteClasspath(node, localClasspath, classpathFilter, libPrefix, true, s3, bucket, keyspace);
     logger.info("Java Remote Classpath: " + remoteClasspath);
     String commandLine = String.format("java %s -cp %s %s %s", javaOpts, remoteClasspath, Tendril.class.getCanonicalName(), programArguments);
     logger.info("Java Command Line: " + commandLine);
-    EC2Util.Process process = execAsync(node.getConnection(), commandLine, new CloseShieldOutputStream(System.out));
-    return getControl(localControlPort);
+    execAsync(node.getConnection(), commandLine, new CloseShieldOutputStream(System.out));
+    return new TendrilControl(getControl(localControlPort));
   }
   
-  public static TendrilNode getControl(final int localControlPort) {return getControl(localControlPort, 3);}
   
-  public static TendrilNode getControl(final int localControlPort, final int retries) {
+  public static TendrilLink getControl(final int localControlPort) {return getControl(localControlPort, 3);}
+  
+  public static TendrilLink getControl(final int localControlPort, final int retries) {
     try {
       Client client = new Client();
       configure(client.getKryo());
       client.start();
       client.connect(30000, "127.0.0.1", localControlPort, -1);
-      return ObjectSpace.getRemoteObject(client, 1318, TendrilNode.class);
+      return ObjectSpace.getRemoteObject(client, 1318, TendrilLink.class);
     } catch (Throwable e) {
       if (retries > 0) {
         sleep(5000);
@@ -117,26 +123,29 @@ public class Tendril {
   }
   
   public static void configure(final Kryo kryo) {
-    kryo.register(TendrilNode.class);
-    kryo.register(LocalTendrilNode.class);
     kryo.setRegistrationRequired(false);
-    kryo.setInstantiatorStrategy(new StdInstantiatorStrategy());
-    kryo.setDefaultSerializer(JavaSerializer.class);
-    kryo.setAutoReset(true);
+    kryo.setInstantiatorStrategy(new Kryo.DefaultInstantiatorStrategy(new StdInstantiatorStrategy()));
+    kryo.register(Object[].class);
+    kryo.register(java.lang.Class.class);
+    kryo.register(SerializedLambda.class);
+    com.esotericsoftware.kryonet.rmi.ObjectSpace.registerClasses(kryo);
+    kryo.register(ClosureSerializer.Closure.class, new ClosureSerializer());
+    kryo.register(SerializableCallable.class, new JavaSerializer());
+    kryo.register(TendrilLink.class);
   }
   
   @Nonnull
-  public static String stageRemoteClasspath(final EC2Node node, final String libPrefix, final String keyspace, final String bucket, final Predicate<String> classpathFilter, final String localClasspath, final boolean parallel) {
+  public static String stageRemoteClasspath(final EC2Node node, final String localClasspath, final Predicate<String> classpathFilter, final String libPrefix, final boolean parallel, final AmazonS3 s3, final String bucket, final String keyspace) {
     logger.info(String.format("Mkdir %s: %s", libPrefix, node.exec("mkdir -p " + libPrefix)));
     Stream<String> stream = Arrays.stream(localClasspath.split(File.pathSeparator)).filter(classpathFilter);
     if (parallel) stream = stream.parallel();
     return stream.map(entryPath -> {
-      return stageClasspathEntry(node, libPrefix, keyspace, bucket, entryPath);
+      return stageClasspathEntry(node, libPrefix, entryPath, s3, bucket, keyspace);
     }).reduce((a, b) -> a + ":" + b).get();
   }
   
   @Nonnull
-  public static String stageClasspathEntry(final EC2Node node, final String libPrefix, final String keyspace, final String bucket, final String entryPath) {
+  public static String stageClasspathEntry(final EC2Node node, final String libPrefix, final String entryPath, final AmazonS3 s3, final String bucket, final String keyspace) {
     logger.info(String.format("Processing %s", entryPath));
     final File entryFile = new File(entryPath);
     try {
@@ -144,7 +153,7 @@ public class Tendril {
         String remote = libPrefix + hash(entryFile) + ".jar";
         logger.info(String.format("Uploading %s to %s", entryPath, remote));
         try {
-          stage(node, keyspace, bucket, entryFile, remote);
+          stage(node, entryFile, remote, s3, bucket, keyspace);
         } catch (Throwable e) {
           logger.warn(String.format("Error staging %s to %s", entryFile, remote), e);
         }
@@ -155,7 +164,7 @@ public class Tendril {
         String remote = libPrefix + hash(tempJar) + ".jar";
         logger.info(String.format("Uploading %s to %s", tempJar, remote));
         try {
-          stage(node, keyspace, bucket, tempJar, remote);
+          stage(node, tempJar, remote, s3, bucket, keyspace);
         } catch (Throwable e) {
           logger.warn(String.format("Error staging %s to %s", entryFile, remote), e);
         }
@@ -166,26 +175,26 @@ public class Tendril {
     }
   }
   
-  public static boolean shouldTransfer(final String file) {
+  public static boolean defaultClasspathFilter(final String file) {
     if (file.contains("jre")) return false;
     return !file.contains("jdk");
   }
   
-  public static void stage(final EC2Node node, final String keyspace, final String bucket, final File entryFile, final String remote) {stage(node, keyspace, bucket, entryFile, remote, 3);}
+  public static void stage(final EC2Node node, final File entryFile, final String remote, final AmazonS3 s3, final String bucket, final String keyspace) {stage(node, entryFile, remote, 10, s3, bucket, keyspace);}
   
-  public static void stage(final EC2Node node, final String keyspace, final String bucket, final File entryFile, final String remote, final int retries) {
+  public static void stage(final EC2Node node, final File entryFile, final String remote, final int retries, final AmazonS3 s3, final String bucket, final String keyspace) {
     try {
       if (null == bucket || bucket.isEmpty()) {
         node.scp(entryFile, remote);
       }
       else {
-        node.stage(entryFile, remote, bucket, keyspace);
+        node.stage(entryFile, remote, bucket, keyspace, s3);
       }
     } catch (Throwable e) {
       if (retries > 0) {
         logger.debug("Retrying " + remote, e);
-        sleep(10000);
-        stage(node, keyspace, bucket, entryFile, remote, retries - 1);
+        sleep(5000);
+        stage(node, entryFile, remote, retries - 1, s3, bucket, keyspace);
       }
       else {
         throw new RuntimeException(e);
@@ -220,7 +229,7 @@ public class Tendril {
   }
   
   public static String hash(final File classpath) throws NoSuchAlgorithmException, IOException {
-    MessageDigest digest = MessageDigest.getInstance("SHA-1");
+    MessageDigest digest = MessageDigest.getInstance("MD5");
     InputStream fis = new FileInputStream(classpath);
     int n = 0;
     byte[] buffer = new byte[8192];
@@ -233,10 +242,17 @@ public class Tendril {
     return new String(Hex.encodeHex(digest.digest()));
   }
   
+  public static TendrilControl startRemoteJvm(final EC2Node node, final JvmConfig jvmConfig, final int localControlPort, final Predicate<String> shouldTransfer, final AmazonS3 s3, final String bucket) {
+    return startRemoteJvm(node, localControlPort, jvmConfig.javaOpts, jvmConfig.programArguments, jvmConfig.libPrefix, jvmConfig.keyspace, shouldTransfer, s3, bucket);
+  }
+  
+  public interface SerializableRunnable extends Runnable, Serializable {
+  }
+  
   public interface SerializableCallable<T> extends Callable<T>, Serializable {
   }
   
-  public interface TendrilNode {
+  public interface TendrilLink {
     boolean isAlive();
     
     long time();
@@ -244,7 +260,46 @@ public class Tendril {
     <T> T run(SerializableCallable<T> task) throws Exception;
   }
   
-  public static class LocalTendrilNode implements TendrilNode {
+  public static class TendrilControl implements Executor {
+    
+    private final TendrilLink inner;
+    
+    public TendrilControl(final TendrilLink inner) {this.inner = inner;}
+    
+    public long time() {
+      return inner.time();
+    }
+    
+    public <T> T run(final SerializableCallable<T> task) throws Exception {
+      assert inner.isAlive();
+      return inner.run(task);
+    }
+    
+    public void start(SerializableRunnable task) {
+      assert inner.isAlive();
+      try {
+        inner.run(() -> {
+          new Thread(() -> {
+            try {
+              task.run();
+            } catch (Exception e) {
+              logger.warn("Task Error", e);
+            }
+          }).start();
+          return null;
+        });
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
+    
+    @Override
+    public void execute(final @NotNull Runnable command) {
+      start(() -> command.run());
+    }
+  }
+  
+  protected static class TendrilLinkImpl implements TendrilLink {
     @Override
     public boolean isAlive() {
       return true;
@@ -258,6 +313,21 @@ public class Tendril {
     @Override
     public <T> T run(final SerializableCallable<T> task) throws Exception {
       return task.call();
+    }
+  }
+  
+  public static class JvmConfig extends NodeConfig {
+    public String javaOpts;
+    public String programArguments;
+    public String libPrefix;
+    public String keyspace;
+    
+    public JvmConfig(final String imageId, final String instanceType, final String username) {
+      super(imageId, instanceType, username);
+      javaOpts = "";
+      programArguments = "";
+      libPrefix = "lib/";
+      keyspace = "";
     }
   }
 }

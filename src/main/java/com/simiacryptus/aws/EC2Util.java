@@ -26,12 +26,14 @@ import com.amazonaws.services.ec2.model.AuthorizeSecurityGroupIngressRequest;
 import com.amazonaws.services.ec2.model.CreateKeyPairRequest;
 import com.amazonaws.services.ec2.model.CreateSecurityGroupRequest;
 import com.amazonaws.services.ec2.model.DescribeInstancesRequest;
+import com.amazonaws.services.ec2.model.DescribeKeyPairsRequest;
 import com.amazonaws.services.ec2.model.DescribeSecurityGroupsRequest;
 import com.amazonaws.services.ec2.model.IamInstanceProfileSpecification;
 import com.amazonaws.services.ec2.model.Instance;
 import com.amazonaws.services.ec2.model.IpPermission;
 import com.amazonaws.services.ec2.model.IpRange;
 import com.amazonaws.services.ec2.model.KeyPair;
+import com.amazonaws.services.ec2.model.KeyPairInfo;
 import com.amazonaws.services.ec2.model.RunInstancesRequest;
 import com.amazonaws.services.ec2.model.TerminateInstancesRequest;
 import com.amazonaws.services.ec2.model.TerminateInstancesResult;
@@ -48,7 +50,6 @@ import com.amazonaws.services.identitymanagement.model.InstanceProfile;
 import com.amazonaws.services.identitymanagement.model.Policy;
 import com.amazonaws.services.identitymanagement.model.Role;
 import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.util.StringInputStream;
 import com.jcraft.jsch.Channel;
@@ -114,10 +115,8 @@ public class EC2Util {
       }
     }
   }
-
-  @Nonnull
-  public static void stage(final Session session, final File file, final String remote, String bucket, String cacheNamespace) {
-    AmazonS3 s3 = AmazonS3ClientBuilder.standard().build();
+  
+  public static void stage(final Session session, final File file, final String remote, final String bucket, final String cacheNamespace, final AmazonS3 s3) {
     String key = cacheNamespace + remote;
     if (!s3.doesObjectExist(bucket, key)) {
       s3.putObject(new PutObjectRequest(bucket, key, file));
@@ -191,7 +190,16 @@ public class EC2Util {
   
   @Nonnull
   public static EC2Node start(final AmazonEC2 ec2, final String imageId, final String instanceType, final String username, final AmazonIdentityManagement iam, final String bucket, final int localControlPort, final int... ports) {
-    return start(ec2, imageId, instanceType, username, newIamRole(iam, bucket), localControlPort, ports);
+    return start(ec2, imageId, instanceType, username, newIamRole(iam, ("{\n" +
+      "  \"Version\": \"2012-10-17\",\n" +
+      "  \"Statement\": [\n" +
+      "    {\n" +
+      "      \"Action\": \"s3:*\",\n" +
+      "      \"Effect\": \"Allow\",\n" +
+      "      \"Resource\": \"arn:aws:s3:::BUCKET*\"\n" +
+      "    }\n" +
+      "  ]\n" +
+      "}").replaceAll("BUCKET", bucket)), localControlPort, ports);
   }
   
   @Nonnull
@@ -200,8 +208,8 @@ public class EC2Util {
   }
   
   @Nullable
-  public static EC2Node start(final AmazonEC2 ec2, final String imageId, final String instanceType, final String username, final KeyPair keyPair, final String groupId, final InstanceProfile role, final int localControlPort) {
-    Instance instance = start(ec2, imageId, instanceType, groupId, keyPair, role);
+  public static EC2Node start(final AmazonEC2 ec2, final String imageId, final String instanceType, final String username, final KeyPair keyPair, final String groupId, final InstanceProfile instanceProfile, final int localControlPort) {
+    Instance instance = start(ec2, imageId, instanceType, groupId, keyPair, instanceProfile);
     try {
       return new EC2Node(ec2, connect(keyPair, username, instance, localControlPort), instance.getInstanceId());
     } catch (InterruptedException e) {
@@ -212,7 +220,16 @@ public class EC2Util {
   
   @Nullable
   public static EC2Node start(final AmazonEC2 ec2, final String imageId, final String instanceType, final String username, final KeyPair keyPair, final String groupId, final AmazonIdentityManagement iam, final String bucket) {
-    return start(ec2, imageId, instanceType, username, keyPair, groupId, newIamRole(iam, bucket), 1319);
+    return start(ec2, imageId, instanceType, username, keyPair, groupId, newIamRole(iam, ("{\n" +
+      "  \"Version\": \"2012-10-17\",\n" +
+      "  \"Statement\": [\n" +
+      "    {\n" +
+      "      \"Action\": \"s3:*\",\n" +
+      "      \"Effect\": \"Allow\",\n" +
+      "      \"Resource\": \"arn:aws:s3:::BUCKET*\"\n" +
+      "    }\n" +
+      "  ]\n" +
+      "}").replaceAll("BUCKET", bucket)), 1319);
   }
   
   @Nonnull
@@ -220,11 +237,22 @@ public class EC2Util {
     if (null == keyPair) {
       synchronized (EC2Util.class) {
         if (null == keyPair) {
-          keyPair = ec2.createKeyPair(new CreateKeyPairRequest().withKeyName("key_" + randomHex())).getKeyPair();
-          try {
-            FileUtils.write(new File(keyPair.getKeyName() + ".pem"), keyPair.getKeyMaterial(), "UTF-8");
-          } catch (IOException e) {
-            throw new RuntimeException(e);
+          KeyPair key = Arrays.stream(new File(".").listFiles()).filter(x -> x.getName().endsWith(".pem")).map(pem -> {
+            String[] split = pem.getName().split("\\.");
+            return split.length > 0 ? split[0] : "";
+          }).filter(x -> !x.isEmpty()).map(keyName -> loadKey(ec2, keyName)).filter(x -> x != null).findFirst().orElse(null);
+          if (null != key) {
+            keyPair = key;
+          }
+          else {
+            String keyName = "key_" + randomHex();
+            logger.info("Creating Key Pair: " + keyName);
+            keyPair = ec2.createKeyPair(new CreateKeyPairRequest().withKeyName(keyName)).getKeyPair();
+            try {
+              FileUtils.write(new File(keyPair.getKeyName() + ".pem"), keyPair.getKeyMaterial(), "UTF-8");
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
           }
         }
       }
@@ -232,7 +260,21 @@ public class EC2Util {
     return keyPair;
   }
   
-  public static InstanceProfile newIamRole(AmazonIdentityManagement iam, final String bucket) {
+  @Nullable
+  public static KeyPair loadKey(final AmazonEC2 ec2, final String keyNames) {
+    try {
+      KeyPairInfo localKeyPair = ec2.describeKeyPairs(new DescribeKeyPairsRequest().withKeyNames(keyNames)).getKeyPairs().get(0);
+      String pemData = FileUtils.readFileToString(new File(localKeyPair.getKeyName() + ".pem"), charset);
+      logger.info("Loaded Key Pair: " + localKeyPair);
+      return new KeyPair().withKeyName(localKeyPair.getKeyName()).withKeyFingerprint(localKeyPair.getKeyFingerprint()).withKeyMaterial(pemData);
+    } catch (Throwable e) {
+      logger.warn("Error loading local keys");
+      return null;
+    }
+  }
+  
+  @Nonnull
+  public static InstanceProfile newIamRole(final AmazonIdentityManagement iam, final String policyDocument) {
     String initialDocument = "{\n" +
       "               \"Version\" : \"2012-10-17\",\n" +
       "               \"Statement\": [ {\n" +
@@ -248,16 +290,6 @@ public class EC2Util {
       .withAssumeRolePolicyDocument(initialDocument)
     ).getRole();
     while (!getRole(iam, role.getRoleName()).isPresent()) sleep(10000);
-    String policyDocument = ("{\n" +
-      "  \"Version\": \"2012-10-17\",\n" +
-      "  \"Statement\": [\n" +
-      "    {\n" +
-      "      \"Action\": \"s3:*\",\n" +
-      "      \"Effect\": \"Allow\",\n" +
-      "      \"Resource\": \"arn:aws:s3:::BUCKET*\"\n" +
-      "    }\n" +
-      "  ]\n" +
-      "}").replaceAll("BUCKET", bucket);
     Policy policy = iam.createPolicy(new CreatePolicyRequest()
       .withPolicyDocument(policyDocument.replaceAll("ROLEARN", role.getArn()))
       .withPolicyName("policy-" + randomHex())
@@ -335,17 +367,26 @@ public class EC2Util {
   }
   
   public static Instance start(final AmazonEC2 ec2, final String ami, final String instanceType, final String groupId, final KeyPair keyPair, final AmazonIdentityManagement iam, final String bucket) {
-    return start(ec2, ami, instanceType, groupId, keyPair, newIamRole(iam, bucket));
+    return start(ec2, ami, instanceType, groupId, keyPair, newIamRole(iam, ("{\n" +
+      "  \"Version\": \"2012-10-17\",\n" +
+      "  \"Statement\": [\n" +
+      "    {\n" +
+      "      \"Action\": \"s3:*\",\n" +
+      "      \"Effect\": \"Allow\",\n" +
+      "      \"Resource\": \"arn:aws:s3:::BUCKET*\"\n" +
+      "    }\n" +
+      "  ]\n" +
+      "}").replaceAll("BUCKET", bucket)));
   }
   
-  public static Instance start(final AmazonEC2 ec2, final String ami, final String instanceType, final String groupId, final KeyPair keyPair, final InstanceProfile role) {
+  public static Instance start(final AmazonEC2 ec2, final String ami, final String instanceType, final String groupId, final KeyPair keyPair, final InstanceProfile instanceProfile) {
     final AtomicReference<Instance> instance = new AtomicReference<>();
     
     instance.set(ec2.runInstances(new RunInstancesRequest()
       .withImageId(ami)
       .withInstanceType(instanceType)
         .withIamInstanceProfile(new IamInstanceProfileSpecification()
-            .withArn(role.getArn())
+            .withArn(instanceProfile.getArn())
 //        .withName(role.getInstanceProfileName())
         )
       .withMinCount(1)
@@ -422,6 +463,10 @@ public class EC2Util {
     }
   }
   
+  public static EC2Node start(final AmazonEC2 ec2, final NodeConfig jvmConfig, final ServiceConfig serviceConfig, final int localControlPort) {
+    return start(ec2, jvmConfig.imageId, jvmConfig.instanceType, jvmConfig.username, serviceConfig.keyPair, serviceConfig.groupId, serviceConfig.instanceProfile, localControlPort);
+  }
+  
   public static class EC2Node implements AutoCloseable {
     private final AmazonEC2 ec2;
     private final Session connection;
@@ -432,7 +477,11 @@ public class EC2Util {
       this.connection = connection;
       this.instanceId = instanceId;
     }
-    
+  
+    public Tendril.TendrilControl startJvm(final AmazonEC2 ec2, final AmazonS3 s3, final AwsTendrilSettings settings, final int localControlPort) {
+      return Tendril.startRemoteJvm(this, settings.getJvmConfig(), localControlPort, Tendril::defaultClasspathFilter, s3, settings.getServiceConfig(ec2).bucket);
+    }
+  
     public <T> T runAndTerminate(final Function<Session, T> task) {
       try {
         return task.apply(getConnection());
@@ -474,8 +523,8 @@ public class EC2Util {
       return EC2Util.execAsync(getConnection(), command);
     }
   
-    public void stage(final File entryFile, final String remote, final String bucket, final String keyspace) {
-      EC2Util.stage(getConnection(), entryFile, remote, bucket, keyspace);
+    public void stage(final File entryFile, final String remote, final String bucket, final String keyspace, final AmazonS3 s3) {
+      EC2Util.stage(getConnection(), entryFile, remote, bucket, keyspace, s3);
     }
   }
   
@@ -514,4 +563,37 @@ public class EC2Util {
       return new String(getOutBuffer().toByteArray(), charset);
     }
   }
+  
+  public static class ServiceConfig {
+    public String bucket;
+    public InstanceProfile instanceProfile;
+    public String groupId;
+    public KeyPair keyPair;
+    
+    public ServiceConfig(final AmazonEC2 ec2, final String bucket, final String roleArn) {this(ec2, bucket, roleArn, EC2Util.newSecurityGroup(ec2, 22, 80));}
+    
+    public ServiceConfig(final AmazonEC2 ec2, final String bucket, final String roleArn, final String groupId) {this(ec2, bucket, groupId, new InstanceProfile().withArn(roleArn));}
+    
+    public ServiceConfig(final AmazonEC2 ec2, final String bucket, final String groupId, final InstanceProfile instanceProfile) {this(bucket, groupId, instanceProfile, EC2Util.getKeyPair(ec2));}
+    
+    public ServiceConfig(final String bucket, final String groupId, final InstanceProfile instanceProfile, final KeyPair keyPair) {
+      this.bucket = bucket;
+      this.groupId = groupId;
+      this.instanceProfile = instanceProfile;
+      this.keyPair = keyPair;
+    }
+  }
+  
+  public static class NodeConfig {
+    public String imageId;
+    public String instanceType;
+    public String username;
+    
+    public NodeConfig(final String imageId, final String instanceType, final String username) {
+      this.imageId = imageId;
+      this.instanceType = instanceType;
+      this.username = username;
+    }
+  }
+
 }
