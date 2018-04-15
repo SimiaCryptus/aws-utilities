@@ -205,14 +205,17 @@ public class Tendril {
   @Nonnull
   public static File toJar(final File entry) throws IOException {
     File tempJar = new File(UUID.randomUUID() + ".jar");
-    logger.info(String.format("Archiving %s to %s", entry, tempJar));
-    try (ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(tempJar))) {
-      for (final File file : Arrays.stream(entry.listFiles()).sorted().collect(Collectors.toList())) {
-        write(zip, "", file);
+    try {
+      logger.info(String.format("Archiving %s to %s", entry, tempJar));
+      try (ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(tempJar))) {
+        for (final File file : Arrays.stream(entry.listFiles()).sorted().collect(Collectors.toList())) {
+          write(zip, "", file);
+        }
       }
+      return tempJar;
+    } finally {
+      tempJar.deleteOnExit();
     }
-    tempJar.deleteOnExit();
-    return tempJar;
   }
   
   private static void write(final ZipOutputStream zip, final String base, final File entry) throws IOException {
