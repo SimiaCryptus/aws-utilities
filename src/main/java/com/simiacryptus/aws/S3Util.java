@@ -24,7 +24,18 @@ import com.amazonaws.services.s3.model.PutObjectRequest;
 
 import java.io.File;
 
+/**
+ * The type S 3 util.
+ */
 public class S3Util {
+  /**
+   * Upload.
+   *
+   * @param s3        the s 3
+   * @param bucket    the bucket
+   * @param namespace the namespace
+   * @param file      the file
+   */
   public static void upload(final AmazonS3 s3, final String bucket, final String namespace, final File file) {
     if (!file.exists()) throw new RuntimeException(file.toString());
     if (file.isFile()) {
