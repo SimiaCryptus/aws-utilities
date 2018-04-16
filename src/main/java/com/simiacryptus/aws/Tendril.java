@@ -62,10 +62,18 @@ import java.util.zip.ZipOutputStream;
 
 import static com.simiacryptus.aws.EC2Util.*;
 
+/**
+ * The type Tendril.
+ */
 public class Tendril {
   
   private static final Logger logger = LoggerFactory.getLogger(EC2Util.class);
   
+  /**
+   * The entry point of application.
+   *
+   * @param args the input arguments
+   */
   public static void main(String... args) {
     try {
       if (Boolean.parseBoolean(System.getProperty("SHUTDOWN_ON_EXIT", "true")))
@@ -107,6 +115,20 @@ public class Tendril {
   }
   
   
+  /**
+   * Start remote jvm tendril control.
+   *
+   * @param node             the node
+   * @param localControlPort the local control port
+   * @param javaOpts         the java opts
+   * @param programArguments the program arguments
+   * @param libPrefix        the lib prefix
+   * @param keyspace         the keyspace
+   * @param classpathFilter  the classpath filter
+   * @param s3               the s 3
+   * @param bucket           the bucket
+   * @return the tendril control
+   */
   @Nullable
   public static TendrilControl startRemoteJvm(final EC2Node node, final int localControlPort, final String javaOpts, final String programArguments, final String libPrefix, final String keyspace, final Predicate<String> classpathFilter, final AmazonS3 s3, final String bucket) {
     String localClasspath = System.getProperty("java.class.path");
@@ -120,8 +142,21 @@ public class Tendril {
   }
   
   
+  /**
+   * Gets control.
+   *
+   * @param localControlPort the local control port
+   * @return the control
+   */
   public static TendrilLink getControl(final int localControlPort) {return getControl(localControlPort, 3);}
   
+  /**
+   * Gets control.
+   *
+   * @param localControlPort the local control port
+   * @param retries          the retries
+   * @return the control
+   */
   public static TendrilLink getControl(final int localControlPort, final int retries) {
     try {
       Client client = new Client();
@@ -138,6 +173,11 @@ public class Tendril {
     }
   }
   
+  /**
+   * Configure.
+   *
+   * @param kryo the kryo
+   */
   public static void configure(final Kryo kryo) {
     kryo.setRegistrationRequired(false);
     kryo.setInstantiatorStrategy(new Kryo.DefaultInstantiatorStrategy(new StdInstantiatorStrategy()));
@@ -150,6 +190,19 @@ public class Tendril {
     kryo.register(TendrilLink.class);
   }
   
+  /**
+   * Stage remote classpath string.
+   *
+   * @param node            the node
+   * @param localClasspath  the local classpath
+   * @param classpathFilter the classpath filter
+   * @param libPrefix       the lib prefix
+   * @param parallel        the parallel
+   * @param s3              the s 3
+   * @param bucket          the bucket
+   * @param keyspace        the keyspace
+   * @return the string
+   */
   @Nonnull
   public static String stageRemoteClasspath(final EC2Node node, final String localClasspath, final Predicate<String> classpathFilter, final String libPrefix, final boolean parallel, final AmazonS3 s3, final String bucket, final String keyspace) {
     logger.info(String.format("Mkdir %s: %s", libPrefix, node.exec("mkdir -p " + libPrefix)));
@@ -164,6 +217,17 @@ public class Tendril {
     }).reduce((a, b) -> a + ":" + b).get();
   }
   
+  /**
+   * Stage classpath entry string.
+   *
+   * @param node      the node
+   * @param libPrefix the lib prefix
+   * @param entryPath the entry path
+   * @param s3        the s 3
+   * @param bucket    the bucket
+   * @param keyspace  the keyspace
+   * @return the string
+   */
   @Nonnull
   public static String stageClasspathEntry(final EC2Node node, final String libPrefix, final String entryPath, final AmazonS3 s3, final String bucket, final String keyspace) {
     logger.info(String.format("Processing %s", entryPath));
@@ -199,13 +263,40 @@ public class Tendril {
     }
   }
   
+  /**
+   * Default classpath filter boolean.
+   *
+   * @param file the file
+   * @return the boolean
+   */
   public static boolean defaultClasspathFilter(final String file) {
     if (file.replace('\\', '/').contains("/jre/")) return false;
     return !file.replace('\\', '/').contains("/jdk/");
   }
   
+  /**
+   * Stage.
+   *
+   * @param node      the node
+   * @param entryFile the entry file
+   * @param remote    the remote
+   * @param s3        the s 3
+   * @param bucket    the bucket
+   * @param keyspace  the keyspace
+   */
   public static void stage(final EC2Node node, final File entryFile, final String remote, final AmazonS3 s3, final String bucket, final String keyspace) {stage(node, entryFile, remote, 10, s3, bucket, keyspace);}
   
+  /**
+   * Stage.
+   *
+   * @param node      the node
+   * @param entryFile the entry file
+   * @param remote    the remote
+   * @param retries   the retries
+   * @param s3        the s 3
+   * @param bucket    the bucket
+   * @param keyspace  the keyspace
+   */
   public static void stage(final EC2Node node, final File entryFile, final String remote, final int retries, final AmazonS3 s3, final String bucket, final String keyspace) {
     try {
       if (null == bucket || bucket.isEmpty()) {
@@ -226,6 +317,13 @@ public class Tendril {
     }
   }
   
+  /**
+   * To jar file.
+   *
+   * @param entry the entry
+   * @return the file
+   * @throws IOException the io exception
+   */
   @Nonnull
   public static File toJar(final File entry) throws IOException {
     File tempJar = File.createTempFile(UUID.randomUUID().toString(), ".jar").getAbsoluteFile();
@@ -256,6 +354,14 @@ public class Tendril {
     
   }
   
+  /**
+   * Hash string.
+   *
+   * @param classpath the classpath
+   * @return the string
+   * @throws NoSuchAlgorithmException the no such algorithm exception
+   * @throws IOException              the io exception
+   */
   public static String hash(final File classpath) throws NoSuchAlgorithmException, IOException {
     MessageDigest digest = MessageDigest.getInstance("MD5");
     InputStream fis = new FileInputStream(classpath);
@@ -270,41 +376,110 @@ public class Tendril {
     return new String(Hex.encodeHex(digest.digest()));
   }
   
+  /**
+   * Start remote jvm tendril control.
+   *
+   * @param node             the node
+   * @param jvmConfig        the jvm config
+   * @param localControlPort the local control port
+   * @param shouldTransfer   the should transfer
+   * @param s3               the s 3
+   * @param bucket           the bucket
+   * @return the tendril control
+   */
   public static TendrilControl startRemoteJvm(final EC2Node node, final JvmConfig jvmConfig, final int localControlPort, final Predicate<String> shouldTransfer, final AmazonS3 s3, final String bucket) {
     return startRemoteJvm(node, localControlPort, jvmConfig.javaOpts, jvmConfig.programArguments, jvmConfig.libPrefix, jvmConfig.keyspace, shouldTransfer, s3, bucket);
   }
   
+  /**
+   * The interface Serializable runnable.
+   */
   public interface SerializableRunnable extends Runnable, Serializable {
   }
   
+  /**
+   * The interface Serializable callable.
+   *
+   * @param <T> the type parameter
+   */
   public interface SerializableCallable<T> extends Callable<T>, Serializable {
   }
   
+  /**
+   * The interface Tendril link.
+   */
   public interface TendrilLink {
+    /**
+     * Is alive boolean.
+     *
+     * @return the boolean
+     */
     boolean isAlive();
-  
+    
+    /**
+     * Exit.
+     */
     void exit();
     
+    /**
+     * Time long.
+     *
+     * @return the long
+     */
     long time();
-  
+    
+    /**
+     * Run t.
+     *
+     * @param <T>  the type parameter
+     * @param task the task
+     * @return the t
+     * @throws Exception the exception
+     */
     <T> T run(SerializableCallable<T> task) throws Exception;
   }
   
+  /**
+   * The type Tendril control.
+   */
   public static class TendrilControl implements Executor, AutoCloseable {
     
     private final TendrilLink inner;
     
+    /**
+     * Instantiates a new Tendril control.
+     *
+     * @param inner the inner
+     */
     public TendrilControl(final TendrilLink inner) {this.inner = inner;}
     
+    /**
+     * Time long.
+     *
+     * @return the long
+     */
     public long time() {
       return inner.time();
     }
     
+    /**
+     * Run t.
+     *
+     * @param <T>  the type parameter
+     * @param task the task
+     * @return the t
+     * @throws Exception the exception
+     */
     public <T> T run(final SerializableCallable<T> task) throws Exception {
       assert inner.isAlive();
       return inner.run(task);
     }
     
+    /**
+     * Start.
+     *
+     * @param task the task
+     */
     public void start(SerializableRunnable task) {
       assert inner.isAlive();
       try {
@@ -335,17 +510,26 @@ public class Tendril {
     }
   }
   
+  /**
+   * The type Tendril link.
+   */
   protected static class TendrilLinkImpl implements TendrilLink {
     @Override
     public boolean isAlive() {
       return true;
     }
-  
+    
     @Override
     public void exit() {
       exit(0, 1000);
     }
-  
+    
+    /**
+     * Exit.
+     *
+     * @param status the status
+     * @param wait   the wait
+     */
     public void exit(final int status, final int wait) {
       logger.warn(String.format("Exiting with code %d in %d", status, wait));
       new Thread(() -> {
@@ -369,12 +553,34 @@ public class Tendril {
     }
   }
   
+  /**
+   * The type Jvm config.
+   */
   public static class JvmConfig extends NodeConfig {
+    /**
+     * The Java opts.
+     */
     public String javaOpts;
+    /**
+     * The Program arguments.
+     */
     public String programArguments;
+    /**
+     * The Lib prefix.
+     */
     public String libPrefix;
+    /**
+     * The Keyspace.
+     */
     public String keyspace;
     
+    /**
+     * Instantiates a new Jvm config.
+     *
+     * @param imageId      the image id
+     * @param instanceType the instance type
+     * @param username     the username
+     */
     public JvmConfig(final String imageId, final String instanceType, final String username) {
       super(imageId, instanceType, username);
       javaOpts = "";
