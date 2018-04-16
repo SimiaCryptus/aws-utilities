@@ -22,6 +22,7 @@ package com.simiacryptus.aws;
 import com.amazonaws.services.ec2.AmazonEC2;
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagement;
 import com.amazonaws.services.identitymanagement.model.InstanceProfile;
+import com.simiacryptus.util.io.JsonUtil;
 
 import javax.annotation.Nonnull;
 
@@ -40,7 +41,7 @@ public final class AwsTendrilSettings {
   
   public static AwsTendrilSettings setup(AmazonEC2 ec2, final AmazonIdentityManagement iam, final String bucket, final String instanceType, final String imageId, final String username) {
     AwsTendrilSettings self = new AwsTendrilSettings();
-    self.securityGroup = EC2Util.newSecurityGroup(ec2, 22, 80);
+    self.securityGroup = EC2Util.newSecurityGroup(ec2, 22, 1080);
     self.bucket = bucket;
     self.instanceProfileArn = EC2Util.newIamRole(iam, ("{\n" +
       "  \"Version\": \"2012-10-17\",\n" +
@@ -64,8 +65,13 @@ public final class AwsTendrilSettings {
     return self;
   }
   
+  @Override
+  public String toString() {
+    return JsonUtil.toJson(this).toString();
+  }
+  
   public EC2Util.EC2Node startNode(final AmazonEC2 ec2, final int localControlPort) {
-    return EC2Util.start(ec2, getJvmConfig(), getServiceConfig(ec2), localControlPort);
+    return EC2Util.start(ec2, jvmConfig(), getServiceConfig(ec2), localControlPort);
   }
   
   @Nonnull
@@ -74,7 +80,7 @@ public final class AwsTendrilSettings {
   }
   
   @Nonnull
-  public Tendril.JvmConfig getJvmConfig() {
+  public Tendril.JvmConfig jvmConfig() {
     return new Tendril.JvmConfig(this.imageId, this.instanceType, this.username);
   }
 }

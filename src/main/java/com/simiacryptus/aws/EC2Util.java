@@ -19,9 +19,7 @@
 
 package com.simiacryptus.aws;
 
-import com.amazonaws.regions.Regions;
 import com.amazonaws.services.ec2.AmazonEC2;
-import com.amazonaws.services.ec2.AmazonEC2ClientBuilder;
 import com.amazonaws.services.ec2.model.AuthorizeSecurityGroupIngressRequest;
 import com.amazonaws.services.ec2.model.CreateKeyPairRequest;
 import com.amazonaws.services.ec2.model.CreateSecurityGroupRequest;
@@ -35,6 +33,7 @@ import com.amazonaws.services.ec2.model.IpRange;
 import com.amazonaws.services.ec2.model.KeyPair;
 import com.amazonaws.services.ec2.model.KeyPairInfo;
 import com.amazonaws.services.ec2.model.RunInstancesRequest;
+import com.amazonaws.services.ec2.model.ShutdownBehavior;
 import com.amazonaws.services.ec2.model.TerminateInstancesRequest;
 import com.amazonaws.services.ec2.model.TerminateInstancesResult;
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagement;
@@ -57,7 +56,6 @@ import com.jcraft.jsch.ChannelExec;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.JSchException;
 import com.jcraft.jsch.Session;
-import com.simiacryptus.util.FastRandom;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.output.CloseShieldOutputStream;
 import org.slf4j.Logger;
@@ -75,6 +73,7 @@ import java.io.SequenceInputStream;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.Optional;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
@@ -84,37 +83,6 @@ public class EC2Util {
   private static final Logger logger = LoggerFactory.getLogger(EC2Util.class);
   private static final Charset charset = Charset.forName("UTF-8");
   private static volatile KeyPair keyPair = null;
-  
-  public static void main(String[] a) {
-    AmazonEC2 ec2 = AmazonEC2ClientBuilder.standard().withRegion(Regions.US_EAST_1).build();
-    String imageId = "ami-346b9c49";
-    String instanceType = "t1.micro";
-    String username = "ubuntu";
-    String bucket = "simiacryptus";
-    try {
-      String consoleLog = run(ec2, imageId, instanceType, username, session -> {
-        try {
-          File file = new File("test.txt");
-          FileUtils.write(file, "Hello World", charset);
-          scp(session, file, file.getName());
-          String exec = EC2Util.exec(session, "cat test.txt");
-          shell(session);
-          return exec;
-        } catch (IOException e) {
-          throw new RuntimeException(e);
-        }
-      }, bucket, 1319, 22, 80);
-      logger.info(String.format("Result: %s", consoleLog));
-    } finally {
-      if (Thread.interrupted()) logger.info("Interupted");
-      try {
-        Thread.sleep(15000);
-      } catch (InterruptedException e) {
-      } finally {
-        System.exit(0);
-      }
-    }
-  }
   
   public static void stage(final Session session, final File file, final String remote, final String bucket, final String cacheNamespace, final AmazonS3 s3) {
     String key = cacheNamespace + remote;
@@ -326,13 +294,7 @@ public class EC2Util {
     return groupId;
   }
   
-  public static void sleep(final int millis) {
-    try {
-      Thread.sleep(millis);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
-  }
+  private static final Random random = new Random();
   
   @Nonnull
   public static Session connect(final KeyPair keyPair, final String username, final Instance ec2instance, final int localControlPort) throws InterruptedException {
@@ -379,27 +341,13 @@ public class EC2Util {
       "}").replaceAll("BUCKET", bucket)));
   }
   
-  public static Instance start(final AmazonEC2 ec2, final String ami, final String instanceType, final String groupId, final KeyPair keyPair, final InstanceProfile instanceProfile) {
-    final AtomicReference<Instance> instance = new AtomicReference<>();
-    
-    instance.set(ec2.runInstances(new RunInstancesRequest()
-      .withImageId(ami)
-      .withInstanceType(instanceType)
-        .withIamInstanceProfile(new IamInstanceProfileSpecification()
-            .withArn(instanceProfile.getArn())
-//        .withName(role.getInstanceProfileName())
-        )
-      .withMinCount(1)
-      .withMaxCount(1)
-      .withKeyName(keyPair.getKeyName())
-      .withSecurityGroupIds(groupId)
-    ).getReservation().getInstances().get(0));
-    while (instance.get().getState().getName().equals("pending")) {
-      logger.info("Awaiting instance startup...");
-      sleep(10000);
-      instance.set(getInstance(ec2, instance.get()));
+  public static void sleep(final int millis) {
+    try {
+      Thread.sleep(millis);
+    } catch (InterruptedException e) {
+      logger.info("Interuptted");
+      Thread.currentThread().interrupt();
     }
-    return instance.get();
   }
   
   public static boolean exists(final AmazonEC2 ec2, final String groupId) {
@@ -414,9 +362,33 @@ public class EC2Util {
     return ec2.describeInstances(new DescribeInstancesRequest().withInstanceIds(instance.getInstanceId())).getReservations().get(0).getInstances().get(0);
   }
   
+  public static Instance start(final AmazonEC2 ec2, final String ami, final String instanceType, final String groupId, final KeyPair keyPair, final InstanceProfile instanceProfile) {
+    final AtomicReference<Instance> instance = new AtomicReference<>();
+    
+    instance.set(ec2.runInstances(new RunInstancesRequest()
+      .withImageId(ami)
+      .withInstanceType(instanceType)
+        .withIamInstanceProfile(new IamInstanceProfileSpecification()
+            .withArn(instanceProfile.getArn())
+//        .withName(role.getInstanceProfileName())
+        )
+        .withInstanceInitiatedShutdownBehavior(ShutdownBehavior.Terminate)
+      .withMinCount(1)
+      .withMaxCount(1)
+      .withKeyName(keyPair.getKeyName())
+      .withSecurityGroupIds(groupId)
+    ).getReservation().getInstances().get(0));
+    while (instance.get().getState().getName().equals("pending")) {
+      logger.info("Awaiting instance startup...");
+      sleep(10000);
+      instance.set(getInstance(ec2, instance.get()));
+    }
+    return instance.get();
+  }
+
   @Nonnull
   public static String randomHex() {
-    return Long.toHexString(FastRandom.INSTANCE.next()).substring(0, 5);
+    return Long.toHexString(random.nextLong()).substring(0, 5);
   }
   
   public static IpPermission getTcpPermission(final int port) {
@@ -479,7 +451,7 @@ public class EC2Util {
     }
   
     public Tendril.TendrilControl startJvm(final AmazonEC2 ec2, final AmazonS3 s3, final AwsTendrilSettings settings, final int localControlPort) {
-      return Tendril.startRemoteJvm(this, settings.getJvmConfig(), localControlPort, Tendril::defaultClasspathFilter, s3, settings.getServiceConfig(ec2).bucket);
+      return Tendril.startRemoteJvm(this, settings.jvmConfig(), localControlPort, Tendril::defaultClasspathFilter, s3, settings.getServiceConfig(ec2).bucket);
     }
   
     public <T> T runAndTerminate(final Function<Session, T> task) {
@@ -491,6 +463,7 @@ public class EC2Util {
     }
     
     public TerminateInstancesResult terminate() {
+      logger.info("Terminating " + getInstanceId());
       return ec2.terminateInstances(new TerminateInstancesRequest().withInstanceIds(getInstanceId()));
     }
     
@@ -525,6 +498,10 @@ public class EC2Util {
   
     public void stage(final File entryFile, final String remote, final String bucket, final String keyspace, final AmazonS3 s3) {
       EC2Util.stage(getConnection(), entryFile, remote, bucket, keyspace, s3);
+    }
+  
+    public Instance getStatus() {
+      return ec2.describeInstances(new DescribeInstancesRequest().withInstanceIds(getInstanceId())).getReservations().get(0).getInstances().get(0);
     }
   }
   
@@ -569,8 +546,8 @@ public class EC2Util {
     public InstanceProfile instanceProfile;
     public String groupId;
     public KeyPair keyPair;
-    
-    public ServiceConfig(final AmazonEC2 ec2, final String bucket, final String roleArn) {this(ec2, bucket, roleArn, EC2Util.newSecurityGroup(ec2, 22, 80));}
+  
+    public ServiceConfig(final AmazonEC2 ec2, final String bucket, final String roleArn) {this(ec2, bucket, roleArn, EC2Util.newSecurityGroup(ec2, 22, 1080));}
     
     public ServiceConfig(final AmazonEC2 ec2, final String bucket, final String roleArn, final String groupId) {this(ec2, bucket, groupId, new InstanceProfile().withArn(roleArn));}
     
