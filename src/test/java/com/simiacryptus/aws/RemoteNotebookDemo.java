@@ -123,7 +123,7 @@ public class RemoteNotebookDemo {
     try {
       Desktop.getDesktop().browse(new URI(String.format("http://%s:1080/", node.getStatus().getPublicIpAddress())));
     } catch (IOException | URISyntaxException e) {
-      throw new RuntimeException(e);
+      logger.info("Error opening browser", e);
     }
     for (int i = 0; i < 100; i++) {
       String state = log.code(() -> {
