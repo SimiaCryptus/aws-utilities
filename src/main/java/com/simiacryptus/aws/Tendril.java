@@ -28,6 +28,7 @@ import com.esotericsoftware.kryonet.Connection;
 import com.esotericsoftware.kryonet.Listener;
 import com.esotericsoftware.kryonet.Server;
 import com.esotericsoftware.kryonet.rmi.ObjectSpace;
+import com.simiacryptus.util.test.SysOutInterceptor;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.CloseShieldOutputStream;
@@ -43,6 +44,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintStream;
 import java.io.Serializable;
 import java.lang.invoke.SerializedLambda;
 import java.net.InetSocketAddress;
@@ -66,6 +68,19 @@ public class Tendril {
   
   public static void main(String... args) {
     try {
+      if (Boolean.parseBoolean(System.getProperty("SHUTDOWN_ON_EXIT", "true")))
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+          String command = "sudo shutdown -h 0";
+          System.err.println("Terminating system via command: " + command);
+          try {
+            int i = Runtime.getRuntime().exec(command).waitFor();
+            System.err.printf("Result %s for %s%n", i, command);
+          } catch (IOException e) {
+            e.printStackTrace();
+          } catch (InterruptedException e) {
+            e.printStackTrace();
+          }
+        }));
       Server server = new Server();
       configure(server.getKryo());
       ObjectSpace.registerClasses(server.getKryo());
@@ -91,6 +106,7 @@ public class Tendril {
     }
   }
   
+  
   @Nullable
   public static TendrilControl startRemoteJvm(final EC2Node node, final int localControlPort, final String javaOpts, final String programArguments, final String libPrefix, final String keyspace, final Predicate<String> classpathFilter, final AmazonS3 s3, final String bucket) {
     String localClasspath = System.getProperty("java.class.path");
@@ -111,7 +127,7 @@ public class Tendril {
       Client client = new Client();
       configure(client.getKryo());
       client.start();
-      client.connect(30000, "127.0.0.1", localControlPort, -1);
+      client.connect(5000, "127.0.0.1", localControlPort, -1);
       return ObjectSpace.getRemoteObject(client, 1318, TendrilLink.class);
     } catch (Throwable e) {
       if (retries > 0) {
@@ -138,9 +154,13 @@ public class Tendril {
   public static String stageRemoteClasspath(final EC2Node node, final String localClasspath, final Predicate<String> classpathFilter, final String libPrefix, final boolean parallel, final AmazonS3 s3, final String bucket, final String keyspace) {
     logger.info(String.format("Mkdir %s: %s", libPrefix, node.exec("mkdir -p " + libPrefix)));
     Stream<String> stream = Arrays.stream(localClasspath.split(File.pathSeparator)).filter(classpathFilter);
+    PrintStream out = SysOutInterceptor.INSTANCE.currentHandler();
     if (parallel) stream = stream.parallel();
     return stream.map(entryPath -> {
-      return stageClasspathEntry(node, libPrefix, entryPath, s3, bucket, keyspace);
+      PrintStream prev = SysOutInterceptor.INSTANCE.setCurrentHandler(out);
+      String classpathEntry = stageClasspathEntry(node, libPrefix, entryPath, s3, bucket, keyspace);
+      SysOutInterceptor.INSTANCE.setCurrentHandler(prev);
+      return classpathEntry;
     }).reduce((a, b) -> a + ":" + b).get();
   }
   
@@ -161,14 +181,18 @@ public class Tendril {
       }
       else {
         File tempJar = toJar(entryFile);
-        String remote = libPrefix + hash(tempJar) + ".jar";
-        logger.info(String.format("Uploading %s to %s", tempJar, remote));
         try {
-          stage(node, tempJar, remote, s3, bucket, keyspace);
-        } catch (Throwable e) {
-          logger.warn(String.format("Error staging %s to %s", entryFile, remote), e);
+          String remote = libPrefix + hash(tempJar) + ".jar";
+          logger.info(String.format("Uploading %s to %s", tempJar, remote));
+          try {
+            stage(node, tempJar, remote, s3, bucket, keyspace);
+          } catch (Throwable e) {
+            throw new RuntimeException(String.format("Error staging %s to %s", entryFile, remote), e);
+          }
+          return remote;
+        } finally {
+          tempJar.delete();
         }
-        return remote;
       }
     } catch (Throwable e) {
       throw new RuntimeException(e);
@@ -176,8 +200,8 @@ public class Tendril {
   }
   
   public static boolean defaultClasspathFilter(final String file) {
-    if (file.contains("jre")) return false;
-    return !file.contains("jdk");
+    if (file.replace('\\', '/').contains("/jre/")) return false;
+    return !file.replace('\\', '/').contains("/jdk/");
   }
   
   public static void stage(final EC2Node node, final File entryFile, final String remote, final AmazonS3 s3, final String bucket, final String keyspace) {stage(node, entryFile, remote, 10, s3, bucket, keyspace);}
@@ -192,7 +216,7 @@ public class Tendril {
       }
     } catch (Throwable e) {
       if (retries > 0) {
-        logger.debug("Retrying " + remote, e);
+        logger.info("Retrying " + remote, e);
         sleep(5000);
         stage(node, entryFile, remote, retries - 1, s3, bucket, keyspace);
       }
@@ -204,24 +228,25 @@ public class Tendril {
   
   @Nonnull
   public static File toJar(final File entry) throws IOException {
-    File tempJar = new File(UUID.randomUUID() + ".jar");
-    try {
-      logger.info(String.format("Archiving %s to %s", entry, tempJar));
-      try (ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(tempJar))) {
-        for (final File file : Arrays.stream(entry.listFiles()).sorted().collect(Collectors.toList())) {
-          write(zip, "", file);
-        }
+    File tempJar = File.createTempFile(UUID.randomUUID().toString(), ".jar").getAbsoluteFile();
+    logger.info(String.format("Archiving %s to %s", entry, tempJar));
+    try (ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(tempJar))) {
+      for (final File file : Arrays.stream(entry.listFiles()).sorted().collect(Collectors.toList())) {
+        write(zip, "", file);
       }
-      return tempJar;
-    } finally {
-      tempJar.deleteOnExit();
+    } catch (Throwable e) {
+      if (tempJar.exists()) tempJar.delete();
+      throw new RuntimeException(e);
     }
+    return tempJar;
   }
   
   private static void write(final ZipOutputStream zip, final String base, final File entry) throws IOException {
     if (entry.isFile()) {
       zip.putNextEntry(new ZipEntry(base + entry.getName()));
-      IOUtils.copy(new FileInputStream(entry), zip);
+      try (FileInputStream input = new FileInputStream(entry)) {
+        IOUtils.copy(input, zip);
+      }
     }
     else {
       for (final File file : Arrays.stream(entry.listFiles()).sorted().collect(Collectors.toList())) {
@@ -257,13 +282,15 @@ public class Tendril {
   
   public interface TendrilLink {
     boolean isAlive();
+  
+    void exit();
     
     long time();
   
     <T> T run(SerializableCallable<T> task) throws Exception;
   }
   
-  public static class TendrilControl implements Executor {
+  public static class TendrilControl implements Executor, AutoCloseable {
     
     private final TendrilLink inner;
     
@@ -300,12 +327,35 @@ public class Tendril {
     public void execute(final @NotNull Runnable command) {
       start(() -> command.run());
     }
+    
+    @Override
+    public void close() {
+      logger.info("Closing " + this);
+      inner.exit();
+    }
   }
   
   protected static class TendrilLinkImpl implements TendrilLink {
     @Override
     public boolean isAlive() {
       return true;
+    }
+  
+    @Override
+    public void exit() {
+      exit(0, 1000);
+    }
+  
+    public void exit(final int status, final int wait) {
+      logger.warn(String.format("Exiting with code %d in %d", status, wait));
+      new Thread(() -> {
+        try {
+          Thread.sleep(wait);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+        System.exit(status);
+      }).start();
     }
     
     @Override

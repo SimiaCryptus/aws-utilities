@@ -26,7 +26,10 @@ import com.amazonaws.services.identitymanagement.AmazonIdentityManagement;
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagementClientBuilder;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import com.simiacryptus.util.Util;
 import com.simiacryptus.util.io.JsonUtil;
+import com.simiacryptus.util.io.MarkdownNotebookOutput;
+import com.simiacryptus.util.test.SysOutInterceptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,30 +39,64 @@ import java.util.Random;
 
 public class RemoteExecutionDemo {
   
-  private static final Logger logger = LoggerFactory.getLogger(RemoteExecutionDemo.class);
+  static final Logger logger = LoggerFactory.getLogger(RemoteExecutionDemo.class);
+  private static final String default_bucket = "simiacryptus";
+  private static final String default_instanceType = "t2.micro";
+  private static final String default_imageId = "ami-330eab4c";
+  private static final String default_username = "ec2-user";
+  private static final String gitBase = "https://github.com/SimiaCryptus/aws-utilities";
+  
+  static {
+    SysOutInterceptor.INSTANCE.init();
+  }
   
   public static void main(String... args) throws Exception {
+    try (MarkdownNotebookOutput log = new MarkdownNotebookOutput(
+      new File("target/report/" + Util.dateStr("yyyyMMddHHmmss") + "/index"),
+      gitBase + "/tree/master/src/")) {
+      new RemoteExecutionDemo().demo(log);
+    }
+  }
+  
+  public void demo(final MarkdownNotebookOutput log) {
     AmazonEC2 ec2 = AmazonEC2ClientBuilder.standard().withRegion(Regions.US_EAST_1).build();
     AmazonIdentityManagement iam = AmazonIdentityManagementClientBuilder.standard().withRegion(Regions.US_EAST_1).build();
     AmazonS3 s3 = AmazonS3ClientBuilder.standard().build();
     
-    String bucket = "simiacryptus";
-    String instanceType = "t2.micro";
-    String imageId = "ami-330eab4c";
-    String username = "ec2-user";
-    int localControlPort = new Random().nextInt(1024) + 1024;
+    AwsTendrilSettings settings = log.code(() -> {
+      return JsonUtil.cache(new File("settings.json"), AwsTendrilSettings.class,
+        () -> {
+          return AwsTendrilSettings.setup(ec2, iam, default_bucket, default_instanceType, default_imageId, default_username);
+        });
+    });
     
-    AwsTendrilSettings settings = JsonUtil.cache(new File("settings.json"), AwsTendrilSettings.class,
-      () -> AwsTendrilSettings.setup(ec2, iam, bucket, instanceType, imageId, username));
-    
-    try (EC2Util.EC2Node node = settings.startNode(ec2, localControlPort)) {
-      Tendril.TendrilControl remoteJvm = node.startJvm(ec2, s3, settings, localControlPort);
-      logger.info("Remote Test: " + remoteJvm.run(() -> {
-        String msg = String.format("Hello World! The time is %s", new Date());
-        System.out.println("Returning Value: " + msg);
-        return msg;
-      }));
-    }
+    log.code(() -> {
+      int localControlPort = new Random().nextInt(1024) + 1024;
+      try (EC2Util.EC2Node node = settings.startNode(ec2, localControlPort)) {
+        //node.shell();
+        try (Tendril.TendrilControl remoteJvm = node.startJvm(ec2, s3, settings, localControlPort)) {
+          return remoteJvm.run(() -> {
+            String msg = String.format("Hello World! The time is %s", new Date());
+            System.out.println("Returning Value: " + msg);
+            return msg;
+          });
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        } finally {
+          logger.info("Pausing to demonstrate automatic shutdown...");
+          for (int i = 0; i < 10; i++) {
+            String state = node.getStatus().getState().getName();
+            logger.info("Current Machine State: " + state);
+            if (!"running".equals(state)) break;
+            try {
+              Thread.sleep(15 * 1000);
+            } catch (InterruptedException e) {
+              e.printStackTrace();
+            }
+          }
+        }
+      }
+    });
     
   }
   
