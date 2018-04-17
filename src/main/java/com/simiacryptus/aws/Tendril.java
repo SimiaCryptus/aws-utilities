@@ -180,7 +180,7 @@ public class Tendril {
    */
   public static void configure(final Kryo kryo) {
     kryo.setRegistrationRequired(false);
-    kryo.setInstantiatorStrategy(new Kryo.DefaultInstantiatorStrategy(new StdInstantiatorStrategy()));
+    kryo.setInstantiatorStrategy(new StdInstantiatorStrategy());
     kryo.register(Object[].class);
     kryo.register(java.lang.Class.class);
     kryo.register(SerializedLambda.class);
