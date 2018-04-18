@@ -457,6 +457,7 @@ public class EC2Util {
       Session session = null;
       try {
         JSch jSch = new JSch();
+        logger.info(String.format("Connecting to %s with key %s", ec2instance.getPublicIpAddress(), keyPair.getKeyFingerprint()));
         jSch.addIdentity(username, keyPair.getKeyMaterial().getBytes(charset), keyPair.getKeyFingerprint().getBytes(charset), null);
         session = jSch.getSession(username, ec2instance.getPublicIpAddress());
         session.setConfig("StrictHostKeyChecking", "no");

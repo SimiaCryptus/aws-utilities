@@ -54,6 +54,7 @@ import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -135,7 +136,7 @@ public class Tendril {
     logger.info("Java Local Classpath: " + localClasspath);
     String remoteClasspath = stageRemoteClasspath(node, localClasspath, classpathFilter, libPrefix, true, s3, bucket, keyspace);
     logger.info("Java Remote Classpath: " + remoteClasspath);
-    String commandLine = String.format("java %s -cp %s %s %s", javaOpts, remoteClasspath, Tendril.class.getCanonicalName(), programArguments);
+    String commandLine = String.format("nohup java %s -cp %s %s %s", javaOpts, remoteClasspath, Tendril.class.getCanonicalName(), programArguments);
     logger.info("Java Command Line: " + commandLine);
     execAsync(node.getConnection(), commandLine, new CloseShieldOutputStream(System.out));
     return new TendrilControl(getControl(localControlPort));
@@ -403,6 +404,9 @@ public class Tendril {
    * @param <T> the type parameter
    */
   public interface SerializableCallable<T> extends Callable<T>, Serializable {
+  }
+  
+  public interface SerializableConsumer<T> extends Consumer<T>, Serializable {
   }
   
   /**
