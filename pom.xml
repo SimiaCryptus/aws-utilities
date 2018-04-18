@@ -29,7 +29,7 @@
     </parent>
 
     <artifactId>aws-utilities</artifactId>
-    <version>1.4.7</version>
+    <version>1.4.17</version>
     <description>Neural Networks with Java 8 and CuDNN</description>
     <scm>
         <url>https://github.com/SimiaCryptus/MindsEye/</url>
@@ -141,7 +141,7 @@
         <dependency>
             <groupId>com.simiacryptus</groupId>
             <artifactId>java-util</artifactId>
-            <version>1.4.7</version>
+            <version>1.4.17</version>
         </dependency>
         <dependency>
             <groupId>com.github.jnr</groupId>
