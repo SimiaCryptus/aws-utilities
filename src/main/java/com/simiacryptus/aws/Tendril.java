@@ -22,7 +22,6 @@ package com.simiacryptus.aws;
 import com.amazonaws.services.s3.AmazonS3;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.serializers.ClosureSerializer;
-import com.esotericsoftware.kryo.serializers.JavaSerializer;
 import com.esotericsoftware.kryonet.Client;
 import com.esotericsoftware.kryonet.Connection;
 import com.esotericsoftware.kryonet.Listener;
@@ -185,9 +184,11 @@ public class Tendril {
     kryo.register(Object[].class);
     kryo.register(java.lang.Class.class);
     kryo.register(SerializedLambda.class);
-    com.esotericsoftware.kryonet.rmi.ObjectSpace.registerClasses(kryo);
     kryo.register(ClosureSerializer.Closure.class, new ClosureSerializer());
-    kryo.register(SerializableCallable.class, new JavaSerializer());
+    com.esotericsoftware.kryonet.rmi.ObjectSpace.registerClasses(kryo);
+//    kryo.register(SerializableCallable.class, new JavaSerializer());
+//    kryo.register(SerializableConsumer.class, new JavaSerializer());
+//    kryo.register(Serializable.class, new JavaSerializer());
     kryo.register(TendrilLink.class);
   }
   
