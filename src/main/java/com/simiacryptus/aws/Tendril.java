@@ -162,7 +162,7 @@ public class Tendril {
    * @param localControlPort the local control port
    * @return the control
    */
-  public static TendrilLink getControl(final int localControlPort) {return getControl(localControlPort, 3);}
+  public static TendrilLink getControl(final int localControlPort) {return getControl(localControlPort, 10);}
   
   /**
    * Gets control.
