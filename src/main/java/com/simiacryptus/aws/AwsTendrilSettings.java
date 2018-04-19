@@ -22,11 +22,12 @@ package com.simiacryptus.aws;
 import com.amazonaws.services.ec2.AmazonEC2;
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagement;
 import com.amazonaws.services.identitymanagement.model.InstanceProfile;
+import com.amazonaws.services.s3.AmazonS3;
 import com.simiacryptus.util.io.JsonUtil;
 
 import javax.annotation.Nonnull;
 
-import static com.simiacryptus.aws.EC2Util.sleep;
+import static com.simiacryptus.aws.EC2Util.*;
 
 /**
  * The type Aws tendril settings.
@@ -68,6 +69,21 @@ public final class AwsTendrilSettings {
    *
    * @param ec2          the ec 2
    * @param iam          the iam
+   * @param s3           the s3
+   * @param instanceType the instance type
+   * @param imageId      the image id
+   * @param username     the username
+   * @return the
+   */
+  public static AwsTendrilSettings setup(AmazonEC2 ec2, final AmazonIdentityManagement iam, final AmazonS3 s3, final String instanceType, final String imageId, final String username) {
+    return setup(ec2, iam, s3.createBucket("mindseye-art-" + randomHex()).getName(), instanceType, imageId, username);
+  }
+  
+  /**
+   * Sets .
+   *
+   * @param ec2          the ec 2
+   * @param iam          the iam
    * @param bucket       the bucket
    * @param instanceType the instance type
    * @param imageId      the image id
@@ -75,24 +91,55 @@ public final class AwsTendrilSettings {
    * @return the
    */
   public static AwsTendrilSettings setup(AmazonEC2 ec2, final AmazonIdentityManagement iam, final String bucket, final String instanceType, final String imageId, final String username) {
-    AwsTendrilSettings self = new AwsTendrilSettings();
-    self.securityGroup = EC2Util.newSecurityGroup(ec2, 22, 1080);
-    self.bucket = bucket;
-    self.instanceProfileArn = EC2Util.newIamRole(iam, ("{\n" +
+    return setup(bucket, instanceType, imageId, username, EC2Util.newSecurityGroup(ec2, 22, 1080), EC2Util.newIamRole(iam, defaultPolicy(bucket)).getArn());
+  }
+  
+  /**
+   * Default policy string.
+   *
+   * @param bucket the bucket
+   * @return the string
+   */
+  @Nonnull
+  public static String defaultPolicy(final String bucket) {
+    return "{\n" +
       "  \"Version\": \"2012-10-17\",\n" +
       "  \"Statement\": [\n" +
       "    {\n" +
       "      \"Action\": \"s3:*\",\n" +
       "      \"Effect\": \"Allow\",\n" +
-      "      \"Resource\": \"arn:aws:s3:::" + self.bucket + "*\"\n" +
+      "      \"Resource\": \"arn:aws:s3:::" + bucket + "*\"\n" +
       "    },\n" +
       "    {\n" +
       "      \"Action\": \"s3:ListBucket*\",\n" +
       "      \"Effect\": \"Allow\",\n" +
       "      \"Resource\": \"arn:aws:s3:::*\"\n" +
+      "    },\n" +
+      "    {\n" +
+      "      \"Action\": [\"ses:SendEmail\",\"ses:SendRawEmail\"],\n" +
+      "      \"Effect\": \"Allow\",\n" +
+      "      \"Resource\": \"*\"\n" +
       "    }\n" +
       "  ]\n" +
-      "}")).getArn();
+      "}";
+  }
+  
+  /**
+   * Sets .
+   *
+   * @param bucket             the bucket
+   * @param instanceType       the instance type
+   * @param imageId            the image id
+   * @param username           the username
+   * @param securityGroup      the security group
+   * @param instanceProfileArn the instance profile arn
+   * @return the
+   */
+  public static AwsTendrilSettings setup(final String bucket, final String instanceType, final String imageId, final String username, final String securityGroup, final String instanceProfileArn) {
+    AwsTendrilSettings self = new AwsTendrilSettings();
+    self.securityGroup = securityGroup;
+    self.bucket = bucket;
+    self.instanceProfileArn = instanceProfileArn;
     self.imageId = imageId;
     self.instanceType = instanceType;
     self.username = username;

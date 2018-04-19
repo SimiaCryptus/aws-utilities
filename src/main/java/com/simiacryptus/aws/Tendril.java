@@ -22,12 +22,18 @@ package com.simiacryptus.aws;
 import com.amazonaws.services.s3.AmazonS3;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.serializers.ClosureSerializer;
+import com.esotericsoftware.kryo.serializers.JavaSerializer;
+import com.esotericsoftware.kryo.serializers.OptionalSerializers;
 import com.esotericsoftware.kryonet.Client;
 import com.esotericsoftware.kryonet.Connection;
+import com.esotericsoftware.kryonet.KryoSerialization;
 import com.esotericsoftware.kryonet.Listener;
 import com.esotericsoftware.kryonet.Server;
 import com.esotericsoftware.kryonet.rmi.ObjectSpace;
 import com.simiacryptus.util.test.SysOutInterceptor;
+import com.twitter.chill.KryoInstantiator;
+import com.twitter.chill.java.Java8ClosureRegistrar;
+import com.twitter.chill.java.UnmodifiableCollectionSerializer;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.CloseShieldOutputStream;
@@ -53,6 +59,8 @@ import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -89,11 +97,17 @@ public class Tendril {
             e.printStackTrace();
           }
         }));
-      Server server = new Server();
-      configure(server.getKryo());
+      Server server = new Server(16384, 2048, new KryoSerialization(getKryo()));
       ObjectSpace.registerClasses(server.getKryo());
       ObjectSpace objectSpace = new ObjectSpace();
-      objectSpace.register(1318, new TendrilLinkImpl());
+      TendrilLinkImpl tendrilLink = new TendrilLinkImpl();
+      Executors.newScheduledThreadPool(1).schedule(() -> {
+        if (!tendrilLink.contacted) {
+          logger.warn("Server has not been contacted yet. Exiting.");
+          System.exit(1);
+        }
+      }, 5, TimeUnit.MINUTES);
+      objectSpace.register(1318, tendrilLink);
       server.addListener(new Listener() {
         @Override
         public void connected(final Connection connection) {
@@ -159,8 +173,7 @@ public class Tendril {
    */
   public static TendrilLink getControl(final int localControlPort, final int retries) {
     try {
-      Client client = new Client();
-      configure(client.getKryo());
+      Client client = new Client(8192, 2048, new KryoSerialization(getKryo()));
       client.start();
       client.connect(5000, "127.0.0.1", localControlPort, -1);
       return ObjectSpace.getRemoteObject(client, 1318, TendrilLink.class);
@@ -174,22 +187,27 @@ public class Tendril {
   }
   
   /**
-   * Configure.
+   * Gets kryo.
    *
-   * @param kryo the kryo
+   * @return the kryo
    */
-  public static void configure(final Kryo kryo) {
+  public static Kryo getKryo() {
+    final Kryo kryo = new KryoInstantiator().setRegistrationRequired(false).setReferences(true).newKryo();
     kryo.setRegistrationRequired(false);
     kryo.setInstantiatorStrategy(new StdInstantiatorStrategy());
     kryo.register(Object[].class);
-    kryo.register(java.lang.Class.class);
+    kryo.register(Class.class);
     kryo.register(SerializedLambda.class);
     kryo.register(ClosureSerializer.Closure.class, new ClosureSerializer());
-    com.esotericsoftware.kryonet.rmi.ObjectSpace.registerClasses(kryo);
-//    kryo.register(SerializableCallable.class, new JavaSerializer());
-//    kryo.register(SerializableConsumer.class, new JavaSerializer());
-//    kryo.register(Serializable.class, new JavaSerializer());
+    ObjectSpace.registerClasses(kryo);
+    new Java8ClosureRegistrar().apply(kryo);
+    UnmodifiableCollectionSerializer.registrar().apply(kryo);
+    OptionalSerializers.addDefaultSerializers(kryo);
+    kryo.register(SerializableCallable.class, new JavaSerializer());
+    kryo.register(SerializableConsumer.class, new JavaSerializer());
+    kryo.register(Serializable.class, new JavaSerializer());
     kryo.register(TendrilLink.class);
+    return kryo;
   }
   
   /**
@@ -407,6 +425,11 @@ public class Tendril {
   public interface SerializableCallable<T> extends Callable<T>, Serializable {
   }
   
+  /**
+   * The interface Serializable consumer.
+   *
+   * @param <T> the type parameter
+   */
   public interface SerializableConsumer<T> extends Consumer<T>, Serializable {
   }
   
@@ -420,19 +443,19 @@ public class Tendril {
      * @return the boolean
      */
     boolean isAlive();
-    
+  
     /**
      * Exit.
      */
     void exit();
-    
+  
     /**
      * Time long.
      *
      * @return the long
      */
     long time();
-    
+  
     /**
      * Run t.
      *
@@ -450,14 +473,14 @@ public class Tendril {
   public static class TendrilControl implements Executor, AutoCloseable {
     
     private final TendrilLink inner;
-    
+  
     /**
      * Instantiates a new Tendril control.
      *
      * @param inner the inner
      */
     public TendrilControl(final TendrilLink inner) {this.inner = inner;}
-    
+  
     /**
      * Time long.
      *
@@ -466,7 +489,7 @@ public class Tendril {
     public long time() {
       return inner.time();
     }
-    
+  
     /**
      * Run t.
      *
@@ -479,7 +502,7 @@ public class Tendril {
       assert inner.isAlive();
       return inner.run(task);
     }
-    
+  
     /**
      * Start.
      *
@@ -519,16 +542,23 @@ public class Tendril {
    * The type Tendril link.
    */
   protected static class TendrilLinkImpl implements TendrilLink {
+    /**
+     * The Contacted.
+     */
+    public boolean contacted = false;
+  
     @Override
     public boolean isAlive() {
+      contacted = true;
       return true;
     }
     
     @Override
     public void exit() {
+      contacted = true;
       exit(0, 1000);
     }
-    
+  
     /**
      * Exit.
      *
@@ -536,6 +566,7 @@ public class Tendril {
      * @param wait   the wait
      */
     public void exit(final int status, final int wait) {
+      contacted = true;
       logger.warn(String.format("Exiting with code %d in %d", status, wait));
       new Thread(() -> {
         try {
@@ -549,11 +580,13 @@ public class Tendril {
     
     @Override
     public long time() {
+      contacted = true;
       return System.currentTimeMillis();
     }
     
     @Override
     public <T> T run(final SerializableCallable<T> task) throws Exception {
+      contacted = true;
       return task.call();
     }
   }
@@ -578,7 +611,7 @@ public class Tendril {
      * The Keyspace.
      */
     public String keyspace;
-    
+  
     /**
      * Instantiates a new Jvm config.
      *

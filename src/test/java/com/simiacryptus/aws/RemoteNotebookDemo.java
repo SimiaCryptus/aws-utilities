@@ -31,6 +31,7 @@ import com.simiacryptus.util.Util;
 import com.simiacryptus.util.io.JsonUtil;
 import com.simiacryptus.util.io.MarkdownNotebookOutput;
 import com.simiacryptus.util.test.SysOutInterceptor;
+import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,6 +40,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.Charset;
 import java.util.Date;
 import java.util.Random;
 
@@ -148,8 +150,14 @@ public class RemoteNotebookDemo {
           S3Util.upload(getS3(), default_bucket, "reports/", workingDir);
         });
         log.onComplete(workingDir -> {
+          String html = "";
+          try {
+            html = FileUtils.readFileToString(new File(workingDir, testName + ".html"), Charset.defaultCharset());
+          } catch (IOException e) {
+            logger.warn("Error reading html", e);
+          }
           SESUtil.send(AmazonSimpleEmailServiceClientBuilder.defaultClient(),
-            "Demo Report", to, "Test Report",
+            "Demo Report", to, "Test Report", html,
             new File(workingDir, testName + ".zip"),
             new File(workingDir, testName + ".pdf"));
         });

@@ -688,7 +688,7 @@ public class EC2Util {
     private final AmazonEC2 ec2;
     private final Session connection;
     private final String instanceId;
-    
+  
     /**
      * Instantiates a new Ec 2 node.
      *
@@ -701,7 +701,7 @@ public class EC2Util {
       this.connection = connection;
       this.instanceId = instanceId;
     }
-    
+  
     /**
      * Start jvm tendril . tendril control.
      *
@@ -714,7 +714,7 @@ public class EC2Util {
     public Tendril.TendrilControl startJvm(final AmazonEC2 ec2, final AmazonS3 s3, final AwsTendrilSettings settings, final int localControlPort) {
       return Tendril.startRemoteJvm(this, settings.jvmConfig(), localControlPort, Tendril::defaultClasspathFilter, s3, settings.getServiceConfig(ec2).bucket);
     }
-    
+  
     /**
      * Run and terminate t.
      *
@@ -729,7 +729,7 @@ public class EC2Util {
         terminate();
       }
     }
-    
+  
     /**
      * Terminate terminate instances result.
      *
@@ -739,7 +739,7 @@ public class EC2Util {
       logger.info("Terminating " + getInstanceId());
       return ec2.terminateInstances(new TerminateInstancesRequest().withInstanceIds(getInstanceId()));
     }
-    
+  
     /**
      * Gets connection.
      *
@@ -748,7 +748,7 @@ public class EC2Util {
     public Session getConnection() {
       return connection;
     }
-    
+  
     /**
      * Gets instance id.
      *
@@ -762,7 +762,7 @@ public class EC2Util {
     public void close() {
       terminate();
     }
-    
+  
     /**
      * Shell int.
      *
@@ -771,7 +771,7 @@ public class EC2Util {
     public int shell() {
       return EC2Util.shell(getConnection());
     }
-    
+  
     /**
      * Scp string.
      *
@@ -782,7 +782,7 @@ public class EC2Util {
     public String scp(final File local, final String remote) {
       return EC2Util.scp(getConnection(), local, remote);
     }
-    
+  
     /**
      * Exec string.
      *
@@ -792,7 +792,7 @@ public class EC2Util {
     public String exec(final String command) {
       return EC2Util.exec(getConnection(), command);
     }
-    
+  
     /**
      * Exec async process.
      *
@@ -802,7 +802,7 @@ public class EC2Util {
     public Process execAsync(final String command) {
       return EC2Util.execAsync(getConnection(), command);
     }
-    
+  
     /**
      * Stage.
      *
@@ -815,7 +815,7 @@ public class EC2Util {
     public void stage(final File entryFile, final String remote, final String bucket, final String keyspace, final AmazonS3 s3) {
       EC2Util.stage(getConnection(), entryFile, remote, bucket, keyspace, s3);
     }
-    
+  
     /**
      * Gets status.
      *
@@ -832,7 +832,7 @@ public class EC2Util {
   public static class Process {
     private final ChannelExec channel;
     private final OutputStream outBuffer;
-    
+  
     /**
      * Instantiates a new Process.
      *
@@ -849,7 +849,7 @@ public class EC2Util {
       channel.setExtOutputStream(new CloseShieldOutputStream(System.err));
       channel.connect();
     }
-    
+  
     /**
      * Gets channel.
      *
@@ -858,7 +858,7 @@ public class EC2Util {
     public ChannelExec getChannel() {
       return channel;
     }
-    
+  
     /**
      * Gets out buffer.
      *
@@ -867,7 +867,7 @@ public class EC2Util {
     public ByteArrayOutputStream getOutBuffer() {
       return (ByteArrayOutputStream) outBuffer;
     }
-    
+  
     /**
      * Join string.
      *
@@ -881,7 +881,7 @@ public class EC2Util {
         throw new RuntimeException(e);
       }
     }
-    
+  
     /**
      * Gets output.
      *
@@ -913,7 +913,7 @@ public class EC2Util {
      * The Key pair.
      */
     public KeyPair keyPair;
-    
+  
     /**
      * Instantiates a new Service config.
      *
@@ -922,7 +922,7 @@ public class EC2Util {
      * @param roleArn the role arn
      */
     public ServiceConfig(final AmazonEC2 ec2, final String bucket, final String roleArn) {this(ec2, bucket, roleArn, EC2Util.newSecurityGroup(ec2, 22, 1080));}
-    
+  
     /**
      * Instantiates a new Service config.
      *
@@ -932,7 +932,7 @@ public class EC2Util {
      * @param groupId the group id
      */
     public ServiceConfig(final AmazonEC2 ec2, final String bucket, final String roleArn, final String groupId) {this(ec2, bucket, groupId, new InstanceProfile().withArn(roleArn));}
-    
+  
     /**
      * Instantiates a new Service config.
      *
@@ -942,7 +942,7 @@ public class EC2Util {
      * @param instanceProfile the instance profile
      */
     public ServiceConfig(final AmazonEC2 ec2, final String bucket, final String groupId, final InstanceProfile instanceProfile) {this(bucket, groupId, instanceProfile, EC2Util.getKeyPair(ec2));}
-    
+  
     /**
      * Instantiates a new Service config.
      *
@@ -975,7 +975,7 @@ public class EC2Util {
      * The Username.
      */
     public String username;
-    
+  
     /**
      * Instantiates a new Node config.
      *
