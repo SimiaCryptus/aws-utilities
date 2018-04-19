@@ -54,13 +54,15 @@ public class SESUtil {
    * @param subject     the subject
    * @param to          the to
    * @param body        the body
+   * @param html        the html
    * @param attachments the attachments
    */
-  public static void send(final AmazonSimpleEmailService ses, final String subject, final String to, final String body, final File... attachments) {
+  public static void send(final AmazonSimpleEmailService ses, final String subject, final String to, final String body, final String html, final File... attachments) {
     try {
+      Stream<MimeBodyPart> attachmentStream = Arrays.stream(attachments).filter(x -> x.exists() && x.length() < 1024 * 1024 * 4).map(SESUtil::toAttachment);
       ses.sendRawEmail(new SendRawEmailRequest(toRaw(getMessage(
         Session.getDefaultInstance(new Properties()), subject, to,
-        mix(Stream.concat(Stream.of(wrap(getEmailBody(body))), Arrays.stream(attachments).map(SESUtil::toAttachment)).toArray(i -> new MimeBodyPart[i]))
+        mix(Stream.concat(Stream.of(wrap(getEmailBody(body, html))), attachmentStream).toArray(i -> new MimeBodyPart[i]))
       ))));
     } catch (IOException | MessagingException e) {
       throw new RuntimeException(e);
@@ -90,14 +92,20 @@ public class SESUtil {
    * Gets email body.
    *
    * @param body the body
+   * @param html the html
    * @return the email body
    * @throws MessagingException the messaging exception
    */
-  public static MimeMultipart getEmailBody(final String body) throws MessagingException {
+  public static MimeMultipart getEmailBody(final String body, final String html) throws MessagingException {
     MimeMultipart multipart = new MimeMultipart("alternative");
     MimeBodyPart textPart = new MimeBodyPart();
     textPart.setContent(body, "text/plain; charset=UTF-8");
     multipart.addBodyPart(textPart);
+    if (!html.isEmpty()) {
+      MimeBodyPart htmlPart = new MimeBodyPart();
+      htmlPart.setContent(html, "text/html; charset=UTF-8");
+      multipart.addBodyPart(htmlPart);
+    }
     return multipart;
   }
   
