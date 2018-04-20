@@ -55,7 +55,9 @@ import java.lang.invoke.SerializedLambda;
 import java.net.InetSocketAddress;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
@@ -229,11 +231,11 @@ public class Tendril {
     Stream<String> stream = Arrays.stream(localClasspath.split(File.pathSeparator)).filter(classpathFilter);
     PrintStream out = SysOutInterceptor.INSTANCE.currentHandler();
     if (parallel) stream = stream.parallel();
-    return stream.map(entryPath -> {
+    return stream.flatMap(entryPath -> {
       PrintStream prev = SysOutInterceptor.INSTANCE.setCurrentHandler(out);
-      String classpathEntry = stageClasspathEntry(node, libPrefix, entryPath, s3, bucket, keyspace);
+      List<String> classpathEntry = stageClasspathEntry(node, libPrefix, entryPath, s3, bucket, keyspace);
       SysOutInterceptor.INSTANCE.setCurrentHandler(prev);
-      return classpathEntry;
+      return classpathEntry.stream();
     }).reduce((a, b) -> a + ":" + b).get();
   }
   
@@ -249,7 +251,7 @@ public class Tendril {
    * @return the string
    */
   @Nonnull
-  public static String stageClasspathEntry(final EC2Node node, final String libPrefix, final String entryPath, final AmazonS3 s3, final String bucket, final String keyspace) {
+  public static List<String> stageClasspathEntry(final EC2Node node, final String libPrefix, final String entryPath, final AmazonS3 s3, final String bucket, final String keyspace) {
     logger.info(String.format("Processing %s", entryPath));
     final File entryFile = new File(entryPath);
     try {
@@ -261,25 +263,38 @@ public class Tendril {
         } catch (Throwable e) {
           logger.warn(String.format("Error staging %s to %s", entryFile, remote), e);
         }
-        return remote;
+        return Arrays.asList(remote);
       }
       else {
-        File tempJar = toJar(entryFile);
-        try {
-          String remote = libPrefix + hash(tempJar) + ".jar";
-          logger.info(String.format("Uploading %s to %s", tempJar, remote));
-          try {
-            stage(node, tempJar, remote, s3, bucket, keyspace);
-          } catch (Throwable e) {
-            throw new RuntimeException(String.format("Error staging %s to %s", entryFile, remote), e);
-          }
-          return remote;
-        } finally {
-          tempJar.delete();
+        ArrayList<String> list = new ArrayList<>();
+        if (entryFile.getName().equals("classes") && entryFile.getParentFile().getName().equals("target")) {
+          list.add(addDir(node, libPrefix, s3, bucket, keyspace, new File(new File(new File(entryFile.getParentFile().getParentFile(), "src"), "main"), "java")));
         }
+        if (entryFile.getName().equals("test-classes") && entryFile.getParentFile().getName().equals("target")) {
+          list.add(addDir(node, libPrefix, s3, bucket, keyspace, new File(new File(new File(entryFile.getParentFile().getParentFile(), "src"), "test"), "java")));
+        }
+        list.add(addDir(node, libPrefix, s3, bucket, keyspace, entryFile));
+        return list;
       }
     } catch (Throwable e) {
       throw new RuntimeException(e);
+    }
+  }
+  
+  @Nonnull
+  public static String addDir(final EC2Node node, final String libPrefix, final AmazonS3 s3, final String bucket, final String keyspace, final File entryFile) throws IOException, NoSuchAlgorithmException {
+    File tempJar = toJar(entryFile);
+    try {
+      String remote = libPrefix + hash(tempJar) + ".jar";
+      logger.info(String.format("Uploading %s to %s", tempJar, remote));
+      try {
+        stage(node, tempJar, remote, s3, bucket, keyspace);
+      } catch (Throwable e) {
+        throw new RuntimeException(String.format("Error staging %s to %s", entryFile, remote), e);
+      }
+      return remote;
+    } finally {
+      tempJar.delete();
     }
   }
   
