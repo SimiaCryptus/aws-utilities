@@ -22,6 +22,7 @@ package com.simiacryptus.aws;
 import com.amazonaws.services.simpleemail.AmazonSimpleEmailService;
 import com.amazonaws.services.simpleemail.model.RawMessage;
 import com.amazonaws.services.simpleemail.model.SendRawEmailRequest;
+import com.amazonaws.services.simpleemail.model.VerifyEmailAddressRequest;
 
 import javax.activation.DataHandler;
 import javax.activation.DataSource;
@@ -39,6 +40,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Properties;
 import java.util.stream.Stream;
 
@@ -168,5 +170,11 @@ public class SESUtil {
       throw new RuntimeException(e);
     }
     return att;
+  }
+  
+  public static void setup(final AmazonSimpleEmailService ses, final String emailAddress) {
+    List<String> verifiedEmailAddresses = ses.listVerifiedEmailAddresses().getVerifiedEmailAddresses();
+    if (verifiedEmailAddresses.contains(emailAddress)) return;
+    ses.verifyEmailAddress(new VerifyEmailAddressRequest().withEmailAddress(emailAddress));
   }
 }

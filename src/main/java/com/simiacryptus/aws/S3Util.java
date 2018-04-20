@@ -20,9 +20,13 @@
 package com.simiacryptus.aws;
 
 import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.model.CannedAccessControlList;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 
 import java.io.File;
+import java.net.URL;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * The type S 3 util.
@@ -36,15 +40,19 @@ public class S3Util {
    * @param namespace the namespace
    * @param file      the file
    */
-  public static void upload(final AmazonS3 s3, final String bucket, final String namespace, final File file) {
+  public static Map<File, URL> upload(final AmazonS3 s3, final String bucket, final String namespace, final File file) {
+    HashMap<File, URL> map = new HashMap<>();
     if (!file.exists()) throw new RuntimeException(file.toString());
     if (file.isFile()) {
-      s3.putObject(new PutObjectRequest(bucket, namespace + file.getName(), file));
+      String key = namespace + file.getName();
+      s3.putObject(new PutObjectRequest(bucket, key, file).withCannedAcl(CannedAccessControlList.PublicRead));
+      map.put(file.getAbsoluteFile(), s3.getUrl(bucket, key));
     }
     else {
       for (File subfile : file.listFiles()) {
-        upload(s3, bucket, namespace + file.getName() + "/", subfile);
+        map.putAll(upload(s3, bucket, namespace + file.getName() + "/", subfile));
       }
     }
+    return map;
   }
 }
