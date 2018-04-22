@@ -78,6 +78,7 @@ import static com.simiacryptus.aws.EC2Util.*;
 public class Tendril {
   
   private static final Logger logger = LoggerFactory.getLogger(EC2Util.class);
+  private static final int BUFFER_SIZE = 8 * 1024 * 1024;
   
   /**
    * The entry point of application.
@@ -99,7 +100,7 @@ public class Tendril {
             e.printStackTrace();
           }
         }));
-      Server server = new Server(16384, 2048, new KryoSerialization(getKryo()));
+      Server server = new Server(BUFFER_SIZE, BUFFER_SIZE, new KryoSerialization(getKryo()));
       ObjectSpace.registerClasses(server.getKryo());
       ObjectSpace objectSpace = new ObjectSpace();
       TendrilLinkImpl tendrilLink = new TendrilLinkImpl();
@@ -175,7 +176,7 @@ public class Tendril {
    */
   public static TendrilLink getControl(final int localControlPort, final int retries) {
     try {
-      Client client = new Client(8192, 2048, new KryoSerialization(getKryo()));
+      Client client = new Client(BUFFER_SIZE, BUFFER_SIZE, new KryoSerialization(getKryo()));
       client.start();
       client.connect(5000, "127.0.0.1", localControlPort, -1);
       return ObjectSpace.getRemoteObject(client, 1318, TendrilLink.class);
