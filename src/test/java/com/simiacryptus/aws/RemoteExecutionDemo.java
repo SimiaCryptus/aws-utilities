@@ -65,7 +65,7 @@ public class RemoteExecutionDemo {
   public static void main(String... args) throws Exception {
     try (MarkdownNotebookOutput log = new MarkdownNotebookOutput(
       new File("target/report/" + Util.dateStr("yyyyMMddHHmmss") + "/index"),
-      gitBase + "/tree/master/src/", true)) {
+      gitBase + "/tree/master/src/", Util.AUTO_BROWSE)) {
       new RemoteExecutionDemo().demo(log);
     }
   }

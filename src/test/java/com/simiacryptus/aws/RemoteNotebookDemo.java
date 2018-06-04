@@ -74,7 +74,7 @@ public class RemoteNotebookDemo {
   public static void main(String... args) throws Exception {
     try (MarkdownNotebookOutput log = new MarkdownNotebookOutput(
       new File("target/report/" + Util.dateStr("yyyyMMddHHmmss") + "/index"),
-      gitBase + "/tree/master/src/", true)) {
+      gitBase + "/tree/master/src/", Util.AUTO_BROWSE)) {
       new RemoteNotebookDemo().launcherNotebook(log);
     }
   }
@@ -145,7 +145,7 @@ public class RemoteNotebookDemo {
       String dateStr = Util.dateStr("yyyyMMddHHmmss");
       try (MarkdownNotebookOutput log = new MarkdownNotebookOutput(
         new File("report/" + dateStr + "/" + testName),
-        gitBase + "/tree/master/src/", 1080, true)) {
+        gitBase + "/tree/master/src/", 1080, Util.AUTO_BROWSE)) {
         log.onComplete(workingDir -> {
           S3Util.upload(getS3(), default_bucket, "reports/", workingDir);
         });
