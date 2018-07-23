@@ -30,6 +30,7 @@ import com.amazonaws.services.simpleemail.AmazonSimpleEmailServiceClientBuilder;
 import com.simiacryptus.util.Util;
 import com.simiacryptus.util.io.JsonUtil;
 import com.simiacryptus.util.io.MarkdownNotebookOutput;
+import com.simiacryptus.util.io.NotebookOutput;
 import com.simiacryptus.util.test.SysOutInterceptor;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
@@ -72,7 +73,7 @@ public class RemoteNotebookDemo {
    * @throws Exception the exception
    */
   public static void main(String... args) throws Exception {
-    try (MarkdownNotebookOutput log = new MarkdownNotebookOutput(
+    try (NotebookOutput log = new MarkdownNotebookOutput(
       new File("target/report/" + Util.dateStr("yyyyMMddHHmmss") + "/index"),
       gitBase + "/tree/master/src/", Util.AUTO_BROWSE)) {
       new RemoteNotebookDemo().launcherNotebook(log);
@@ -111,7 +112,7 @@ public class RemoteNotebookDemo {
    *
    * @param log the log
    */
-  public void launcherNotebook(final MarkdownNotebookOutput log) {
+  public void launcherNotebook(final NotebookOutput log) {
     AwsTendrilSettings settings = log.code(() -> {
       return JsonUtil.cache(new File("settings.json"), AwsTendrilSettings.class,
         () -> AwsTendrilSettings.setup(getEc2(), getIam(), default_bucket, default_instanceType, default_imageId, default_username));
@@ -143,7 +144,7 @@ public class RemoteNotebookDemo {
   private void nodeMain() {
     try {
       String dateStr = Util.dateStr("yyyyMMddHHmmss");
-      try (MarkdownNotebookOutput log = new MarkdownNotebookOutput(
+      try (NotebookOutput log = new MarkdownNotebookOutput(
         new File("report/" + dateStr + "/" + testName),
         gitBase + "/tree/master/src/", 1080, Util.AUTO_BROWSE)) {
         log.onComplete(workingDir -> {
@@ -181,7 +182,7 @@ public class RemoteNotebookDemo {
    *
    * @param log the log
    */
-  public void nodeTaskNotebook(final MarkdownNotebookOutput log) {
+  public void nodeTaskNotebook(final NotebookOutput log) {
     logger.info("Running worker process");
     for (int i = 0; i < 10; i++) {
       logger.info("Running worker loop " + i);

@@ -29,6 +29,7 @@ import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.simiacryptus.util.Util;
 import com.simiacryptus.util.io.JsonUtil;
 import com.simiacryptus.util.io.MarkdownNotebookOutput;
+import com.simiacryptus.util.io.NotebookOutput;
 import com.simiacryptus.util.test.SysOutInterceptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,7 +64,7 @@ public class RemoteExecutionDemo {
    * @throws Exception the exception
    */
   public static void main(String... args) throws Exception {
-    try (MarkdownNotebookOutput log = new MarkdownNotebookOutput(
+    try (NotebookOutput log = new MarkdownNotebookOutput(
       new File("target/report/" + Util.dateStr("yyyyMMddHHmmss") + "/index"),
       gitBase + "/tree/master/src/", Util.AUTO_BROWSE)) {
       new RemoteExecutionDemo().demo(log);
@@ -75,7 +76,7 @@ public class RemoteExecutionDemo {
    *
    * @param log the log
    */
-  public void demo(final MarkdownNotebookOutput log) {
+  public void demo(final NotebookOutput log) {
     AmazonEC2 ec2 = AmazonEC2ClientBuilder.standard().withRegion(Regions.US_EAST_1).build();
     AmazonIdentityManagement iam = AmazonIdentityManagementClientBuilder.standard().withRegion(Regions.US_EAST_1).build();
     AmazonS3 s3 = AmazonS3ClientBuilder.standard().build();
