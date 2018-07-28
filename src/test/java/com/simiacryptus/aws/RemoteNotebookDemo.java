@@ -165,11 +165,9 @@ public class RemoteNotebookDemo {
         nodeTaskNotebook(log);
         logger.info("Finished worker process");
       } catch (IOException e) {
-        e.printStackTrace();
         logger.warn("Error!", e);
       }
     } catch (Throwable e) {
-      e.printStackTrace();
       logger.warn("Error!", e);
     } finally {
       logger.info("Exiting node worker");
