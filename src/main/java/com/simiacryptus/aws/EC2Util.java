@@ -36,6 +36,7 @@ import com.amazonaws.services.ec2.model.RunInstancesRequest;
 import com.amazonaws.services.ec2.model.ShutdownBehavior;
 import com.amazonaws.services.ec2.model.TerminateInstancesRequest;
 import com.amazonaws.services.ec2.model.TerminateInstancesResult;
+import com.amazonaws.services.ec2.model.UserIdGroupPair;
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagement;
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagementClientBuilder;
 import com.amazonaws.services.identitymanagement.model.AddRoleToInstanceProfileRequest;
@@ -72,11 +73,13 @@ import java.io.OutputStream;
 import java.io.SequenceInputStream;
 import java.nio.charset.Charset;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 /**
  * The type Ec 2 util.
@@ -100,6 +103,7 @@ public class EC2Util {
   public static void stage(final Session session, final File file, final String remote, final String bucket, final String cacheNamespace, final AmazonS3 s3) {
     String key = cacheNamespace + remote;
     if (!s3.doesObjectExist(bucket, key)) {
+      logger.info(String.format("Pushing to s3: %s/%s <= %s", bucket, key, file));
       s3.putObject(new PutObjectRequest(bucket, key, file));
     }
     logger.info("Pulling from s3: " + exec(session, String.format("aws s3api get-object --bucket %s --key %s %s", bucket, key, remote)));
@@ -431,7 +435,14 @@ public class EC2Util {
     }
     ec2.authorizeSecurityGroupIngress(new AuthorizeSecurityGroupIngressRequest()
       .withGroupId(groupId)
-      .withIpPermissions(Arrays.stream(ports).mapToObj(port -> getTcpPermission(port)).toArray(i -> new IpPermission[i])));
+                                        .withIpPermissions(Stream.concat(
+                                          Arrays.stream(ports).mapToObj(port -> getTcpPermission(port)),
+                                          Stream.of(new IpPermission()
+                                                      .withUserIdGroupPairs(new UserIdGroupPair().withGroupId(groupId))
+                                                      .withIpProtocol("tcp")
+                                                      .withFromPort(0)
+                                                      .withToPort(0xFFFF))
+                                        ).toArray(i -> new IpPermission[i])));
     return groupId;
   }
   
@@ -598,10 +609,10 @@ public class EC2Util {
    */
   public static IpPermission getTcpPermission(final int port) {
     return new IpPermission()
-      .withIpv4Ranges(Arrays.asList(new IpRange().withCidrIp("0.0.0.0/0")))
-      .withIpProtocol("tcp")
-      .withFromPort(port)
-      .withToPort(port);
+             .withIpv4Ranges(Arrays.asList(new IpRange().withCidrIp("0.0.0.0/0")))
+             .withIpProtocol("tcp")
+             .withFromPort(port)
+             .withToPort(port);
   }
   
   /**
@@ -711,8 +722,21 @@ public class EC2Util {
      * @param localControlPort the local control port
      * @return the tendril . tendril control
      */
-    public Tendril.TendrilControl startJvm(final AmazonEC2 ec2, final AmazonS3 s3, final AwsTendrilSettings settings, final int localControlPort) {
-      return Tendril.startRemoteJvm(this, settings.jvmConfig(), localControlPort, Tendril::defaultClasspathFilter, s3, settings.getServiceConfig(ec2).bucket);
+    public Tendril.TendrilControl startJvm(
+      final AmazonEC2 ec2,
+      final AmazonS3 s3,
+      final AwsTendrilNodeSettings settings,
+      final int localControlPort
+    )
+    {
+      return Tendril.startRemoteJvm(this,
+                                    settings.jvmConfig(),
+                                    localControlPort,
+                                    Tendril::defaultClasspathFilter,
+                                    s3,
+                                    settings.getServiceConfig(ec2).bucket,
+                                    new HashMap<String, String>()
+      );
     }
   
     /**
@@ -921,7 +945,14 @@ public class EC2Util {
      * @param bucket  the bucket
      * @param roleArn the role arn
      */
-    public ServiceConfig(final AmazonEC2 ec2, final String bucket, final String roleArn) {this(ec2, bucket, roleArn, EC2Util.newSecurityGroup(ec2, 22, 1080));}
+    public ServiceConfig(final AmazonEC2 ec2, final String bucket, final String roleArn) {
+      this(
+        ec2,
+        bucket,
+        roleArn,
+        EC2Util.newSecurityGroup(ec2, 22, 1080, 4040, 8080)
+      );
+    }
   
     /**
      * Instantiates a new Service config.

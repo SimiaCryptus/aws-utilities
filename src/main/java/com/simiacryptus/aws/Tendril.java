@@ -43,7 +43,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -57,6 +56,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -125,7 +125,7 @@ public class Tendril {
         }
       });
       server.start();
-      server.bind(new InetSocketAddress("127.0.0.1", 1318), null);
+      server.bind(new InetSocketAddress("127.0.0.1", Integer.parseInt(System.getProperty("controlPort", "1318"))), null);
     } catch (Throwable e) {
       e.printStackTrace();
     }
@@ -144,15 +144,39 @@ public class Tendril {
    * @param classpathFilter  the classpath filter
    * @param s3               the s 3
    * @param bucket           the bucket
+   * @param env
    * @return the tendril control
    */
-  @Nullable
-  public static TendrilControl startRemoteJvm(final EC2Node node, final int localControlPort, final String javaOpts, final String programArguments, final String libPrefix, final String keyspace, final Predicate<String> classpathFilter, final AmazonS3 s3, final String bucket) {
+  @Nonnull
+  public static TendrilControl startRemoteJvm(
+    final EC2Node node,
+    final int localControlPort,
+    final String javaOpts,
+    final String programArguments,
+    final String libPrefix,
+    final String keyspace,
+    final Predicate<String> classpathFilter,
+    final AmazonS3 s3,
+    final String bucket, final HashMap<String, String> env
+  )
+  {
     String localClasspath = System.getProperty("java.class.path");
     logger.info("Java Local Classpath: " + localClasspath);
-    String remoteClasspath = stageRemoteClasspath(node, localClasspath, classpathFilter, libPrefix, true, s3, bucket, keyspace);
+    String remoteClasspath = stageRemoteClasspath(node, localClasspath, classpathFilter, libPrefix, false, s3, bucket, keyspace);
     logger.info("Java Remote Classpath: " + remoteClasspath);
-    String commandLine = String.format("nohup java %s -cp %s %s %s", javaOpts, remoteClasspath, Tendril.class.getCanonicalName(), programArguments);
+    String envString = env.entrySet().stream().map(e -> String.format(
+      "%s=%s",
+      e.getKey(),
+      e.getValue()
+    )).reduce((a, b) -> a + " " + b).map(x -> x + " ").orElse("");
+    String commandLine = String.format(
+      "%snohup java %s -cp %s %s %s",
+      envString,
+      javaOpts,
+      remoteClasspath,
+      Tendril.class.getCanonicalName(),
+      programArguments
+    );
     logger.info("Java Command Line: " + commandLine);
     execAsync(node.getConnection(), commandLine, new CloseShieldOutputStream(System.out));
     return new TendrilControl(getControl(localControlPort));
@@ -178,7 +202,9 @@ public class Tendril {
     try {
       Client client = new Client(BUFFER_SIZE, BUFFER_SIZE, new KryoSerialization(getKryo()));
       client.start();
-      client.connect(5000, "127.0.0.1", localControlPort, -1);
+      client.setTimeout((int) TimeUnit.SECONDS.toMillis(30));
+      client.setKeepAliveTCP((int) TimeUnit.SECONDS.toMillis(5));
+      client.connect((int) TimeUnit.SECONDS.toMillis(30), "127.0.0.1", localControlPort, -1);
       return ObjectSpace.getRemoteObject(client, 1318, TendrilLink.class);
     } catch (Throwable e) {
       if (retries > 0) {
@@ -232,7 +258,7 @@ public class Tendril {
     Stream<String> stream = Arrays.stream(localClasspath.split(File.pathSeparator)).filter(classpathFilter);
     PrintStream out = SysOutInterceptor.INSTANCE.currentHandler();
     if (parallel) stream = stream.parallel();
-    return stream.flatMap(entryPath -> {
+    return stream.parallel().flatMap(entryPath -> {
       PrintStream prev = SysOutInterceptor.INSTANCE.setCurrentHandler(out);
       List<String> classpathEntry = stageClasspathEntry(node, libPrefix, entryPath, s3, bucket, keyspace);
       SysOutInterceptor.INSTANCE.setCurrentHandler(prev);
@@ -253,12 +279,11 @@ public class Tendril {
    */
   @Nonnull
   public static List<String> stageClasspathEntry(final EC2Node node, final String libPrefix, final String entryPath, final AmazonS3 s3, final String bucket, final String keyspace) {
-    logger.info(String.format("Processing %s", entryPath));
     final File entryFile = new File(entryPath);
     try {
       if (entryFile.isFile()) {
         String remote = libPrefix + hash(entryFile) + ".jar";
-        logger.info(String.format("Uploading %s to %s", entryPath, remote));
+        logger.info(String.format("Staging %s via %s", entryPath, remote));
         try {
           stage(node, entryFile, remote, s3, bucket, keyspace);
         } catch (Throwable e) {
@@ -267,12 +292,19 @@ public class Tendril {
         return Arrays.asList(remote);
       }
       else {
+        logger.info(String.format("Processing %s", entryPath));
         ArrayList<String> list = new ArrayList<>();
         if (entryFile.getName().equals("classes") && entryFile.getParentFile().getName().equals("target")) {
-          list.add(addDir(node, libPrefix, s3, bucket, keyspace, new File(new File(new File(entryFile.getParentFile().getParentFile(), "src"), "main"), "java")));
+          File javaSrc = new File(new File(new File(entryFile.getParentFile().getParentFile(), "src"), "main"), "java");
+          if (javaSrc.exists()) list.add(addDir(node, libPrefix, s3, bucket, keyspace, javaSrc));
+          File scalaSrc = new File(new File(new File(entryFile.getParentFile().getParentFile(), "src"), "main"), "scala");
+          if (scalaSrc.exists()) list.add(addDir(node, libPrefix, s3, bucket, keyspace, scalaSrc));
         }
         if (entryFile.getName().equals("test-classes") && entryFile.getParentFile().getName().equals("target")) {
-          list.add(addDir(node, libPrefix, s3, bucket, keyspace, new File(new File(new File(entryFile.getParentFile().getParentFile(), "src"), "test"), "java")));
+          File javaSrc = new File(new File(new File(entryFile.getParentFile().getParentFile(), "src"), "test"), "java");
+          if (javaSrc.exists()) list.add(addDir(node, libPrefix, s3, bucket, keyspace, javaSrc));
+          File scalaSrc = new File(new File(new File(entryFile.getParentFile().getParentFile(), "src"), "test"), "scala");
+          if (scalaSrc.exists()) list.add(addDir(node, libPrefix, s3, bucket, keyspace, scalaSrc));
         }
         list.add(addDir(node, libPrefix, s3, bucket, keyspace, entryFile));
         return list;
@@ -361,7 +393,7 @@ public class Tendril {
    * @throws IOException the io exception
    */
   @Nonnull
-  public static File toJar(final File entry) throws IOException {
+  public static File toJar(@Nonnull final File entry) throws IOException {
     File tempJar = File.createTempFile(UUID.randomUUID().toString(), ".jar").getAbsoluteFile();
     logger.info(String.format("Archiving %s to %s", entry, tempJar));
     try (ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(tempJar))) {
@@ -421,10 +453,32 @@ public class Tendril {
    * @param shouldTransfer   the should transfer
    * @param s3               the s 3
    * @param bucket           the bucket
+   * @param env
    * @return the tendril control
    */
-  public static TendrilControl startRemoteJvm(final EC2Node node, final JvmConfig jvmConfig, final int localControlPort, final Predicate<String> shouldTransfer, final AmazonS3 s3, final String bucket) {
-    return startRemoteJvm(node, localControlPort, jvmConfig.javaOpts, jvmConfig.programArguments, jvmConfig.libPrefix, jvmConfig.keyspace, shouldTransfer, s3, bucket);
+  @Nonnull
+  public static TendrilControl startRemoteJvm(
+    final EC2Node node,
+    final JvmConfig jvmConfig,
+    final int localControlPort,
+    final Predicate<String> shouldTransfer,
+    final AmazonS3 s3,
+    final String bucket,
+    final HashMap<String, String> env
+  )
+  {
+    return startRemoteJvm(
+      node,
+      localControlPort,
+      jvmConfig.javaOpts,
+      jvmConfig.programArguments,
+      jvmConfig.libPrefix,
+      jvmConfig.keyspace,
+      shouldTransfer,
+      s3,
+      bucket,
+      env
+    );
   }
   
   /**
@@ -583,7 +637,7 @@ public class Tendril {
      */
     public void exit(final int status, final int wait) {
       contacted = true;
-      logger.warn(String.format("Exiting with code %d in %d", status, wait));
+      logger.warn(String.format("Exiting with run %d in %d", status, wait));
       new Thread(() -> {
         try {
           Thread.sleep(wait);
