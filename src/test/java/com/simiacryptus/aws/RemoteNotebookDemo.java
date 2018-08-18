@@ -113,13 +113,21 @@ public class RemoteNotebookDemo {
    * @param log the log
    */
   public void launcherNotebook(final NotebookOutput log) {
-    AwsTendrilSettings settings = log.code(() -> {
-      return JsonUtil.cache(new File("settings.json"), AwsTendrilSettings.class,
-        () -> AwsTendrilSettings.setup(getEc2(), getIam(), default_bucket, default_instanceType, default_imageId, default_username));
+    AwsTendrilNodeSettings settings = log.eval(() -> {
+      return JsonUtil.cache(new File("settings.json"), AwsTendrilNodeSettings.class,
+                            () -> AwsTendrilNodeSettings.setup(
+                              getEc2(),
+                              getIam(),
+                              default_bucket,
+                              default_instanceType,
+                              default_imageId,
+                              default_username
+                            )
+      );
     });
     int localControlPort = new Random().nextInt(1024) + 1024;
     EC2Util.EC2Node node = settings.startNode(getEc2(), localControlPort);
-    log.code(() -> {
+    log.run(() -> {
       Tendril.TendrilControl tendrilControl = node.startJvm(getEc2(), getS3(), settings, localControlPort);
       tendrilControl.start(this::nodeMain);
     });
@@ -129,7 +137,7 @@ public class RemoteNotebookDemo {
       logger.info("Error opening browser", e);
     }
     for (int i = 0; i < 100; i++) {
-      String state = log.code(() -> {
+      String state = log.eval(() -> {
         return node.getStatus().getState().getName();
       });
       if (!"running".equals(state)) break;
@@ -184,7 +192,7 @@ public class RemoteNotebookDemo {
     logger.info("Running worker process");
     for (int i = 0; i < 10; i++) {
       logger.info("Running worker loop " + i);
-      log.code(() -> {
+      log.run(() -> {
         try {
           System.out.println(String.format("The time is now %s", new Date()));
           Thread.sleep(10000);

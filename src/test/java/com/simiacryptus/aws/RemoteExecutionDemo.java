@@ -80,15 +80,15 @@ public class RemoteExecutionDemo {
     AmazonEC2 ec2 = AmazonEC2ClientBuilder.standard().withRegion(Regions.US_EAST_1).build();
     AmazonIdentityManagement iam = AmazonIdentityManagementClientBuilder.standard().withRegion(Regions.US_EAST_1).build();
     AmazonS3 s3 = AmazonS3ClientBuilder.standard().build();
-    
-    AwsTendrilSettings settings = log.code(() -> {
-      return JsonUtil.cache(new File("settings.json"), AwsTendrilSettings.class,
+  
+    AwsTendrilNodeSettings settings = log.eval(() -> {
+      return JsonUtil.cache(new File("settings.json"), AwsTendrilNodeSettings.class,
         () -> {
-          return AwsTendrilSettings.setup(ec2, iam, default_bucket, default_instanceType, default_imageId, default_username);
+          return AwsTendrilNodeSettings.setup(ec2, iam, default_bucket, default_instanceType, default_imageId, default_username);
         });
     });
-    
-    log.code(() -> {
+  
+    log.eval(() -> {
       int localControlPort = new Random().nextInt(1024) + 1024;
       try (EC2Util.EC2Node node = settings.startNode(ec2, localControlPort)) {
         //node.shell();
