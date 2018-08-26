@@ -30,6 +30,9 @@ import com.esotericsoftware.kryonet.KryoSerialization;
 import com.esotericsoftware.kryonet.Listener;
 import com.esotericsoftware.kryonet.Server;
 import com.esotericsoftware.kryonet.rmi.ObjectSpace;
+import com.simiacryptus.util.lang.SerializableCallable;
+import com.simiacryptus.util.lang.SerializableConsumer;
+import com.simiacryptus.util.lang.SerializableRunnable;
 import com.simiacryptus.util.test.SysOutInterceptor;
 import com.twitter.chill.KryoInstantiator;
 import com.twitter.chill.java.Java8ClosureRegistrar;
@@ -59,11 +62,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -479,28 +480,6 @@ public class Tendril {
       bucket,
       env
     );
-  }
-  
-  /**
-   * The interface Serializable runnable.
-   */
-  public interface SerializableRunnable extends Runnable, Serializable {
-  }
-  
-  /**
-   * The interface Serializable callable.
-   *
-   * @param <T> the type parameter
-   */
-  public interface SerializableCallable<T> extends Callable<T>, Serializable {
-  }
-  
-  /**
-   * The interface Serializable consumer.
-   *
-   * @param <T> the type parameter
-   */
-  public interface SerializableConsumer<T> extends Consumer<T>, Serializable {
   }
   
   /**

@@ -39,6 +39,7 @@ import com.simiacryptus.util.io.JsonUtil;
 import com.simiacryptus.util.io.MarkdownNotebookOutput;
 import com.simiacryptus.util.io.NotebookOutput;
 import com.simiacryptus.util.lang.CodeUtil;
+import com.simiacryptus.util.lang.SerializableConsumer;
 import com.simiacryptus.util.test.SysOutInterceptor;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -61,9 +62,9 @@ import java.util.stream.Stream;
 /**
  * The type Ec 2 runner.
  */
-public class EC2NbRunner {
+public class EC2NotebookRunner {
   
-  private static final Logger logger = LoggerFactory.getLogger(EC2NbRunner.class);
+  private static final Logger logger = LoggerFactory.getLogger(EC2NotebookRunner.class);
   public static String JAVA_OPTS = " -Xmx50g";
   
   static {
@@ -74,7 +75,7 @@ public class EC2NbRunner {
   /**
    * The Fns.
    */
-  Tendril.SerializableConsumer<NotebookOutput>[] fns;
+  SerializableConsumer<NotebookOutput>[] fns;
   private String s3bucket = "";
   private boolean emailFiles = false;
   
@@ -83,7 +84,7 @@ public class EC2NbRunner {
    *
    * @param fns the fns
    */
-  public EC2NbRunner(final Tendril.SerializableConsumer<NotebookOutput>... fns) {
+  public EC2NotebookRunner(final SerializableConsumer<NotebookOutput>... fns) {
     this.fns = fns;
   }
   
@@ -93,14 +94,14 @@ public class EC2NbRunner {
    * @param reportTasks the report tasks
    * @throws IOException the io exception
    */
-  public static void run(final Tendril.SerializableConsumer<NotebookOutput>... reportTasks) throws IOException {
-    for (final Tendril.SerializableConsumer<NotebookOutput> reportTask : reportTasks) {
+  public static void run(final SerializableConsumer<NotebookOutput>... reportTasks) throws IOException {
+    for (final SerializableConsumer<NotebookOutput> reportTask : reportTasks) {
       Tendril.getKryo().copy(reportTask);
     }
-    String runnerName = EC2NbRunner.class.getSimpleName();
+    String runnerName = EC2NotebookRunner.class.getSimpleName();
     File reportFile = new File("target/report/" + Util.dateStr("yyyyMMddHHmmss") + "/" + runnerName);
     try (NotebookOutput log = new MarkdownNotebookOutput(reportFile, runnerName, Util.AUTO_BROWSE)) {
-      new EC2NbRunner(reportTasks).launchNotebook(log);
+      new EC2NotebookRunner(reportTasks).launchNotebook(log);
     }
   }
   
@@ -137,7 +138,7 @@ public class EC2NbRunner {
    * @param fn the fn
    * @return the test name
    */
-  public static String getTestName(final Tendril.SerializableConsumer<NotebookOutput> fn) {
+  public static String getTestName(final SerializableConsumer<NotebookOutput> fn) {
     String name = fn.getClass().getCanonicalName();
     if (null == name || name.isEmpty()) name = fn.getClass().getSimpleName();
     if (null == name || name.isEmpty()) name = "index";
@@ -166,7 +167,7 @@ public class EC2NbRunner {
    * @param consumer the consumer
    * @param testName the test name
    */
-  public static void run(final Tendril.SerializableConsumer<NotebookOutput> consumer, final String testName) {
+  public static void run(final SerializableConsumer<NotebookOutput> consumer, final String testName) {
     try {
       String dateStr = Util.dateStr("yyyyMMddHHmmss");
       try (NotebookOutput log = new MarkdownNotebookOutput(
@@ -250,7 +251,7 @@ public class EC2NbRunner {
   
   private void nodeMain() {
     try {
-      for (final Tendril.SerializableConsumer<NotebookOutput> fn : this.fns) {
+      for (final SerializableConsumer<NotebookOutput> fn : this.fns) {
         run(notificationWrapper(getTestName(fn), fn), getTestName(fn));
       }
     } finally {
@@ -259,9 +260,9 @@ public class EC2NbRunner {
     }
   }
   
-  private Tendril.SerializableConsumer<NotebookOutput> notificationWrapper(
+  private SerializableConsumer<NotebookOutput> notificationWrapper(
     final String testName,
-    final Tendril.SerializableConsumer<NotebookOutput> fn
+    final SerializableConsumer<NotebookOutput> fn
   )
   {
     long startTime = System.currentTimeMillis();
@@ -328,7 +329,7 @@ public class EC2NbRunner {
     );
   }
   
-  private void sendStartEmail(final String testName, final Tendril.SerializableConsumer<NotebookOutput> fn) throws IOException, URISyntaxException {
+  private void sendStartEmail(final String testName, final SerializableConsumer<NotebookOutput> fn) throws IOException, URISyntaxException {
     String publicHostname = IOUtils.toString(new URI("http://169.254.169.254/latest/meta-data/public-hostname"), "UTF-8");
     String instanceId = IOUtils.toString(new URI("http://169.254.169.254/latest/meta-data/instance-id"), "UTF-8");
     String functionJson = new ObjectMapper()
@@ -353,7 +354,7 @@ public class EC2NbRunner {
     return emailFiles;
   }
   
-  public EC2NbRunner setEmailFiles(boolean emailFiles) {
+  public EC2NotebookRunner setEmailFiles(boolean emailFiles) {
     this.emailFiles = emailFiles;
     return this;
   }

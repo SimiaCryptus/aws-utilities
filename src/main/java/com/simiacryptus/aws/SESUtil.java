@@ -173,8 +173,12 @@ public class SESUtil {
   }
   
   public static void setup(final AmazonSimpleEmailService ses, final String emailAddress) {
-    List<String> verifiedEmailAddresses = ses.listVerifiedEmailAddresses().getVerifiedEmailAddresses();
-    if (verifiedEmailAddresses.contains(emailAddress)) return;
-    ses.verifyEmailAddress(new VerifyEmailAddressRequest().withEmailAddress(emailAddress));
+    try {
+      List<String> verifiedEmailAddresses = ses.listVerifiedEmailAddresses().getVerifiedEmailAddresses();
+      if (verifiedEmailAddresses.contains(emailAddress)) return;
+      ses.verifyEmailAddress(new VerifyEmailAddressRequest().withEmailAddress(emailAddress));
+    } catch (Throwable e) {
+      e.printStackTrace();
+    }
   }
 }
