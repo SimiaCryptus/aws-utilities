@@ -25,6 +25,7 @@ package com.simiacryptus.aws.exe;
 public class EC2NodeSettings {
   
   public static final EC2NodeSettings DeepLearningAMI = new EC2NodeSettings("p3.2xlarge", "ami-2fb71c52", "ec2-user");
+  public static final EC2NodeSettings DeepLearningAMI_P2 = new EC2NodeSettings("p2.xlarge", "ami-2fb71c52", "ec2-user");
   public static final EC2NodeSettings StandardJavaAMI = new EC2NodeSettings("t2.large", "ami-2fb71c52", "ec2-user");
   
   /**
