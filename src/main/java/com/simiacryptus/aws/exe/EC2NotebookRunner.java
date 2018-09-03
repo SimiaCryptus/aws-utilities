@@ -192,7 +192,7 @@ public class EC2NotebookRunner {
    */
   public void launchNotebook(final NotebookOutput log) {
     AwsTendrilNodeSettings settings = log.eval(() -> {
-      EC2NodeSettings nodeSettings = EC2NodeSettings.DeepLearningAMI;
+        EC2NodeSettings nodeSettings = EC2NodeSettings.P3_2XL;
       return JsonUtil.cache(new File("ec2-settings.json"), AwsTendrilNodeSettings.class,
                             () -> AwsTendrilNodeSettings.setup(
                               getEc2(),
