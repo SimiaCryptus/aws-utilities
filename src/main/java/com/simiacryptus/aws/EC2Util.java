@@ -106,7 +106,8 @@ public class EC2Util {
       logger.info(String.format("Pushing to s3: %s/%s <= %s", bucket, key, file));
       s3.putObject(new PutObjectRequest(bucket, key, file));
     }
-    logger.info("Pulling from s3: " + exec(session, String.format("aws s3api get-object --bucket %s --key %s %s", bucket, key, remote)));
+    logger.debug(String.format("Pulling from s3: %s/%s", bucket, key));
+    exec(session, String.format("aws s3api get-object --bucket %s --key %s %s", bucket, key, remote));
   }
   
   
@@ -625,7 +626,7 @@ public class EC2Util {
   @Nonnull
   public static String exec(final Session session, final String script) {
     try {
-      logger.info("Executing: " + script);
+      logger.debug("Executing: " + script);
       Process process = execAsync(session, script);
       join(process.getChannel());
       String output = new String(process.getOutBuffer().toByteArray(), charset);
