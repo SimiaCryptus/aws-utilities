@@ -66,7 +66,7 @@ public class LocalNotebookRunner {
     for (final Consumer<NotebookOutput> fn : fns) {
       try (NotebookOutput log = new MarkdownNotebookOutput(
         new File("report/" + Util.dateStr("yyyyMMddHHmmss") + "/index"),
-        "", Util.AUTO_BROWSE
+          Util.AUTO_BROWSE
       ))
       {
         fn.accept(log);

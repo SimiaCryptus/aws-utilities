@@ -75,7 +75,7 @@ public class RemoteNotebookDemo {
   public static void main(String... args) throws Exception {
     try (NotebookOutput log = new MarkdownNotebookOutput(
       new File("target/report/" + Util.dateStr("yyyyMMddHHmmss") + "/index"),
-      gitBase + "/tree/master/src/", Util.AUTO_BROWSE)) {
+        Util.AUTO_BROWSE)) {
       new RemoteNotebookDemo().launcherNotebook(log);
     }
   }
@@ -152,23 +152,25 @@ public class RemoteNotebookDemo {
   private void nodeMain() {
     try {
       String dateStr = Util.dateStr("yyyyMMddHHmmss");
-      try (NotebookOutput log = new MarkdownNotebookOutput(
+      try (MarkdownNotebookOutput log = new MarkdownNotebookOutput(
         new File("report/" + dateStr + "/" + testName),
-        gitBase + "/tree/master/src/", 1080, Util.AUTO_BROWSE)) {
-        log.onComplete(workingDir -> {
-          S3Util.upload(getS3(), default_bucket, "reports/", workingDir);
+          1080, Util.AUTO_BROWSE)) {
+        URI archiveHome = URI.create("s3://" + default_bucket + "/reports/");
+        log.onComplete(() -> {
+          S3Util.upload(getS3(), archiveHome, log.getRoot());
         });
-        log.onComplete(workingDir -> {
+        log.setArchiveHome(archiveHome);
+        log.onComplete(() -> {
           String html = "";
           try {
-            html = FileUtils.readFileToString(new File(workingDir, testName + ".html"), Charset.defaultCharset());
+            html = FileUtils.readFileToString(new File(log.getRoot(), testName + ".html"), Charset.defaultCharset());
           } catch (IOException e) {
             logger.warn("Error reading html", e);
           }
           SESUtil.send(AmazonSimpleEmailServiceClientBuilder.defaultClient(),
             "Demo Report", to, "Test Report", html,
-            new File(workingDir, testName + ".zip"),
-            new File(workingDir, testName + ".pdf"));
+              new File(log.getRoot(), testName + ".zip"),
+              new File(log.getRoot(), testName + ".pdf"));
         });
         nodeTaskNotebook(log);
         logger.info("Finished worker process");

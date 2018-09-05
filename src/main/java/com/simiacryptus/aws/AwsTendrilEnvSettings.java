@@ -27,9 +27,11 @@ import com.simiacryptus.util.io.JsonUtil;
 
 import javax.annotation.Nonnull;
 
+import java.io.Serializable;
+
 import static com.simiacryptus.aws.EC2Util.*;
 
-public class AwsTendrilEnvSettings {
+public class AwsTendrilEnvSettings implements Serializable {
   /**
    * The Security group.
    */

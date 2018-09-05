@@ -100,7 +100,7 @@ public class EC2NotebookRunner {
     }
     String runnerName = EC2NotebookRunner.class.getSimpleName();
     File reportFile = new File("target/report/" + Util.dateStr("yyyyMMddHHmmss") + "/" + runnerName);
-    try (NotebookOutput log = new MarkdownNotebookOutput(reportFile, runnerName, Util.AUTO_BROWSE)) {
+    try (NotebookOutput log = new MarkdownNotebookOutput(reportFile, Util.AUTO_BROWSE)) {
       new EC2NotebookRunner(reportTasks).launchNotebook(log);
     }
   }
@@ -172,7 +172,7 @@ public class EC2NotebookRunner {
       String dateStr = Util.dateStr("yyyyMMddHHmmss");
       try (NotebookOutput log = new MarkdownNotebookOutput(
         new File("report/" + dateStr + "/" + testName),
-        testName, 1080, true
+          1080, true
       ))
       {
         consumer.accept(log);
@@ -267,10 +267,12 @@ public class EC2NotebookRunner {
   {
     long startTime = System.currentTimeMillis();
     return log -> {
-      log.onComplete(workingDir -> {
-        logFiles(workingDir);
-        Map<File, URL> uploads = S3Util.upload(getS3(), s3bucket, "reports/", workingDir);
-        sendCompleteEmail(testName, workingDir, uploads, startTime);
+      URI archiveHome = URI.create("s3://" + s3bucket + "/reports/");
+      ((MarkdownNotebookOutput) log).setArchiveHome(archiveHome);
+      log.onComplete(() -> {
+        logFiles(log.getRoot());
+        Map<File, URL> uploads = S3Util.upload(getS3(), archiveHome, log.getRoot());
+        sendCompleteEmail(testName, log.getRoot(), uploads, startTime);
       });
       try {
         sendStartEmail(testName, fn);

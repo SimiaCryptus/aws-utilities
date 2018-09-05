@@ -22,37 +22,44 @@ package com.simiacryptus.aws;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.CannedAccessControlList;
 import com.amazonaws.services.s3.model.PutObjectRequest;
+import org.apache.commons.io.FileUtils;
 
 import java.io.File;
+import java.io.IOException;
+import java.net.URI;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * The type S 3 util.
+ * The type S3 util.
  */
 public class S3Util {
-  /**
-   * Upload.
-   *
-   * @param s3        the s 3
-   * @param bucket    the bucket
-   * @param namespace the namespace
-   * @param file      the file
-   */
-  public static Map<File, URL> upload(final AmazonS3 s3, final String bucket, final String namespace, final File file) {
-    HashMap<File, URL> map = new HashMap<>();
-    if (!file.exists()) throw new RuntimeException(file.toString());
-    if (file.isFile()) {
-      String key = namespace + file.getName();
-      s3.putObject(new PutObjectRequest(bucket, key, file).withCannedAcl(CannedAccessControlList.PublicRead));
-      map.put(file.getAbsoluteFile(), s3.getUrl(bucket, key));
-    }
-    else {
-      for (File subfile : file.listFiles()) {
-        map.putAll(upload(s3, bucket, namespace + file.getName() + "/", subfile));
+  public static Map<File, URL> upload(final AmazonS3 s3, final URI path, final File file) {
+    try {
+      HashMap<File, URL> map = new HashMap<>();
+      if (!file.exists()) throw new RuntimeException(file.toString());
+      if (file.isFile()) {
+        if (path.getScheme().startsWith("s3")) {
+          String key = path.getPath() + file.getName();
+          s3.putObject(new PutObjectRequest(path.getHost(), key, file).withCannedAcl(CannedAccessControlList.PublicRead));
+          map.put(file.getAbsoluteFile(), s3.getUrl(path.getHost(), key));
+        } else {
+          URI dest = path.resolve(file.getName());
+          try {
+            FileUtils.copyFile(file, new File(dest.getPath()));
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }
+      } else {
+        for (File subfile : file.listFiles()) {
+          map.putAll(upload(s3, path.resolve(file.getName()), subfile));
+        }
       }
+      return map;
+    } catch (Throwable e) {
+      throw new RuntimeException("Error uploading " + file + " to " + path, e);
     }
-    return map;
   }
 }
