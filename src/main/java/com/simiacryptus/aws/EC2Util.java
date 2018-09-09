@@ -97,7 +97,7 @@ public class EC2Util {
    * @param file           the file
    * @param remote         the remote
    * @param bucket         the bucket
-   * @param cacheNamespace the cache namespace
+   * @param cacheNamespace the cacheLocal namespace
    * @param s3             the s 3
    */
   public static void stage(final Session session, final File file, final String remote, final String bucket, final String cacheNamespace, final AmazonS3 s3) {
