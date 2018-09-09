@@ -22,14 +22,19 @@ package com.simiacryptus.aws;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.CannedAccessControlList;
 import com.amazonaws.services.s3.model.PutObjectRequest;
+import com.simiacryptus.util.Util;
+import com.simiacryptus.util.io.TeeInputStream;
 import org.apache.commons.io.FileUtils;
+import org.jetbrains.annotations.NotNull;
 
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.net.URI;
 import java.net.URL;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Supplier;
 
 /**
  * The type S3 util.
@@ -62,4 +67,40 @@ public class S3Util {
       throw new RuntimeException("Error uploading " + file + " to " + path, e);
     }
   }
+
+  public static InputStream cache(final AmazonS3 s3, final URI cacheLocation, URI resourceLocation) {
+    return cache(s3, cacheLocation, tempFile(cacheLocation), Util.getStreamSupplier(resourceLocation));
+  }
+
+  public static InputStream cache(AmazonS3 s3, URI s3File, File localFile, Supplier<InputStream> streamSupplier) {
+    final String path = s3File.getPath().replaceAll("^/", "");
+    if (s3.doesObjectExist(s3File.getHost(), path)) {
+      return s3.getObject(s3File.getHost(), path).getObjectContent();
+    } else {
+      try {
+        localFile.deleteOnExit();
+        return new TeeInputStream(streamSupplier.get(), new FileOutputStream(localFile)) {
+          @Override
+          public void close() throws IOException {
+            super.close();
+            s3.putObject(s3File.getHost(), path, localFile);
+          }
+        };
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }
+  }
+
+  @NotNull
+  public static File tempFile(URI file) {
+    File localFile;
+    try {
+      localFile = File.createTempFile(file.getPath(), "data");
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    return localFile;
+  }
+
 }
