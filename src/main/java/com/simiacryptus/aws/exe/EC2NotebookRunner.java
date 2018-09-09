@@ -207,7 +207,6 @@ public class EC2NotebookRunner {
     s3bucket = settings.bucket;
     Tendril.JvmConfig jvmConfig = settings.jvmConfig();
     jvmConfig.javaOpts += JAVA_OPTS;
-    jvmConfig.javaOpts += " -DGITBASE=\"" + CodeUtil.getGitBase() + "\"";
     int localControlPort = new Random().nextInt(1024) + 1024;
     SESUtil.setup(AmazonSimpleEmailServiceClientBuilder.defaultClient(), emailAddress);
     EC2Util.EC2Node node = settings.startNode(getEc2(), localControlPort);
