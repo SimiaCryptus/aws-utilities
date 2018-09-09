@@ -1,5 +1,7 @@
 package com.simiacryptus.aws;
 
+import com.simiacryptus.util.io.JsonUtil;
+import com.simiacryptus.util.lang.CodeUtil;
 import com.simiacryptus.util.test.SysOutInterceptor;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.IOUtils;
@@ -203,6 +205,11 @@ public class ClasspathUtil {
             for (final File file : Arrays.stream(entry.listFiles()).sorted().collect(Collectors.toList())) {
                 write(zip, "", file);
             }
+            zip.putNextEntry(new ZipEntry("META-INF/CodeUtil/classSourceInfo.json"));
+            try (InputStream input = new ByteArrayInputStream(JsonUtil.toJson(CodeUtil.classSourceInfo).toString().getBytes("UTF-8"))) {
+                IOUtils.copy(input, zip);
+            }
+            zip.closeEntry();
         } catch (Throwable e) {
             if (tempJar.exists()) tempJar.delete();
             throw new RuntimeException(e);
