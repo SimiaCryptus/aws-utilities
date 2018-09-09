@@ -149,16 +149,17 @@ public class ClasspathUtil {
             } else {
                 logger.info(String.format("Processing %s", entryPath));
                 ArrayList<String> list = new ArrayList<>();
+                File parentFile = entryFile.getParentFile().getParentFile();
                 if (entryFile.getName().equals("classes") && entryFile.getParentFile().getName().equals("target")) {
-                    File javaSrc = new File(new File(new File(entryFile.getParentFile().getParentFile(), "src"), "main"), "java");
+                    File javaSrc = new File(new File(new File(parentFile, "src"), "main"), "java");
                     if (javaSrc.exists()) list.add(addDir(libPrefix, javaSrc));
-                    File scalaSrc = new File(new File(new File(entryFile.getParentFile().getParentFile(), "src"), "main"), "scala");
+                    File scalaSrc = new File(new File(new File(parentFile, "src"), "main"), "scala");
                     if (scalaSrc.exists()) list.add(addDir(libPrefix, scalaSrc));
                 }
                 if (entryFile.getName().equals("test-classes") && entryFile.getParentFile().getName().equals("target")) {
-                    File javaSrc = new File(new File(new File(entryFile.getParentFile().getParentFile(), "src"), "test"), "java");
+                    File javaSrc = new File(new File(new File(parentFile, "src"), "test"), "java");
                     if (javaSrc.exists()) list.add(addDir(libPrefix, javaSrc));
-                    File scalaSrc = new File(new File(new File(entryFile.getParentFile().getParentFile(), "src"), "test"), "scala");
+                    File scalaSrc = new File(new File(new File(parentFile, "src"), "test"), "scala");
                     if (scalaSrc.exists()) list.add(addDir(libPrefix, scalaSrc));
                 }
                 list.add(addDir(libPrefix, entryFile));
