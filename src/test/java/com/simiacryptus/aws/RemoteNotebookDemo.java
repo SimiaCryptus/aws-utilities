@@ -155,11 +155,10 @@ public class RemoteNotebookDemo {
       try (MarkdownNotebookOutput log = new MarkdownNotebookOutput(
         new File("report/" + dateStr + "/" + testName),
           1080, Util.AUTO_BROWSE)) {
-        URI archiveHome = URI.create("s3://" + default_bucket + "/reports/");
+        log.setArchiveHome(URI.create("s3://" + default_bucket + "/reports/"));
         log.onComplete(() -> {
-          S3Util.upload(getS3(), archiveHome, log.getRoot());
+          S3Util.upload(getS3(), log.getArchiveHome(), log.getRoot());
         });
-        log.setArchiveHome(archiveHome);
         log.onComplete(() -> {
           String html = "";
           try {

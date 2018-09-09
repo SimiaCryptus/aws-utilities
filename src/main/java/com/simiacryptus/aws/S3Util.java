@@ -26,6 +26,8 @@ import com.simiacryptus.util.Util;
 import com.simiacryptus.util.io.TeeInputStream;
 import org.apache.commons.io.FileUtils;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.net.URI;
@@ -40,8 +42,11 @@ import java.util.function.Supplier;
  * The type S3 util.
  */
 public class S3Util {
+
+  private final static Logger logger = LoggerFactory.getLogger(S3Util.class);
   public static Map<File, URL> upload(final AmazonS3 s3, final URI path, final File file) {
     try {
+      logger.info(String.format("Uploading %s to %s", file, path));
       HashMap<File, URL> map = new HashMap<>();
       if (!file.exists()) throw new RuntimeException(file.toString());
       if (file.isFile()) {
