@@ -267,11 +267,10 @@ public class EC2NotebookRunner {
   {
     long startTime = System.currentTimeMillis();
     return log -> {
-      URI archiveHome = URI.create("s3://" + s3bucket + "/reports/");
-      ((MarkdownNotebookOutput) log).setArchiveHome(archiveHome);
+      log.setArchiveHome(URI.create("s3://" + s3bucket + "/reports/"));
       log.onComplete(() -> {
         logFiles(log.getRoot());
-        Map<File, URL> uploads = S3Util.upload(getS3(), archiveHome, log.getRoot());
+        Map<File, URL> uploads = S3Util.upload(getS3(), log.getArchiveHome(), log.getRoot());
         sendCompleteEmail(testName, log.getRoot(), uploads, startTime);
       });
       try {
