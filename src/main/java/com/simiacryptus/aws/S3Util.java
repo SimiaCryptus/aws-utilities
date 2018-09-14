@@ -68,7 +68,9 @@ public class S3Util {
         logger.info("No archive destination to publish to");
         return map;
       }
-      URI path = archiveHome.resolve(root.getName());
+
+      URI path = archiveHome.resolve(root.getName() + "/");
+      logger.info(String.format("Resolved %s / %s = %s", archiveHome, root.getName(), path));
       for (File file : root.listFiles()) {
         map.putAll(S3Util.upload(s3, path, file));
       }
@@ -88,31 +90,37 @@ public class S3Util {
 
   public static Map<File, URL> upload(final AmazonS3 s3, final URI path, final File file) {
     try {
-      logger.info(String.format("Uploading %s to %s", file.getAbsolutePath(), path.toString()));
       HashMap<File, URL> map = new HashMap<>();
       if (!file.exists()) throw new RuntimeException(file.toString());
-      URI filePath = path.resolve(file.getName());
-      String reportPath = filePath.getPath().replaceAll("//", "/").replaceAll("^/", "");
+      String bucket = path.getHost();
+      String scheme = path.getScheme();
       if (file.isFile()) {
-        if (path.getScheme().startsWith("s3")) {
-          s3.putObject(new PutObjectRequest(path.getHost(), reportPath, file).withCannedAcl(CannedAccessControlList.PublicRead));
-          map.put(file.getAbsoluteFile(), s3.getUrl(path.getHost(), reportPath));
+        String reportPath = path.resolve(file.getName()).getPath().replaceAll("//", "/").replaceAll("^/", "");
+        if (scheme.startsWith("s3")) {
+          logger.info(String.format("Uploading file %s to s3 %s/%s", file.getAbsolutePath(), bucket, reportPath));
+          s3.putObject(new PutObjectRequest(bucket, reportPath, file).withCannedAcl(CannedAccessControlList.PublicRead));
+          map.put(file.getAbsoluteFile(), s3.getUrl(bucket, reportPath));
         } else {
           try {
+            logger.info(String.format("Copy file %s to %s", file.getAbsolutePath(), reportPath));
             FileUtils.copyFile(file, new File(reportPath));
           } catch (IOException e) {
             throw new RuntimeException(e);
           }
         }
       } else {
-        if (path.getScheme().startsWith("s3")) {
-          List<S3ObjectSummary> preexistingFiles = s3.listObjects(new ListObjectsRequest().withBucketName(path.getHost()).withPrefix(reportPath))
+        URI filePath = path.resolve(file.getName() + "/");
+        if (scheme.startsWith("s3")) {
+          String reportPath = filePath.getPath().replaceAll("//", "/").replaceAll("^/", "");
+          logger.info(String.format("Scanning peer uploads to %s at s3 %s/%s", file.getAbsolutePath(), bucket, reportPath));
+          List<S3ObjectSummary> preexistingFiles = s3.listObjects(new ListObjectsRequest().withBucketName(bucket).withPrefix(reportPath))
               .getObjectSummaries().stream().collect(Collectors.toList());
           for (S3ObjectSummary preexistingFile : preexistingFiles) {
             logger.info(String.format("Preexisting File: '%s' + '%s'", reportPath, preexistingFile.getKey()));
-            map.put(new File(file, preexistingFile.getKey()).getAbsoluteFile(), s3.getUrl(path.getHost(), reportPath + preexistingFile.getKey()));
+            map.put(new File(file, preexistingFile.getKey()).getAbsoluteFile(), s3.getUrl(bucket, reportPath + preexistingFile.getKey()));
           }
         }
+        logger.info(String.format("Uploading folder %s to %s", file.getAbsolutePath(), filePath.toString()));
         for (File subfile : file.listFiles()) {
           map.putAll(upload(s3, filePath, subfile));
         }
