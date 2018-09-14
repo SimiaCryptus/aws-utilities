@@ -68,8 +68,9 @@ public class S3Util {
         logger.info("No archive destination to publish to");
         return map;
       }
+      URI path = archiveHome.resolve(root.getName());
       for (File file : root.listFiles()) {
-        map.putAll(S3Util.upload(s3, archiveHome, file));
+        map.putAll(S3Util.upload(s3, path, file));
       }
       return map;
     } catch (IOException e) {
@@ -87,34 +88,33 @@ public class S3Util {
 
   public static Map<File, URL> upload(final AmazonS3 s3, final URI path, final File file) {
     try {
-      logger.info(String.format("Uploading %s to %s", file, path));
+      logger.info(String.format("Uploading %s to %s", file.getAbsolutePath(), path.toString()));
       HashMap<File, URL> map = new HashMap<>();
       if (!file.exists()) throw new RuntimeException(file.toString());
+      URI filePath = path.resolve(file.getName());
+      String reportPath = filePath.getPath().replaceAll("//", "/").replaceAll("^/", "");
       if (file.isFile()) {
         if (path.getScheme().startsWith("s3")) {
-          String key = path.resolve(file.getName()).getPath().replaceAll("//", "/").replaceAll("^/", "");
-          s3.putObject(new PutObjectRequest(path.getHost(), key, file).withCannedAcl(CannedAccessControlList.PublicRead));
-          map.put(file.getAbsoluteFile(), s3.getUrl(path.getHost(), key));
+          s3.putObject(new PutObjectRequest(path.getHost(), reportPath, file).withCannedAcl(CannedAccessControlList.PublicRead));
+          map.put(file.getAbsoluteFile(), s3.getUrl(path.getHost(), reportPath));
         } else {
-          URI dest = path.resolve(file.getName());
           try {
-            FileUtils.copyFile(file, new File(dest.getPath()));
+            FileUtils.copyFile(file, new File(reportPath));
           } catch (IOException e) {
             throw new RuntimeException(e);
           }
         }
       } else {
         if (path.getScheme().startsWith("s3")) {
-          String prefix = path.resolve(file.getName() + "/").getPath();
-          List<S3ObjectSummary> preexistingFiles = s3.listObjects(new ListObjectsRequest().withBucketName(path.getHost()).withPrefix(prefix))
+          List<S3ObjectSummary> preexistingFiles = s3.listObjects(new ListObjectsRequest().withBucketName(path.getHost()).withPrefix(reportPath))
               .getObjectSummaries().stream().collect(Collectors.toList());
           for (S3ObjectSummary preexistingFile : preexistingFiles) {
-            logger.info(String.format("Preexisting File: '%s' + '%s'", prefix, preexistingFile.getKey()));
-            map.put(new File(file, preexistingFile.getKey()).getAbsoluteFile(), s3.getUrl(path.getHost(), prefix + preexistingFile.getKey()));
+            logger.info(String.format("Preexisting File: '%s' + '%s'", reportPath, preexistingFile.getKey()));
+            map.put(new File(file, preexistingFile.getKey()).getAbsoluteFile(), s3.getUrl(path.getHost(), reportPath + preexistingFile.getKey()));
           }
         }
         for (File subfile : file.listFiles()) {
-          map.putAll(upload(s3, path.resolve(file.getName() + "/"), subfile));
+          map.putAll(upload(s3, filePath, subfile));
         }
       }
       return map;
