@@ -69,10 +69,9 @@ public class S3Util {
         return map;
       }
 
-      URI path = archiveHome.resolve(root.getName() + "/");
-      logger.info(String.format("Resolved %s / %s = %s", archiveHome, root.getName(), path));
+      logger.info(String.format("Resolved %s / %s = %s", archiveHome, root.getName(), archiveHome));
       for (File file : root.listFiles()) {
-        map.putAll(S3Util.upload(s3, path, file));
+        map.putAll(S3Util.upload(s3, archiveHome, file));
       }
       return map;
     } catch (IOException e) {
