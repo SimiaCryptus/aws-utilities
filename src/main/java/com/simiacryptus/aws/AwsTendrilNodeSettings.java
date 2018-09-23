@@ -39,32 +39,32 @@ public final class AwsTendrilNodeSettings extends AwsTendrilEnvSettings {
    * The Username.
    */
   public String username;
-  
+
   /**
    * Instantiates a new Aws tendril settings.
    */
   protected AwsTendrilNodeSettings() {
     super();
   }
-  
+
   public AwsTendrilNodeSettings(final String securityGroup, final String instanceProfileArn, final String bucket) {
     super(securityGroup, instanceProfileArn, bucket);
   }
-  
+
   public AwsTendrilNodeSettings(AwsTendrilEnvSettings parent) {
     super(parent.securityGroup, parent.instanceProfileArn, parent.bucket);
   }
-  
+
   /**
    * Jvm config tendril . jvm config.
    *
    * @return the tendril . jvm config
    */
   @Nonnull
-  public Tendril.JvmConfig jvmConfig() {
+  public Tendril.JvmConfig newJvmConfig() {
     return new Tendril.JvmConfig(this.imageId, this.instanceType, this.username);
   }
-  
+
   /**
    * Start node ec 2 util . ec 2 node.
    *
@@ -73,7 +73,7 @@ public final class AwsTendrilNodeSettings extends AwsTendrilEnvSettings {
    * @return the ec 2 util . ec 2 node
    */
   public EC2Util.EC2Node startNode(final AmazonEC2 ec2, final int localControlPort) {
-    return EC2Util.start(ec2, jvmConfig(), getServiceConfig(ec2), localControlPort);
+    return EC2Util.start(ec2, newJvmConfig(), getServiceConfig(ec2), localControlPort);
   }
-  
+
 }

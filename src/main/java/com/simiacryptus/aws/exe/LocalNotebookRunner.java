@@ -19,11 +19,13 @@
 
 package com.simiacryptus.aws.exe;
 
+import com.simiacryptus.lang.SerializableConsumer;
+import com.simiacryptus.notebook.MarkdownNotebookOutput;
+import com.simiacryptus.notebook.NotebookOutput;
 import com.simiacryptus.util.Util;
-import com.simiacryptus.util.io.MarkdownNotebookOutput;
-import com.simiacryptus.util.io.NotebookOutput;
-import com.simiacryptus.util.lang.SerializableConsumer;
 import com.simiacryptus.util.test.SysOutInterceptor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.util.function.Consumer;
@@ -32,11 +34,12 @@ import java.util.function.Consumer;
  * The type Local runner.
  */
 public class LocalNotebookRunner {
-  
+  private static final Logger logger = LoggerFactory.getLogger(LocalNotebookRunner.class);
+
   static {
     SysOutInterceptor.INSTANCE.init();
   }
-  
+
   /**
    * Gets task.
    *
@@ -49,13 +52,12 @@ public class LocalNotebookRunner {
    * @throws ClassNotFoundException the class not found exception
    */
   public static <T extends SerializableConsumer> SerializableConsumer<NotebookOutput> getTask(
-    final Class<T> defaultClass,
-    final String... args
-  ) throws InstantiationException, IllegalAccessException, ClassNotFoundException
-  {
+      final Class<T> defaultClass,
+      final String... args
+  ) throws InstantiationException, IllegalAccessException, ClassNotFoundException {
     return (SerializableConsumer<NotebookOutput>) (args.length == 0 ? defaultClass : Class.forName(args[0])).newInstance();
   }
-  
+
   /**
    * Run.
    *
@@ -65,16 +67,16 @@ public class LocalNotebookRunner {
   public static void run(Consumer<NotebookOutput>... fns) throws Exception {
     for (final Consumer<NotebookOutput> fn : fns) {
       try (NotebookOutput log = new MarkdownNotebookOutput(
-        new File("report/" + Util.dateStr("yyyyMMddHHmmss") + "/index"),
+          new File("report/" + Util.dateStr("yyyyMMddHHmmss") + "/index"),
           Util.AUTO_BROWSE
-      ))
-      {
+      )) {
         fn.accept(log);
         log.setFrontMatterProperty("status", "OK");
       } finally {
+        logger.warn("Exiting notebook", new RuntimeException("Stack Trace"));
         System.exit(0);
       }
     }
   }
-  
+
 }

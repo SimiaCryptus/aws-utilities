@@ -20,57 +20,27 @@
 package com.simiacryptus.aws;
 
 import com.amazonaws.services.ec2.AmazonEC2;
-import com.amazonaws.services.ec2.model.AuthorizeSecurityGroupIngressRequest;
-import com.amazonaws.services.ec2.model.CreateKeyPairRequest;
-import com.amazonaws.services.ec2.model.CreateSecurityGroupRequest;
-import com.amazonaws.services.ec2.model.DescribeInstancesRequest;
-import com.amazonaws.services.ec2.model.DescribeKeyPairsRequest;
-import com.amazonaws.services.ec2.model.DescribeSecurityGroupsRequest;
-import com.amazonaws.services.ec2.model.IamInstanceProfileSpecification;
-import com.amazonaws.services.ec2.model.Instance;
-import com.amazonaws.services.ec2.model.IpPermission;
-import com.amazonaws.services.ec2.model.IpRange;
+import com.amazonaws.services.ec2.model.*;
 import com.amazonaws.services.ec2.model.KeyPair;
-import com.amazonaws.services.ec2.model.KeyPairInfo;
-import com.amazonaws.services.ec2.model.RunInstancesRequest;
-import com.amazonaws.services.ec2.model.ShutdownBehavior;
-import com.amazonaws.services.ec2.model.TerminateInstancesRequest;
-import com.amazonaws.services.ec2.model.TerminateInstancesResult;
-import com.amazonaws.services.ec2.model.UserIdGroupPair;
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagement;
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagementClientBuilder;
-import com.amazonaws.services.identitymanagement.model.AddRoleToInstanceProfileRequest;
-import com.amazonaws.services.identitymanagement.model.AttachRolePolicyRequest;
-import com.amazonaws.services.identitymanagement.model.CreateInstanceProfileRequest;
-import com.amazonaws.services.identitymanagement.model.CreatePolicyRequest;
-import com.amazonaws.services.identitymanagement.model.CreateRoleRequest;
-import com.amazonaws.services.identitymanagement.model.GetRoleRequest;
-import com.amazonaws.services.identitymanagement.model.GetRoleResult;
-import com.amazonaws.services.identitymanagement.model.InstanceProfile;
-import com.amazonaws.services.identitymanagement.model.Policy;
-import com.amazonaws.services.identitymanagement.model.Role;
+import com.amazonaws.services.identitymanagement.model.*;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.util.StringInputStream;
-import com.jcraft.jsch.Channel;
-import com.jcraft.jsch.ChannelExec;
-import com.jcraft.jsch.JSch;
-import com.jcraft.jsch.JSchException;
-import com.jcraft.jsch.Session;
+import com.jcraft.jsch.*;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.CloseShieldOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.SequenceInputStream;
+import java.io.*;
+import java.net.InetAddress;
+import java.net.URI;
+import java.net.UnknownHostException;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -85,11 +55,12 @@ import java.util.stream.Stream;
  * The type Ec 2 util.
  */
 public class EC2Util {
-  
+
   private static final Logger logger = LoggerFactory.getLogger(EC2Util.class);
   private static final Charset charset = Charset.forName("UTF-8");
+  private static final Random random = new Random();
   private static volatile KeyPair keyPair = null;
-  
+
   /**
    * Stage.
    *
@@ -109,8 +80,19 @@ public class EC2Util {
     logger.debug(String.format("Pulling from s3: %s/%s", bucket, key));
     exec(session, String.format("aws s3api get-object --bucket %s --key %s %s", bucket, key, remote));
   }
-  
-  
+
+  public static String publicHostname() {
+    try {
+      return IOUtils.toString(new URI("http://169.254.169.254/latest/meta-data/public-hostname"), "UTF-8");
+    } catch (Throwable e) {
+      try {
+        return InetAddress.getLocalHost().getHostName();
+      } catch (UnknownHostException e1) {
+        throw new RuntimeException(e1);
+      }
+    }
+  }
+
   /**
    * Scp string.
    *
@@ -120,8 +102,10 @@ public class EC2Util {
    * @return the string
    */
   @Nonnull
-  public static String scp(final Session session, final File file, final String remote) {return scp(session, file, remote, 2);}
-  
+  public static String scp(final Session session, final File file, final String remote) {
+    return scp(session, file, remote, 2);
+  }
+
   /**
    * Scp string.
    *
@@ -142,9 +126,9 @@ public class EC2Util {
       channel.setExtOutputStream(new CloseShieldOutputStream(System.err));
       String header = String.format("C0644 %d %s\n", file.length(), Arrays.stream(remote.split("/")).reduce((a, b) -> b).get());
       channel.setInputStream(Arrays.asList(
-        new StringInputStream(header),
-        new FileInputStream(file),
-        new ByteArrayInputStream(new byte[]{0})
+          new StringInputStream(header),
+          new FileInputStream(file),
+          new ByteArrayInputStream(new byte[]{0})
       ).stream().reduce((a, b) -> new SequenceInputStream(a, b)).get());
       channel.connect();
       join((Channel) channel);
@@ -161,7 +145,7 @@ public class EC2Util {
       throw new RuntimeException(e);
     }
   }
-  
+
   /**
    * Shell int.
    *
@@ -186,7 +170,7 @@ public class EC2Util {
       throw new RuntimeException(e);
     }
   }
-  
+
   /**
    * Join.
    *
@@ -198,7 +182,7 @@ public class EC2Util {
       Thread.sleep(100);
     }
   }
-  
+
   /**
    * Run t.
    *
@@ -216,7 +200,7 @@ public class EC2Util {
   public static <T> T run(final AmazonEC2 ec2, final String imageId, final String instanceType, final String username, Function<Session, T> task, final String bucket, final int localControlPort, final int... ports) {
     return start(ec2, imageId, instanceType, username, AmazonIdentityManagementClientBuilder.defaultClient(), bucket, localControlPort, ports).runAndTerminate(task);
   }
-  
+
   /**
    * Start ec 2 node.
    *
@@ -233,17 +217,17 @@ public class EC2Util {
   @Nonnull
   public static EC2Node start(final AmazonEC2 ec2, final String imageId, final String instanceType, final String username, final AmazonIdentityManagement iam, final String bucket, final int localControlPort, final int... ports) {
     return start(ec2, imageId, instanceType, username, newIamRole(iam, ("{\n" +
-      "  \"Version\": \"2012-10-17\",\n" +
-      "  \"Statement\": [\n" +
-      "    {\n" +
-      "      \"Action\": \"s3:*\",\n" +
-      "      \"Effect\": \"Allow\",\n" +
-      "      \"Resource\": \"arn:aws:s3:::BUCKET*\"\n" +
-      "    }\n" +
-      "  ]\n" +
-      "}").replaceAll("BUCKET", bucket)), localControlPort, ports);
+        "  \"Version\": \"2012-10-17\",\n" +
+        "  \"Statement\": [\n" +
+        "    {\n" +
+        "      \"Action\": \"s3:*\",\n" +
+        "      \"Effect\": \"Allow\",\n" +
+        "      \"Resource\": \"arn:aws:s3:::BUCKET*\"\n" +
+        "    }\n" +
+        "  ]\n" +
+        "}").replaceAll("BUCKET", bucket)), localControlPort, ports);
   }
-  
+
   /**
    * Start ec 2 node.
    *
@@ -260,7 +244,7 @@ public class EC2Util {
   public static EC2Node start(final AmazonEC2 ec2, final String imageId, final String instanceType, final String username, final InstanceProfile iam, final int localControlPort, final int... ports) {
     return start(ec2, imageId, instanceType, username, getKeyPair(ec2), newSecurityGroup(ec2, ports), iam, localControlPort);
   }
-  
+
   /**
    * Start ec 2 node.
    *
@@ -284,7 +268,7 @@ public class EC2Util {
       return null;
     }
   }
-  
+
   /**
    * Start ec 2 node.
    *
@@ -301,17 +285,17 @@ public class EC2Util {
   @Nullable
   public static EC2Node start(final AmazonEC2 ec2, final String imageId, final String instanceType, final String username, final KeyPair keyPair, final String groupId, final AmazonIdentityManagement iam, final String bucket) {
     return start(ec2, imageId, instanceType, username, keyPair, groupId, newIamRole(iam, ("{\n" +
-      "  \"Version\": \"2012-10-17\",\n" +
-      "  \"Statement\": [\n" +
-      "    {\n" +
-      "      \"Action\": \"s3:*\",\n" +
-      "      \"Effect\": \"Allow\",\n" +
-      "      \"Resource\": \"arn:aws:s3:::BUCKET*\"\n" +
-      "    }\n" +
-      "  ]\n" +
-      "}").replaceAll("BUCKET", bucket)), 1319);
+        "  \"Version\": \"2012-10-17\",\n" +
+        "  \"Statement\": [\n" +
+        "    {\n" +
+        "      \"Action\": \"s3:*\",\n" +
+        "      \"Effect\": \"Allow\",\n" +
+        "      \"Resource\": \"arn:aws:s3:::BUCKET*\"\n" +
+        "    }\n" +
+        "  ]\n" +
+        "}").replaceAll("BUCKET", bucket)), 1319);
   }
-  
+
   /**
    * Gets key pair.
    *
@@ -329,8 +313,7 @@ public class EC2Util {
           }).filter(x -> !x.isEmpty()).map(keyName -> loadKey(ec2, keyName)).filter(x -> x != null).findFirst().orElse(null);
           if (null != key) {
             keyPair = key;
-          }
-          else {
+          } else {
             String keyName = "key_" + randomHex();
             logger.info("Creating Key Pair: " + keyName);
             keyPair = ec2.createKeyPair(new CreateKeyPairRequest().withKeyName(keyName)).getKeyPair();
@@ -345,7 +328,7 @@ public class EC2Util {
     }
     return keyPair;
   }
-  
+
   /**
    * Load key key pair.
    *
@@ -365,7 +348,7 @@ public class EC2Util {
       return null;
     }
   }
-  
+
   /**
    * New iam role instance profile.
    *
@@ -376,33 +359,33 @@ public class EC2Util {
   @Nonnull
   public static InstanceProfile newIamRole(final AmazonIdentityManagement iam, final String policyDocument) {
     String initialDocument = "{\n" +
-      "               \"Version\" : \"2012-10-17\",\n" +
-      "               \"Statement\": [ {\n" +
-      "                  \"Effect\": \"Allow\",\n" +
-      "                  \"Principal\": {\n" +
-      "                     \"Service\": [ \"ec2.amazonaws.com\" ]\n" +
-      "                  },\n" +
-      "                  \"Action\": [ \"sts:AssumeRole\" ]\n" +
-      "               } ]\n" +
-      "            }";
+        "               \"Version\" : \"2012-10-17\",\n" +
+        "               \"Statement\": [ {\n" +
+        "                  \"Effect\": \"Allow\",\n" +
+        "                  \"Principal\": {\n" +
+        "                     \"Service\": [ \"ec2.amazonaws.com\" ]\n" +
+        "                  },\n" +
+        "                  \"Action\": [ \"sts:AssumeRole\" ]\n" +
+        "               } ]\n" +
+        "            }";
     Role role = iam.createRole(new CreateRoleRequest()
-      .withRoleName("role_" + randomHex())
-      .withAssumeRolePolicyDocument(initialDocument)
+        .withRoleName("role_" + randomHex())
+        .withAssumeRolePolicyDocument(initialDocument)
     ).getRole();
     while (!getRole(iam, role.getRoleName()).isPresent()) sleep(10000);
     Policy policy = iam.createPolicy(new CreatePolicyRequest()
-      .withPolicyDocument(policyDocument.replaceAll("ROLEARN", role.getArn()))
-      .withPolicyName("policy-" + randomHex())
+        .withPolicyDocument(policyDocument.replaceAll("ROLEARN", role.getArn()))
+        .withPolicyName("policy-" + randomHex())
     ).getPolicy();
     iam.attachRolePolicy(new AttachRolePolicyRequest().withPolicyArn(policy.getArn()).withRoleName(role.getRoleName()));
     InstanceProfile instanceProfile = iam.createInstanceProfile(new CreateInstanceProfileRequest().withInstanceProfileName("runpol-" + randomHex())).getInstanceProfile();
     iam.addRoleToInstanceProfile(new AddRoleToInstanceProfileRequest()
-      .withInstanceProfileName(instanceProfile.getInstanceProfileName())
-      .withRoleName(role.getRoleName())
+        .withInstanceProfileName(instanceProfile.getInstanceProfileName())
+        .withRoleName(role.getRoleName())
     );
     return instanceProfile;
   }
-  
+
   /**
    * Gets role.
    *
@@ -417,7 +400,7 @@ public class EC2Util {
       return Optional.empty();
     }
   }
-  
+
   /**
    * New security group string.
    *
@@ -428,27 +411,25 @@ public class EC2Util {
   public static String newSecurityGroup(final AmazonEC2 ec2, int... ports) {
     String groupName = "sg_" + randomHex();
     String groupId = ec2.createSecurityGroup(new CreateSecurityGroupRequest()
-      .withGroupName(groupName)
-      .withDescription("Created by " + EC2Util.class.getCanonicalName())).getGroupId();
+        .withGroupName(groupName)
+        .withDescription("Created by " + EC2Util.class.getCanonicalName())).getGroupId();
     while (!exists(ec2, groupId)) {
       logger.info("Awaiting security group creation...");
       sleep(10000);
     }
     ec2.authorizeSecurityGroupIngress(new AuthorizeSecurityGroupIngressRequest()
-      .withGroupId(groupId)
-                                        .withIpPermissions(Stream.concat(
-                                          Arrays.stream(ports).mapToObj(port -> getTcpPermission(port)),
-                                          Stream.of(new IpPermission()
-                                                      .withUserIdGroupPairs(new UserIdGroupPair().withGroupId(groupId))
-                                                      .withIpProtocol("tcp")
-                                                      .withFromPort(0)
-                                                      .withToPort(0xFFFF))
-                                        ).toArray(i -> new IpPermission[i])));
+        .withGroupId(groupId)
+        .withIpPermissions(Stream.concat(
+            Arrays.stream(ports).mapToObj(port -> getTcpPermission(port)),
+            Stream.of(new IpPermission()
+                .withUserIdGroupPairs(new UserIdGroupPair().withGroupId(groupId))
+                .withIpProtocol("tcp")
+                .withFromPort(0)
+                .withToPort(0xFFFF))
+        ).toArray(i -> new IpPermission[i])));
     return groupId;
   }
-  
-  private static final Random random = new Random();
-  
+
   /**
    * Connect session.
    *
@@ -491,7 +472,7 @@ public class EC2Util {
       }
     }
   }
-  
+
   /**
    * Start instance.
    *
@@ -506,17 +487,17 @@ public class EC2Util {
    */
   public static Instance start(final AmazonEC2 ec2, final String ami, final String instanceType, final String groupId, final KeyPair keyPair, final AmazonIdentityManagement iam, final String bucket) {
     return start(ec2, ami, instanceType, groupId, keyPair, newIamRole(iam, ("{\n" +
-      "  \"Version\": \"2012-10-17\",\n" +
-      "  \"Statement\": [\n" +
-      "    {\n" +
-      "      \"Action\": \"s3:*\",\n" +
-      "      \"Effect\": \"Allow\",\n" +
-      "      \"Resource\": \"arn:aws:s3:::BUCKET*\"\n" +
-      "    }\n" +
-      "  ]\n" +
-      "}").replaceAll("BUCKET", bucket)));
+        "  \"Version\": \"2012-10-17\",\n" +
+        "  \"Statement\": [\n" +
+        "    {\n" +
+        "      \"Action\": \"s3:*\",\n" +
+        "      \"Effect\": \"Allow\",\n" +
+        "      \"Resource\": \"arn:aws:s3:::BUCKET*\"\n" +
+        "    }\n" +
+        "  ]\n" +
+        "}").replaceAll("BUCKET", bucket)));
   }
-  
+
   /**
    * Sleep.
    *
@@ -530,7 +511,7 @@ public class EC2Util {
       Thread.currentThread().interrupt();
     }
   }
-  
+
   /**
    * Exists boolean.
    *
@@ -545,7 +526,7 @@ public class EC2Util {
       return false;
     }
   }
-  
+
   /**
    * Gets instance.
    *
@@ -556,7 +537,7 @@ public class EC2Util {
   public static Instance getInstance(final AmazonEC2 ec2, final Instance instance) {
     return ec2.describeInstances(new DescribeInstancesRequest().withInstanceIds(instance.getInstanceId())).getReservations().get(0).getInstances().get(0);
   }
-  
+
   /**
    * Start instance.
    *
@@ -570,19 +551,19 @@ public class EC2Util {
    */
   public static Instance start(final AmazonEC2 ec2, final String ami, final String instanceType, final String groupId, final KeyPair keyPair, final InstanceProfile instanceProfile) {
     final AtomicReference<Instance> instance = new AtomicReference<>();
-    
+
     instance.set(ec2.runInstances(new RunInstancesRequest()
-        .withImageId(ami)
-        .withInstanceType(instanceType)
-        .withIamInstanceProfile(new IamInstanceProfileSpecification()
-            .withArn(instanceProfile.getArn())
+            .withImageId(ami)
+            .withInstanceType(instanceType)
+            .withIamInstanceProfile(new IamInstanceProfileSpecification()
+                    .withArn(instanceProfile.getArn())
 //        .withName(role.getInstanceProfileName())
-        )
-        .withInstanceInitiatedShutdownBehavior(ShutdownBehavior.Terminate)
-        .withMinCount(1)
-        .withMaxCount(1)
-        .withKeyName(keyPair.getKeyName())
-        .withSecurityGroupIds(groupId)
+            )
+            .withInstanceInitiatedShutdownBehavior(ShutdownBehavior.Terminate)
+            .withMinCount(1)
+            .withMaxCount(1)
+            .withKeyName(keyPair.getKeyName())
+            .withSecurityGroupIds(groupId)
     ).getReservation().getInstances().get(0));
     while (instance.get().getState().getName().equals("pending")) {
       logger.info("Awaiting instance startup...");
@@ -591,7 +572,7 @@ public class EC2Util {
     }
     return instance.get();
   }
-  
+
   /**
    * Random hex string.
    *
@@ -601,7 +582,7 @@ public class EC2Util {
   public static String randomHex() {
     return Long.toHexString(random.nextLong()).substring(0, 5);
   }
-  
+
   /**
    * Gets tcp permission.
    *
@@ -610,12 +591,12 @@ public class EC2Util {
    */
   public static IpPermission getTcpPermission(final int port) {
     return new IpPermission()
-             .withIpv4Ranges(Arrays.asList(new IpRange().withCidrIp("0.0.0.0/0")))
-             .withIpProtocol("tcp")
-             .withFromPort(port)
-             .withToPort(port);
+        .withIpv4Ranges(Arrays.asList(new IpRange().withCidrIp("0.0.0.0/0")))
+        .withIpProtocol("tcp")
+        .withFromPort(port)
+        .withToPort(port);
   }
-  
+
   /**
    * Exec string.
    *
@@ -627,7 +608,7 @@ public class EC2Util {
   public static String exec(final Session session, final String script) {
     try {
       logger.debug("Executing: " + script);
-      Process process = execAsync(session, script);
+      Process process = execAsync(session, script, new HashMap<String, String>());
       join(process.getChannel());
       String output = new String(process.getOutBuffer().toByteArray(), charset);
       int exitStatus = process.getChannel().getExitStatus();
@@ -640,34 +621,38 @@ public class EC2Util {
       throw new RuntimeException(e);
     }
   }
-  
+
   /**
    * Exec async process.
    *
    * @param session the session
    * @param script  the script
+   * @param env
    * @return the process
    */
   @Nonnull
-  public static Process execAsync(final Session session, final String script) {return execAsync(session, script, new ByteArrayOutputStream());}
-  
+  public static Process execAsync(final Session session, final String script, HashMap<String, String> env) {
+    return execAsync(session, script, new ByteArrayOutputStream(), env);
+  }
+
   /**
    * Exec async process.
    *
    * @param session   the session
    * @param script    the script
    * @param outBuffer the out buffer
+   * @param env
    * @return the process
    */
   @Nonnull
-  public static Process execAsync(final Session session, final String script, final OutputStream outBuffer) {
+  public static Process execAsync(final Session session, final String script, final OutputStream outBuffer, HashMap<String, String> env) {
     try {
-      return new Process(session, script, outBuffer);
+      return new Process(session, script, outBuffer, env);
     } catch (JSchException e) {
       throw new RuntimeException(e);
     }
   }
-  
+
   /**
    * Join.
    *
@@ -679,7 +664,7 @@ public class EC2Util {
       Thread.sleep(100);
     }
   }
-  
+
   /**
    * Start ec 2 node.
    *
@@ -692,7 +677,7 @@ public class EC2Util {
   public static EC2Node start(final AmazonEC2 ec2, final NodeConfig jvmConfig, final ServiceConfig serviceConfig, final int localControlPort) {
     return start(ec2, jvmConfig.imageId, jvmConfig.instanceType, jvmConfig.username, serviceConfig.keyPair, serviceConfig.groupId, serviceConfig.instanceProfile, localControlPort);
   }
-  
+
   /**
    * The type Ec 2 node.
    */
@@ -700,7 +685,7 @@ public class EC2Util {
     private final AmazonEC2 ec2;
     private final Session connection;
     private final String instanceId;
-  
+
     /**
      * Instantiates a new Ec 2 node.
      *
@@ -713,7 +698,7 @@ public class EC2Util {
       this.connection = connection;
       this.instanceId = instanceId;
     }
-  
+
     /**
      * Start jvm tendril . tendril control.
      *
@@ -723,23 +708,22 @@ public class EC2Util {
      * @param localControlPort the local control port
      * @return the tendril . tendril control
      */
-    public Tendril.TendrilControl startJvm(
-      final AmazonEC2 ec2,
-      final AmazonS3 s3,
-      final AwsTendrilNodeSettings settings,
-      final int localControlPort
-    )
-    {
+    public TendrilControl startJvm(
+        final AmazonEC2 ec2,
+        final AmazonS3 s3,
+        final AwsTendrilNodeSettings settings,
+        final int localControlPort
+    ) {
       return Tendril.startRemoteJvm(this,
-                                    settings.jvmConfig(),
-                                    localControlPort,
-                                    Tendril::defaultClasspathFilter,
-                                    s3,
-                                    settings.getServiceConfig(ec2).bucket,
-                                    new HashMap<String, String>()
+          settings.newJvmConfig(),
+          localControlPort,
+          Tendril::defaultClasspathFilter,
+          s3,
+          settings.getServiceConfig(ec2).bucket,
+          new HashMap<String, String>()
       );
     }
-  
+
     /**
      * Run and terminate t.
      *
@@ -754,7 +738,7 @@ public class EC2Util {
         terminate();
       }
     }
-  
+
     /**
      * Terminate terminate instances result.
      *
@@ -764,7 +748,7 @@ public class EC2Util {
       logger.info("Terminating " + getInstanceId());
       return ec2.terminateInstances(new TerminateInstancesRequest().withInstanceIds(getInstanceId()));
     }
-  
+
     /**
      * Gets connection.
      *
@@ -773,7 +757,7 @@ public class EC2Util {
     public Session getConnection() {
       return connection;
     }
-  
+
     /**
      * Gets instance id.
      *
@@ -782,12 +766,12 @@ public class EC2Util {
     public String getInstanceId() {
       return instanceId;
     }
-    
+
     @Override
     public void close() {
       terminate();
     }
-  
+
     /**
      * Shell int.
      *
@@ -796,7 +780,7 @@ public class EC2Util {
     public int shell() {
       return EC2Util.shell(getConnection());
     }
-  
+
     /**
      * Scp string.
      *
@@ -807,7 +791,7 @@ public class EC2Util {
     public String scp(final File local, final String remote) {
       return EC2Util.scp(getConnection(), local, remote);
     }
-  
+
     /**
      * Exec string.
      *
@@ -817,7 +801,7 @@ public class EC2Util {
     public String exec(final String command) {
       return EC2Util.exec(getConnection(), command);
     }
-  
+
     /**
      * Exec async process.
      *
@@ -825,9 +809,9 @@ public class EC2Util {
      * @return the process
      */
     public Process execAsync(final String command) {
-      return EC2Util.execAsync(getConnection(), command);
+      return EC2Util.execAsync(getConnection(), command, new HashMap<String, String>());
     }
-  
+
     /**
      * Stage.
      *
@@ -840,7 +824,7 @@ public class EC2Util {
     public void stage(final File entryFile, final String remote, final String bucket, final String keyspace, final AmazonS3 s3) {
       EC2Util.stage(getConnection(), entryFile, remote, bucket, keyspace, s3);
     }
-  
+
     /**
      * Gets status.
      *
@@ -850,31 +834,33 @@ public class EC2Util {
       return ec2.describeInstances(new DescribeInstancesRequest().withInstanceIds(getInstanceId())).getReservations().get(0).getInstances().get(0);
     }
   }
-  
+
   /**
    * The type Process.
    */
   public static class Process {
     private final ChannelExec channel;
     private final OutputStream outBuffer;
-  
+
     /**
      * Instantiates a new Process.
      *
      * @param session   the session
      * @param script    the script
      * @param outBuffer the out buffer
+     * @param env
      * @throws JSchException the j sch exception
      */
-    public Process(final Session session, final String script, final OutputStream outBuffer) throws JSchException {
+    public Process(final Session session, final String script, final OutputStream outBuffer, HashMap<String, String> env) throws JSchException {
       channel = (ChannelExec) session.openChannel("exec");
       channel.setCommand(script);
       this.outBuffer = outBuffer;
       channel.setOutputStream(this.outBuffer);
+      env.forEach((k,v)->channel.setEnv(k,v));
       channel.setExtOutputStream(new CloseShieldOutputStream(System.err));
       channel.connect();
     }
-  
+
     /**
      * Gets channel.
      *
@@ -883,7 +869,7 @@ public class EC2Util {
     public ChannelExec getChannel() {
       return channel;
     }
-  
+
     /**
      * Gets out buffer.
      *
@@ -892,7 +878,7 @@ public class EC2Util {
     public ByteArrayOutputStream getOutBuffer() {
       return (ByteArrayOutputStream) outBuffer;
     }
-  
+
     /**
      * Join string.
      *
@@ -906,7 +892,7 @@ public class EC2Util {
         throw new RuntimeException(e);
       }
     }
-  
+
     /**
      * Gets output.
      *
@@ -917,7 +903,7 @@ public class EC2Util {
       return new String(getOutBuffer().toByteArray(), charset);
     }
   }
-  
+
   /**
    * The type Service config.
    */
@@ -938,7 +924,7 @@ public class EC2Util {
      * The Key pair.
      */
     public KeyPair keyPair;
-  
+
     /**
      * Instantiates a new Service config.
      *
@@ -948,13 +934,13 @@ public class EC2Util {
      */
     public ServiceConfig(final AmazonEC2 ec2, final String bucket, final String roleArn) {
       this(
-        ec2,
-        bucket,
-        roleArn,
-        EC2Util.newSecurityGroup(ec2, 22, 1080, 4040, 8080)
+          ec2,
+          bucket,
+          roleArn,
+          EC2Util.newSecurityGroup(ec2, 22, 1080, 4040, 8080)
       );
     }
-  
+
     /**
      * Instantiates a new Service config.
      *
@@ -963,8 +949,10 @@ public class EC2Util {
      * @param roleArn the role arn
      * @param groupId the group id
      */
-    public ServiceConfig(final AmazonEC2 ec2, final String bucket, final String roleArn, final String groupId) {this(ec2, bucket, groupId, new InstanceProfile().withArn(roleArn));}
-  
+    public ServiceConfig(final AmazonEC2 ec2, final String bucket, final String roleArn, final String groupId) {
+      this(ec2, bucket, groupId, new InstanceProfile().withArn(roleArn));
+    }
+
     /**
      * Instantiates a new Service config.
      *
@@ -973,8 +961,10 @@ public class EC2Util {
      * @param groupId         the group id
      * @param instanceProfile the instance profile
      */
-    public ServiceConfig(final AmazonEC2 ec2, final String bucket, final String groupId, final InstanceProfile instanceProfile) {this(bucket, groupId, instanceProfile, EC2Util.getKeyPair(ec2));}
-  
+    public ServiceConfig(final AmazonEC2 ec2, final String bucket, final String groupId, final InstanceProfile instanceProfile) {
+      this(bucket, groupId, instanceProfile, EC2Util.getKeyPair(ec2));
+    }
+
     /**
      * Instantiates a new Service config.
      *
@@ -990,7 +980,7 @@ public class EC2Util {
       this.keyPair = keyPair;
     }
   }
-  
+
   /**
    * The type Node config.
    */
@@ -1007,7 +997,7 @@ public class EC2Util {
      * The Username.
      */
     public String username;
-  
+
     /**
      * Instantiates a new Node config.
      *
@@ -1021,5 +1011,5 @@ public class EC2Util {
       this.username = username;
     }
   }
-  
+
 }

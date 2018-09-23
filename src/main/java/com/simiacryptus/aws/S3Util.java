@@ -26,8 +26,8 @@ import com.amazonaws.services.s3.model.CannedAccessControlList;
 import com.amazonaws.services.s3.model.ListObjectsRequest;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
+import com.simiacryptus.notebook.NotebookOutput;
 import com.simiacryptus.util.Util;
-import com.simiacryptus.util.io.NotebookOutput;
 import com.simiacryptus.util.io.TeeInputStream;
 import org.apache.commons.io.FileUtils;
 import org.jetbrains.annotations.NotNull;
@@ -54,7 +54,9 @@ public class S3Util {
   private final static Logger logger = LoggerFactory.getLogger(S3Util.class);
 
   public static Map<File, URL> upload(NotebookOutput log) {
-    return upload(log, AmazonS3ClientBuilder.standard().withRegion(Regions.US_WEST_2).build());
+    synchronized (log) {
+      return upload(log, AmazonS3ClientBuilder.standard().withRegion(Regions.US_WEST_2).build());
+    }
   }
 
   public static Map<File, URL> upload(NotebookOutput log, AmazonS3 s3) {
@@ -64,11 +66,10 @@ public class S3Util {
       logFiles(root);
       URI archiveHome = log.getArchiveHome();
       HashMap<File, URL> map = new HashMap<>();
-      if (null == archiveHome || (archiveHome.getScheme().startsWith("s3") && (null == archiveHome.getHost() || archiveHome.getHost().isEmpty()))) {
+      if (null == archiveHome || (archiveHome.getScheme().startsWith("s3") && (null == archiveHome.getHost() || archiveHome.getHost().isEmpty() || "null".equals(archiveHome.getHost())))) {
         logger.info("No archive destination to publish to");
         return map;
       }
-
       logger.info(String.format("Resolved %s / %s = %s", archiveHome, root.getName(), archiveHome));
       for (File file : root.listFiles()) {
         map.putAll(S3Util.upload(s3, archiveHome, file));

@@ -23,6 +23,8 @@ import com.amazonaws.services.simpleemail.AmazonSimpleEmailService;
 import com.amazonaws.services.simpleemail.model.RawMessage;
 import com.amazonaws.services.simpleemail.model.SendRawEmailRequest;
 import com.amazonaws.services.simpleemail.model.VerifyEmailAddressRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.activation.DataHandler;
 import javax.activation.DataSource;
@@ -48,7 +50,8 @@ import java.util.stream.Stream;
  * The type Ses util.
  */
 public class SESUtil {
-  
+  private static final Logger logger = LoggerFactory.getLogger(SESUtil.class);
+
   /**
    * Send.
    *
@@ -63,14 +66,14 @@ public class SESUtil {
     try {
       Stream<MimeBodyPart> attachmentStream = Arrays.stream(attachments).filter(x -> x.exists() && x.length() < 1024 * 1024 * 4).map(SESUtil::toAttachment);
       ses.sendRawEmail(new SendRawEmailRequest(toRaw(getMessage(
-        Session.getDefaultInstance(new Properties()), subject, to,
-        mix(Stream.concat(Stream.of(wrap(getEmailBody(body, html))), attachmentStream).toArray(i -> new MimeBodyPart[i]))
+          Session.getDefaultInstance(new Properties()), subject, to,
+          mix(Stream.concat(Stream.of(wrap(getEmailBody(body, html))), attachmentStream).toArray(i -> new MimeBodyPart[i]))
       ))));
     } catch (IOException | MessagingException e) {
       throw new RuntimeException(e);
     }
   }
-  
+
   /**
    * Gets message.
    *
@@ -89,7 +92,7 @@ public class SESUtil {
     message.setContent(content);
     return message;
   }
-  
+
   /**
    * Gets email body.
    *
@@ -110,7 +113,7 @@ public class SESUtil {
     }
     return multipart;
   }
-  
+
   /**
    * To raw raw message.
    *
@@ -125,7 +128,7 @@ public class SESUtil {
     message.writeTo(outputStream);
     return new RawMessage(ByteBuffer.wrap(outputStream.toByteArray()));
   }
-  
+
   /**
    * Mix mime multipart.
    *
@@ -140,7 +143,7 @@ public class SESUtil {
     }
     return multipart;
   }
-  
+
   /**
    * Wrap mime body part.
    *
@@ -153,7 +156,7 @@ public class SESUtil {
     mimeBodyPart.setContent(content);
     return mimeBodyPart;
   }
-  
+
   /**
    * To attachment mime body part.
    *
@@ -171,14 +174,14 @@ public class SESUtil {
     }
     return att;
   }
-  
+
   public static void setup(final AmazonSimpleEmailService ses, final String emailAddress) {
     try {
       List<String> verifiedEmailAddresses = ses.listVerifiedEmailAddresses().getVerifiedEmailAddresses();
       if (verifiedEmailAddresses.contains(emailAddress)) return;
       ses.verifyEmailAddress(new VerifyEmailAddressRequest().withEmailAddress(emailAddress));
     } catch (Throwable e) {
-      e.printStackTrace();
+      logger.warn("Error verifying " + emailAddress, e);
     }
   }
 }

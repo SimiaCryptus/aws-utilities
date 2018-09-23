@@ -19,7 +19,7 @@
 
 package com.simiacryptus.aws.exe;
 
-import com.simiacryptus.util.io.JsonUtil;
+import com.simiacryptus.util.JsonUtil;
 
 import java.io.File;
 import java.io.IOException;
@@ -33,11 +33,11 @@ public class UserSettings {
    * The Email address.
    */
   public String emailAddress;
-  
+
   private UserSettings() {
-  
+
   }
-  
+
   /**
    * Load user settings.
    *

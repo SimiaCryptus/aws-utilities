@@ -23,13 +23,13 @@ import com.amazonaws.services.ec2.AmazonEC2;
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagement;
 import com.amazonaws.services.identitymanagement.model.InstanceProfile;
 import com.amazonaws.services.s3.AmazonS3;
-import com.simiacryptus.util.io.JsonUtil;
+import com.simiacryptus.util.JsonUtil;
 
 import javax.annotation.Nonnull;
-
 import java.io.Serializable;
 
-import static com.simiacryptus.aws.EC2Util.*;
+import static com.simiacryptus.aws.EC2Util.randomHex;
+import static com.simiacryptus.aws.EC2Util.sleep;
 
 public class AwsTendrilEnvSettings implements Serializable {
   /**
@@ -44,19 +44,19 @@ public class AwsTendrilEnvSettings implements Serializable {
    * The Bucket.
    */
   public String bucket;
-  
+
   public AwsTendrilEnvSettings(final String securityGroup, final String instanceProfileArn, final String bucket) {
     this.securityGroup = securityGroup;
     this.instanceProfileArn = instanceProfileArn;
     this.bucket = bucket;
   }
-  
+
   public AwsTendrilEnvSettings() {
     this.securityGroup = "";
     this.instanceProfileArn = "";
     this.bucket = "";
   }
-  
+
   /**
    * Sets .
    *
@@ -69,17 +69,16 @@ public class AwsTendrilEnvSettings implements Serializable {
    * @return the
    */
   public static AwsTendrilNodeSettings setup(
-    AmazonEC2 ec2,
-    final AmazonIdentityManagement iam,
-    final AmazonS3 s3,
-    final String instanceType,
-    final String imageId,
-    final String username
-  )
-  {
+      AmazonEC2 ec2,
+      final AmazonIdentityManagement iam,
+      final AmazonS3 s3,
+      final String instanceType,
+      final String imageId,
+      final String username
+  ) {
     return setup(ec2, iam, s3.createBucket("data-" + randomHex()).getName(), instanceType, imageId, username);
   }
-  
+
   /**
    * Sets .
    *
@@ -92,24 +91,23 @@ public class AwsTendrilEnvSettings implements Serializable {
    * @return the
    */
   public static AwsTendrilNodeSettings setup(
-    AmazonEC2 ec2,
-    final AmazonIdentityManagement iam,
-    final String bucket,
-    final String instanceType,
-    final String imageId,
-    final String username
-  )
-  {
+      AmazonEC2 ec2,
+      final AmazonIdentityManagement iam,
+      final String bucket,
+      final String instanceType,
+      final String imageId,
+      final String username
+  ) {
     return setup(
-      bucket,
-      instanceType,
-      imageId,
-      username,
-      EC2Util.newSecurityGroup(ec2, 22, 1080, 4040, 8080),
-      EC2Util.newIamRole(iam, defaultPolicy(bucket)).getArn()
+        bucket,
+        instanceType,
+        imageId,
+        username,
+        EC2Util.newSecurityGroup(ec2, 22, 1080, 4040, 8080),
+        EC2Util.newIamRole(iam, defaultPolicy(bucket)).getArn()
     );
   }
-  
+
   /**
    * Sets .
    *
@@ -121,7 +119,7 @@ public class AwsTendrilEnvSettings implements Serializable {
   public static AwsTendrilEnvSettings setup(AmazonEC2 ec2, final AmazonIdentityManagement iam, final AmazonS3 s3) {
     return setup(ec2, iam, s3.createBucket("data-" + randomHex()).getName());
   }
-  
+
   /**
    * Sets .
    *
@@ -133,7 +131,7 @@ public class AwsTendrilEnvSettings implements Serializable {
   public static AwsTendrilEnvSettings setup(AmazonEC2 ec2, final AmazonIdentityManagement iam, final String bucket) {
     return setup(bucket, EC2Util.newSecurityGroup(ec2, 22, 1080, 4040, 8080), EC2Util.newIamRole(iam, defaultPolicy(bucket)).getArn());
   }
-  
+
   /**
    * Default policy string.
    *
@@ -143,27 +141,27 @@ public class AwsTendrilEnvSettings implements Serializable {
   @Nonnull
   public static String defaultPolicy(final String bucket) {
     return "{\n" +
-             "  \"Version\": \"2012-10-17\",\n" +
-             "  \"Statement\": [\n" +
-             "    {\n" +
-             "      \"Action\": \"s3:*\",\n" +
-             "      \"Effect\": \"Allow\",\n" +
-             "      \"Resource\": \"arn:aws:s3:::" + bucket + "*\"\n" +
-             "    },\n" +
-             "    {\n" +
-             "      \"Action\": \"s3:ListBucket*\",\n" +
-             "      \"Effect\": \"Allow\",\n" +
-             "      \"Resource\": \"arn:aws:s3:::*\"\n" +
-             "    },\n" +
-             "    {\n" +
-             "      \"Action\": [\"ses:SendEmail\",\"ses:SendRawEmail\"],\n" +
-             "      \"Effect\": \"Allow\",\n" +
-             "      \"Resource\": \"*\"\n" +
-             "    }\n" +
-             "  ]\n" +
-             "}";
+        "  \"Version\": \"2012-10-17\",\n" +
+        "  \"Statement\": [\n" +
+        "    {\n" +
+        "      \"Action\": \"s3:*\",\n" +
+        "      \"Effect\": \"Allow\",\n" +
+        "      \"Resource\": \"arn:aws:s3:::" + bucket + "*\"\n" +
+        "    },\n" +
+        "    {\n" +
+        "      \"Action\": \"s3:ListBucket*\",\n" +
+        "      \"Effect\": \"Allow\",\n" +
+        "      \"Resource\": \"arn:aws:s3:::*\"\n" +
+        "    },\n" +
+        "    {\n" +
+        "      \"Action\": [\"ses:SendEmail\",\"ses:SendRawEmail\"],\n" +
+        "      \"Effect\": \"Allow\",\n" +
+        "      \"Resource\": \"*\"\n" +
+        "    }\n" +
+        "  ]\n" +
+        "}";
   }
-  
+
   /**
    * Sets .
    *
@@ -176,14 +174,13 @@ public class AwsTendrilEnvSettings implements Serializable {
    * @return the
    */
   public static AwsTendrilNodeSettings setup(
-    final String bucket,
-    final String instanceType,
-    final String imageId,
-    final String username,
-    final String securityGroup,
-    final String instanceProfileArn
-  )
-  {
+      final String bucket,
+      final String instanceType,
+      final String imageId,
+      final String username,
+      final String securityGroup,
+      final String instanceProfileArn
+  ) {
     AwsTendrilNodeSettings self = new AwsTendrilNodeSettings();
     self.securityGroup = securityGroup;
     self.bucket = bucket;
@@ -194,7 +191,7 @@ public class AwsTendrilEnvSettings implements Serializable {
     sleep(30000); // Pause for objects to init
     return self;
   }
-  
+
   public static AwsTendrilEnvSettings setup(final String bucket, final String securityGroup, final String instanceProfileArn) {
     AwsTendrilEnvSettings self = new AwsTendrilEnvSettings();
     self.securityGroup = securityGroup;
@@ -203,12 +200,12 @@ public class AwsTendrilEnvSettings implements Serializable {
     sleep(30000); // Pause for objects to init
     return self;
   }
-  
+
   @Override
   public String toString() {
     return JsonUtil.toJson(this).toString();
   }
-  
+
   /**
    * Gets service config.
    *

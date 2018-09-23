@@ -27,10 +27,10 @@ import com.amazonaws.services.identitymanagement.AmazonIdentityManagementClientB
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.simpleemail.AmazonSimpleEmailServiceClientBuilder;
+import com.simiacryptus.notebook.MarkdownNotebookOutput;
+import com.simiacryptus.notebook.NotebookOutput;
+import com.simiacryptus.util.JsonUtil;
 import com.simiacryptus.util.Util;
-import com.simiacryptus.util.io.JsonUtil;
-import com.simiacryptus.util.io.MarkdownNotebookOutput;
-import com.simiacryptus.util.io.NotebookOutput;
 import com.simiacryptus.util.test.SysOutInterceptor;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
@@ -49,7 +49,7 @@ import java.util.Random;
  * The type Remote notebook demo.
  */
 public class RemoteNotebookDemo {
-  
+
   /**
    * The Logger.
    */
@@ -61,11 +61,11 @@ public class RemoteNotebookDemo {
   private static final String default_imageId = "ami-330eab4c";
   private static final String default_username = "ec2-user";
   private static final String testName = "index";
-  
+
   static {
     SysOutInterceptor.INSTANCE.init();
   }
-  
+
   /**
    * The entry point of application.
    *
@@ -74,12 +74,12 @@ public class RemoteNotebookDemo {
    */
   public static void main(String... args) throws Exception {
     try (NotebookOutput log = new MarkdownNotebookOutput(
-      new File("target/report/" + Util.dateStr("yyyyMMddHHmmss") + "/index"),
+        new File("target/report/" + Util.dateStr("yyyyMMddHHmmss") + "/index"),
         Util.AUTO_BROWSE)) {
       new RemoteNotebookDemo().launcherNotebook(log);
     }
   }
-  
+
   /**
    * Gets ec 2.
    *
@@ -88,7 +88,7 @@ public class RemoteNotebookDemo {
   public static AmazonEC2 getEc2() {
     return AmazonEC2ClientBuilder.standard().withRegion(Regions.US_EAST_1).build();
   }
-  
+
   /**
    * Gets iam.
    *
@@ -97,7 +97,7 @@ public class RemoteNotebookDemo {
   public static AmazonIdentityManagement getIam() {
     return AmazonIdentityManagementClientBuilder.standard().withRegion(Regions.US_EAST_1).build();
   }
-  
+
   /**
    * Gets s 3.
    *
@@ -106,7 +106,7 @@ public class RemoteNotebookDemo {
   public static AmazonS3 getS3() {
     return AmazonS3ClientBuilder.standard().withRegion(Regions.US_WEST_2).build();
   }
-  
+
   /**
    * Launcher notebook.
    *
@@ -115,21 +115,24 @@ public class RemoteNotebookDemo {
   public void launcherNotebook(final NotebookOutput log) {
     AwsTendrilNodeSettings settings = log.eval(() -> {
       return JsonUtil.cache(new File("settings.json"), AwsTendrilNodeSettings.class,
-                            () -> AwsTendrilNodeSettings.setup(
-                              getEc2(),
-                              getIam(),
-                              default_bucket,
-                              default_instanceType,
-                              default_imageId,
-                              default_username
-                            )
+          () -> AwsTendrilNodeSettings.setup(
+              getEc2(),
+              getIam(),
+              default_bucket,
+              default_instanceType,
+              default_imageId,
+              default_username
+          )
       );
     });
     int localControlPort = new Random().nextInt(1024) + 1024;
     EC2Util.EC2Node node = settings.startNode(getEc2(), localControlPort);
     log.run(() -> {
-      Tendril.TendrilControl tendrilControl = node.startJvm(getEc2(), getS3(), settings, localControlPort);
-      tendrilControl.start(this::nodeMain);
+      TendrilControl tendrilControl = node.startJvm(getEc2(), getS3(), settings, localControlPort);
+      tendrilControl.start(() -> {
+        nodeMain();
+        return null;
+      });
     });
     try {
       Desktop.getDesktop().browse(new URI(String.format("http://%s:1080/", node.getStatus().getPublicIpAddress())));
@@ -148,12 +151,12 @@ public class RemoteNotebookDemo {
       }
     }
   }
-  
+
   private void nodeMain() {
     try {
       String dateStr = Util.dateStr("yyyyMMddHHmmss");
       try (MarkdownNotebookOutput log = new MarkdownNotebookOutput(
-        new File("report/" + dateStr + "/" + testName),
+          new File("report/" + dateStr + "/" + testName),
           1080, Util.AUTO_BROWSE)) {
         log.setArchiveHome(URI.create("s3://" + default_bucket + "/reports/"));
         log.onComplete(() -> {
@@ -167,7 +170,7 @@ public class RemoteNotebookDemo {
             logger.warn("Error reading html", e);
           }
           SESUtil.send(AmazonSimpleEmailServiceClientBuilder.defaultClient(),
-            "Demo Report", to, "Test Report", html,
+              "Demo Report", to, "Test Report", html,
               new File(log.getRoot(), testName + ".zip"),
               new File(log.getRoot(), testName + ".pdf"));
         });
@@ -179,11 +182,11 @@ public class RemoteNotebookDemo {
     } catch (Throwable e) {
       logger.warn("Error!", e);
     } finally {
-      logger.info("Exiting node worker");
+      logger.warn("Exiting node worker", new RuntimeException("Stack Trace"));
       System.exit(0);
     }
   }
-  
+
   /**
    * Node task notebook.
    *
@@ -204,5 +207,5 @@ public class RemoteNotebookDemo {
       logger.info("Finished worker loop " + i);
     }
   }
-  
+
 }
