@@ -25,7 +25,9 @@ package com.simiacryptus.aws.exe;
 public class EC2NodeSettings {
 
   public static final EC2NodeSettings P3_2XL = new EC2NodeSettings("p3.2xlarge", "ami-2fb71c52", "ec2-user");
+  public static final EC2NodeSettings P3_8XL = new EC2NodeSettings("p3.8xlarge", "ami-2fb71c52", "ec2-user");
   public static final EC2NodeSettings P2_XL = new EC2NodeSettings("p2.xlarge", "ami-2fb71c52", "ec2-user");
+  public static final EC2NodeSettings P2_8XL = new EC2NodeSettings("p2.8xlarge", "ami-2fb71c52", "ec2-user");
   public static final EC2NodeSettings T2_L = new EC2NodeSettings("t2.large", "ami-2fb71c52", "ec2-user");
   public static final EC2NodeSettings T2_XL = new EC2NodeSettings("t2.xlarge", "ami-2fb71c52", "ec2-user");
   public static final EC2NodeSettings T2_2XL = new EC2NodeSettings("t2.2xlarge", "ami-2fb71c52", "ec2-user");

@@ -26,10 +26,10 @@ import com.amazonaws.services.identitymanagement.AmazonIdentityManagement;
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagementClientBuilder;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import com.simiacryptus.notebook.MarkdownNotebookOutput;
+import com.simiacryptus.notebook.NotebookOutput;
+import com.simiacryptus.util.JsonUtil;
 import com.simiacryptus.util.Util;
-import com.simiacryptus.util.io.JsonUtil;
-import com.simiacryptus.util.io.MarkdownNotebookOutput;
-import com.simiacryptus.util.io.NotebookOutput;
 import com.simiacryptus.util.test.SysOutInterceptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,7 +42,7 @@ import java.util.Random;
  * The type Remote execution demo.
  */
 public class RemoteExecutionDemo {
-  
+
   /**
    * The Logger.
    */
@@ -52,11 +52,11 @@ public class RemoteExecutionDemo {
   private static final String default_imageId = "ami-330eab4c";
   private static final String default_username = "ec2-user";
   private static final String gitBase = "https://github.com/SimiaCryptus/aws-utilities";
-  
+
   static {
     SysOutInterceptor.INSTANCE.init();
   }
-  
+
   /**
    * The entry point of application.
    *
@@ -65,12 +65,12 @@ public class RemoteExecutionDemo {
    */
   public static void main(String... args) throws Exception {
     try (NotebookOutput log = new MarkdownNotebookOutput(
-      new File("target/report/" + Util.dateStr("yyyyMMddHHmmss") + "/index"),
+        new File("target/report/" + Util.dateStr("yyyyMMddHHmmss") + "/index"),
         Util.AUTO_BROWSE)) {
       new RemoteExecutionDemo().demo(log);
     }
   }
-  
+
   /**
    * Demo.
    *
@@ -80,20 +80,20 @@ public class RemoteExecutionDemo {
     AmazonEC2 ec2 = AmazonEC2ClientBuilder.standard().withRegion(Regions.US_EAST_1).build();
     AmazonIdentityManagement iam = AmazonIdentityManagementClientBuilder.standard().withRegion(Regions.US_EAST_1).build();
     AmazonS3 s3 = AmazonS3ClientBuilder.standard().build();
-  
+
     AwsTendrilNodeSettings settings = log.eval(() -> {
       return JsonUtil.cache(new File("settings.json"), AwsTendrilNodeSettings.class,
-        () -> {
-          return AwsTendrilNodeSettings.setup(ec2, iam, default_bucket, default_instanceType, default_imageId, default_username);
-        });
+          () -> {
+            return AwsTendrilNodeSettings.setup(ec2, iam, default_bucket, default_instanceType, default_imageId, default_username);
+          });
     });
-  
+
     log.eval(() -> {
       int localControlPort = new Random().nextInt(1024) + 1024;
       try (EC2Util.EC2Node node = settings.startNode(ec2, localControlPort)) {
         //node.shell();
-        try (Tendril.TendrilControl remoteJvm = node.startJvm(ec2, s3, settings, localControlPort)) {
-            return remoteJvm.eval(() -> {
+        try (TendrilControl remoteJvm = node.startJvm(ec2, s3, settings, localControlPort)) {
+          return remoteJvm.eval(() -> {
             String msg = String.format("Hello World! The time is %s", new Date());
             System.out.println("Returning Value: " + msg);
             return msg;
@@ -115,7 +115,7 @@ public class RemoteExecutionDemo {
         }
       }
     });
-    
+
   }
-  
+
 }
