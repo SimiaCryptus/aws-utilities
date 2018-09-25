@@ -161,7 +161,7 @@ public class Tendril {
     logger.info("Java Local Classpath: " + localClasspath);
     logger.info("Java Remote Classpath: " + remoteClasspath);
     logger.info("Java Environment: " + env.entrySet().stream().map(e->e.getKey() + " = " + e.getValue()).reduce((a,b)->a+"; "+b).orElse(""));
-    logger.info("Java Command Line: " + commandLine, new RuntimeException("Stack Trace"));
+    logger.info("Java Command Line: " + commandLine);
     execAsync(node.getConnection(), commandLine, new CloseShieldOutputStream(System.out), env);
     return new TendrilControl(getControl(localControlPort));
   }
@@ -196,7 +196,7 @@ public class Tendril {
       ));
       Arrays.stream(programArguments.split(" ")).forEach(cmd::add);
       logger.info("Java Environment: " + env.entrySet().stream().map(e->e.getKey() + " = " + e.getValue()).reduce((a,b)->a+"; "+b).orElse(""));
-      logger.info(String.format("Java Command Line (from %s): %s", workingDir.getAbsolutePath(), cmd.stream().reduce((a, b) -> a + " " + b).get()), new RuntimeException("Stack Trace"));
+      logger.info(String.format("Java Command Line (from %s): %s", workingDir.getAbsolutePath(), cmd.stream().reduce((a, b) -> a + " " + b).get()));
       ProcessBuilder processBuilder = new ProcessBuilder().command(cmd).directory(workingDir).inheritIO();
       processBuilder.environment().putAll(env);
       processBuilder.start();
@@ -214,7 +214,7 @@ public class Tendril {
    * @return the control
    */
   public static TendrilLink getControl(final int localControlPort) {
-    return getControl(localControlPort, 10, 30);
+    return getControl(localControlPort, 10, 300);
   }
 
   public static TendrilLink getControl(int localControlPort, int retries, int timeoutSeconds) {
@@ -223,7 +223,7 @@ public class Tendril {
       client.start();
       client.setTimeout((int) TimeUnit.SECONDS.toMillis(timeoutSeconds));
       client.setKeepAliveTCP((int) TimeUnit.SECONDS.toMillis(30));
-      client.connect((int) TimeUnit.SECONDS.toMillis(timeoutSeconds), "127.0.0.1", localControlPort, -1);
+      client.connect((int) TimeUnit.SECONDS.toMillis(30), "127.0.0.1", localControlPort, -1);
       TendrilLink remoteObject = ObjectSpace.getRemoteObject(client, 1318, TendrilLink.class);
       if(!remoteObject.isAlive()) throw new RuntimeException("Not Alive");
       return remoteObject;
