@@ -63,11 +63,12 @@ public class S3Util {
     try {
       log.write();
       File root = log.getRoot();
-      logFiles(root);
       URI archiveHome = log.getArchiveHome();
+      logger.info(String.format("Files in %s to be archived in %s", root.getAbsolutePath(), archiveHome));
+      logFiles(root);
       HashMap<File, URL> map = new HashMap<>();
       if (null == archiveHome || (archiveHome.getScheme().startsWith("s3") && (null == archiveHome.getHost() || archiveHome.getHost().isEmpty() || "null".equals(archiveHome.getHost())))) {
-        logger.info("No archive destination to publish to");
+        logger.info(String.format("No archive destination to publish to: %s", archiveHome));
         return map;
       }
       logger.info(String.format("Resolved %s / %s = %s", archiveHome, root.getName(), archiveHome));
