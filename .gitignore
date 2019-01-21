@@ -26,3 +26,4 @@ target/
 *.iml
 *.iml
 ../.gitignore
+../.gitignore
