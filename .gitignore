@@ -25,3 +25,4 @@ settings.json
 target/
 *.iml
 *.iml
+../.gitignore
