@@ -73,6 +73,10 @@
         </dependency>
         <dependency>
             <groupId>com.amazonaws</groupId>
+            <artifactId>aws-java-sdk-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-iam</artifactId>
         </dependency>
         <dependency>
@@ -136,6 +140,12 @@
         <dependency>
             <groupId>com.github.jnr</groupId>
             <artifactId>jnr-posix</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.simiacryptus</groupId>
+            <artifactId>literate-reporting</artifactId>
+            <version>1.6.0</version>
+            <scope>compile</scope>
         </dependency>
 
     </dependencies>
