@@ -144,7 +144,7 @@
         <dependency>
             <groupId>com.simiacryptus</groupId>
             <artifactId>literate-reporting</artifactId>
-            <version>1.6.0</version>
+            <version>${project.version}</version>
             <scope>compile</scope>
         </dependency>
 
