@@ -30,6 +30,7 @@
 
     <artifactId>aws-utilities</artifactId>
     <description>AWS Utilities</description>
+    <url>https://simiacryptus.github.io/${github.project}/${github.path}</url>
     <scm>
         <url>https://github.com/SimiaCryptus/aws-utilities/</url>
         <connection>scm:git:git@github.com:SimiaCryptus/aws-utilities.git</connection>
