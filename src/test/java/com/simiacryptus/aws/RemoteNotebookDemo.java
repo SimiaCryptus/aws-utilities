@@ -30,6 +30,7 @@ import com.amazonaws.services.simpleemail.AmazonSimpleEmailServiceClientBuilder;
 import com.simiacryptus.notebook.MarkdownNotebookOutput;
 import com.simiacryptus.notebook.NotebookOutput;
 import com.simiacryptus.util.JsonUtil;
+import com.simiacryptus.util.ReportingUtil;
 import com.simiacryptus.util.Util;
 import com.simiacryptus.util.test.SysOutInterceptor;
 import org.apache.commons.io.FileUtils;
@@ -75,7 +76,7 @@ public class RemoteNotebookDemo {
   public static void main(String... args) throws Exception {
     try (NotebookOutput log = new MarkdownNotebookOutput(
         new File("target/report/" + Util.dateStr("yyyyMMddHHmmss") + "/index"),
-        Util.AUTO_BROWSE)) {
+        ReportingUtil.AUTO_BROWSE)) {
       new RemoteNotebookDemo().launcherNotebook(log);
     }
   }
@@ -157,7 +158,7 @@ public class RemoteNotebookDemo {
       String dateStr = Util.dateStr("yyyyMMddHHmmss");
       try (MarkdownNotebookOutput log = new MarkdownNotebookOutput(
           new File("report/" + dateStr + "/" + testName),
-          1080, Util.AUTO_BROWSE)) {
+          1080, ReportingUtil.AUTO_BROWSE)) {
         log.setArchiveHome(URI.create("s3://" + default_bucket + "/reports/"));
         log.onComplete(() -> {
           S3Util.upload(getS3(), log.getArchiveHome(), log.getRoot());
