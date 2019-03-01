@@ -34,6 +34,7 @@ import com.simiacryptus.lang.SerializableConsumer;
 import com.simiacryptus.notebook.MarkdownNotebookOutput;
 import com.simiacryptus.notebook.NotebookOutput;
 import com.simiacryptus.util.JsonUtil;
+import com.simiacryptus.util.ReportingUtil;
 import com.simiacryptus.util.Util;
 import com.simiacryptus.util.test.SysOutInterceptor;
 import org.apache.commons.io.FileUtils;
@@ -95,7 +96,7 @@ public class EC2NotebookRunner {
     }
     String runnerName = EC2NotebookRunner.class.getSimpleName();
     File reportFile = new File("target/report/" + Util.dateStr("yyyyMMddHHmmss") + "/" + runnerName);
-    try (NotebookOutput log = new MarkdownNotebookOutput(reportFile, Util.AUTO_BROWSE)) {
+    try (NotebookOutput log = new MarkdownNotebookOutput(reportFile, ReportingUtil.AUTO_BROWSE)) {
       new EC2NotebookRunner(reportTasks).launchNotebook(log);
     }
   }
@@ -223,7 +224,7 @@ public class EC2NotebookRunner {
       throw new RuntimeException(e);
     }
     try {
-      Util.browse(new URI(String.format("http://%s:1080/", node.getStatus().getPublicIpAddress())));
+      ReportingUtil.browse(new URI(String.format("http://%s:1080/", node.getStatus().getPublicIpAddress())));
     } catch (IOException | URISyntaxException e) {
       logger.info("Error opening browser", e);
     }
