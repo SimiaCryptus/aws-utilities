@@ -24,19 +24,22 @@ package com.simiacryptus.aws.exe;
  */
 public class EC2NodeSettings {
 
-  public static final EC2NodeSettings P3_2XL = new EC2NodeSettings("p3.2xlarge", "ami-2fb71c52", "ec2-user");
-  public static final EC2NodeSettings P3_8XL = new EC2NodeSettings("p3.8xlarge", "ami-2fb71c52", "ec2-user");
-  public static final EC2NodeSettings P2_XL = new EC2NodeSettings("p2.xlarge", "ami-2fb71c52", "ec2-user");
-  public static final EC2NodeSettings P2_8XL = new EC2NodeSettings("p2.8xlarge", "ami-2fb71c52", "ec2-user");
-  public static final EC2NodeSettings T2_L = new EC2NodeSettings("t2.large", "ami-2fb71c52", "ec2-user");
-  public static final EC2NodeSettings T2_XL = new EC2NodeSettings("t2.xlarge", "ami-2fb71c52", "ec2-user");
-  public static final EC2NodeSettings T2_2XL = new EC2NodeSettings("t2.2xlarge", "ami-2fb71c52", "ec2-user");
-  public static final EC2NodeSettings M5_L = new EC2NodeSettings("m5.large", "ami-2fb71c52", "ec2-user");
-  public static final EC2NodeSettings M5_XL = new EC2NodeSettings("m5.xlarge", "ami-2fb71c52", "ec2-user");
-  public static final EC2NodeSettings M5_2XL = new EC2NodeSettings("m5.2xlarge", "ami-2fb71c52", "ec2-user");
-  public static final EC2NodeSettings R5_L = new EC2NodeSettings("r5.large", "ami-2fb71c52", "ec2-user");
-  public static final EC2NodeSettings R5_XL = new EC2NodeSettings("r5.xlarge", "ami-2fb71c52", "ec2-user");
-  public static final EC2NodeSettings R5_2XL = new EC2NodeSettings("r5.2xlarge", "ami-2fb71c52", "ec2-user");
+  public static final String AMI_AMAZON_DEEP_LEARNING = "ami-02d5d2820a4b1293f"; //"ami-003c401895188b246";
+  public static final String AMI_AMAZON_LINUX = "ami-0f78717cb15ab06bd";
+
+  public static final EC2NodeSettings P3_2XL = new EC2NodeSettings("p3.2xlarge", AMI_AMAZON_DEEP_LEARNING, "ec2-user");
+  public static final EC2NodeSettings P3_8XL = new EC2NodeSettings("p3.8xlarge", AMI_AMAZON_DEEP_LEARNING, "ec2-user");
+  public static final EC2NodeSettings P2_XL = new EC2NodeSettings("p2.xlarge", AMI_AMAZON_DEEP_LEARNING, "ec2-user");
+  public static final EC2NodeSettings P2_8XL = new EC2NodeSettings("p2.8xlarge", AMI_AMAZON_DEEP_LEARNING, "ec2-user");
+  public static final EC2NodeSettings T2_L = new EC2NodeSettings("t2.large", AMI_AMAZON_LINUX, "ec2-user");
+  public static final EC2NodeSettings T2_XL = new EC2NodeSettings("t2.xlarge", AMI_AMAZON_LINUX, "ec2-user");
+  public static final EC2NodeSettings T2_2XL = new EC2NodeSettings("t2.2xlarge", AMI_AMAZON_LINUX, "ec2-user");
+  public static final EC2NodeSettings M5_L = new EC2NodeSettings("m5.large", AMI_AMAZON_LINUX, "ec2-user");
+  public static final EC2NodeSettings M5_XL = new EC2NodeSettings("m5.xlarge", AMI_AMAZON_LINUX, "ec2-user");
+  public static final EC2NodeSettings M5_2XL = new EC2NodeSettings("m5.2xlarge", AMI_AMAZON_LINUX, "ec2-user");
+  public static final EC2NodeSettings R5_L = new EC2NodeSettings("r5.large", AMI_AMAZON_LINUX, "ec2-user");
+  public static final EC2NodeSettings R5_XL = new EC2NodeSettings("r5.xlarge", AMI_AMAZON_LINUX, "ec2-user");
+  public static final EC2NodeSettings R5_2XL = new EC2NodeSettings("r5.2xlarge", AMI_AMAZON_LINUX, "ec2-user");
 
   /**
    * The constant EC2_TYPE.
@@ -55,5 +58,9 @@ public class EC2NodeSettings {
     username = ec2_login;
     imageId = ec2_ami;
     machineType = ec2_type;
+  }
+
+  public EC2NodeSettings withAMI(final String ec2_ami) {
+    return new EC2NodeSettings(username, ec2_ami, machineType);
   }
 }

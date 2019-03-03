@@ -146,7 +146,7 @@ public class Tendril {
       final String bucket, final HashMap<String, String> env
   ) {
     String localClasspath = System.getProperty("java.class.path");
-    Arrays.stream(new File(".").listFiles()).filter(x->x.getName().endsWith(".json")).forEach(file -> {
+    Arrays.stream(new File(".").listFiles()).filter(x -> x.getName().endsWith(".json")).forEach(file -> {
       logger.info("Deploy " + file.getAbsoluteFile());
       node.scp(file, file.getName());
     });
@@ -160,7 +160,7 @@ public class Tendril {
     );
     logger.info("Java Local Classpath: " + localClasspath);
     logger.info("Java Remote Classpath: " + remoteClasspath);
-    logger.info("Java Environment: " + env.entrySet().stream().map(e->e.getKey() + " = " + e.getValue()).reduce((a,b)->a+"; "+b).orElse(""));
+    logger.info("Java Environment: " + env.entrySet().stream().map(e -> e.getKey() + " = " + e.getValue()).reduce((a, b) -> a + "; " + b).orElse(""));
     logger.info("Java Command Line: " + commandLine);
     execAsync(node.getConnection(), commandLine, new CloseShieldOutputStream(System.out), env);
     return new TendrilControl(getControl(localControlPort));
@@ -195,7 +195,7 @@ public class Tendril {
           Tendril.class.getCanonicalName()
       ));
       Arrays.stream(programArguments.split(" ")).forEach(cmd::add);
-      logger.info("Java Environment: " + env.entrySet().stream().map(e->e.getKey() + " = " + e.getValue()).reduce((a,b)->a+"; "+b).orElse(""));
+      logger.info("Java Environment: " + env.entrySet().stream().map(e -> e.getKey() + " = " + e.getValue()).reduce((a, b) -> a + "; " + b).orElse(""));
       logger.info(String.format("Java Command Line (from %s): %s", workingDir.getAbsolutePath(), cmd.stream().reduce((a, b) -> a + " " + b).get()));
       ProcessBuilder processBuilder = new ProcessBuilder().command(cmd).directory(workingDir).inheritIO();
       processBuilder.environment().putAll(env);
@@ -223,9 +223,23 @@ public class Tendril {
       client.start();
       client.setTimeout((int) TimeUnit.SECONDS.toMillis(timeoutSeconds));
       client.setKeepAliveTCP((int) TimeUnit.SECONDS.toMillis(30));
+      new Thread(() -> {
+        try {
+          while (!Thread.interrupted()) {
+            try {
+              client.update(10);
+            } catch (IOException e) {
+              e.printStackTrace();
+              Thread.sleep(1000);
+            }
+          }
+        } catch (Throwable throwable) {
+          throwable.printStackTrace();
+        }
+      }).start();
       client.connect((int) TimeUnit.SECONDS.toMillis(30), "127.0.0.1", localControlPort, -1);
       TendrilLink remoteObject = ObjectSpace.getRemoteObject(client, 1318, TendrilLink.class);
-      if(!remoteObject.isAlive()) throw new RuntimeException("Not Alive");
+      if (!remoteObject.isAlive()) throw new RuntimeException("Not Alive");
       return remoteObject;
     } catch (Throwable e) {
       if (retries > 0) {
@@ -330,7 +344,7 @@ public class Tendril {
         return list;
       }
     } catch (Throwable e) {
-      throw e instanceof RuntimeException?(RuntimeException)e:new RuntimeException(e);
+      throw e instanceof RuntimeException ? (RuntimeException) e : new RuntimeException(e);
     }
   }
 
