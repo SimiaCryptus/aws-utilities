@@ -87,7 +87,7 @@ public class RemoteNotebookDemo {
    * @return the ec 2
    */
   public static AmazonEC2 getEc2() {
-    return AmazonEC2ClientBuilder.standard().withRegion(Regions.US_EAST_1).build();
+    return AmazonEC2ClientBuilder.standard().withRegion(EC2Util.REGION).build();
   }
 
   /**
@@ -96,7 +96,7 @@ public class RemoteNotebookDemo {
    * @return the iam
    */
   public static AmazonIdentityManagement getIam() {
-    return AmazonIdentityManagementClientBuilder.standard().withRegion(Regions.US_EAST_1).build();
+    return AmazonIdentityManagementClientBuilder.standard().withRegion(EC2Util.REGION).build();
   }
 
   /**
@@ -105,7 +105,7 @@ public class RemoteNotebookDemo {
    * @return the s 3
    */
   public static AmazonS3 getS3() {
-    return AmazonS3ClientBuilder.standard().withRegion(Regions.US_WEST_2).build();
+    return AmazonS3ClientBuilder.standard().withRegion(EC2Util.REGION).build();
   }
 
   /**

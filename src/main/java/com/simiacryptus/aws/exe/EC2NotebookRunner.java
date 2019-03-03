@@ -19,7 +19,6 @@
 
 package com.simiacryptus.aws.exe;
 
-import com.amazonaws.regions.Regions;
 import com.amazonaws.services.ec2.AmazonEC2;
 import com.amazonaws.services.ec2.AmazonEC2ClientBuilder;
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagement;
@@ -107,7 +106,7 @@ public class EC2NotebookRunner {
    * @return the ec 2
    */
   public static AmazonEC2 getEc2() {
-    return AmazonEC2ClientBuilder.standard().withRegion(Regions.US_EAST_1).build();
+    return AmazonEC2ClientBuilder.standard().withRegion(EC2Util.REGION).build();
   }
 
   /**
@@ -116,7 +115,7 @@ public class EC2NotebookRunner {
    * @return the iam
    */
   public static AmazonIdentityManagement getIam() {
-    return AmazonIdentityManagementClientBuilder.standard().withRegion(Regions.US_EAST_1).build();
+    return AmazonIdentityManagementClientBuilder.standard().withRegion(EC2Util.REGION).build();
   }
 
   /**
@@ -125,7 +124,7 @@ public class EC2NotebookRunner {
    * @return the s 3
    */
   public static AmazonS3 getS3() {
-    return AmazonS3ClientBuilder.standard().withRegion(Regions.US_WEST_2).build();
+    return AmazonS3ClientBuilder.standard().withRegion(EC2Util.REGION).build();
   }
 
   /**
@@ -187,7 +186,8 @@ public class EC2NotebookRunner {
   public void launchNotebook(final NotebookOutput log) {
     AwsTendrilNodeSettings settings = log.eval(() -> {
       EC2NodeSettings nodeSettings = EC2NodeSettings.P3_2XL;
-      return JsonUtil.cache(new File("ec2-settings.json"), AwsTendrilNodeSettings.class,
+
+      return JsonUtil.cache(new File("ec2-settings." + EC2Util.REGION.toString() + ".json"), AwsTendrilNodeSettings.class,
           () -> AwsTendrilNodeSettings.setup(
               getEc2(),
               getIam(),

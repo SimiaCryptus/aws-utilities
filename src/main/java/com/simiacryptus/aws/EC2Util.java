@@ -19,6 +19,7 @@
 
 package com.simiacryptus.aws;
 
+import com.amazonaws.regions.Regions;
 import com.amazonaws.services.ec2.AmazonEC2;
 import com.amazonaws.services.ec2.model.*;
 import com.amazonaws.services.ec2.model.KeyPair;
@@ -59,6 +60,7 @@ public class EC2Util {
   private static final Logger logger = LoggerFactory.getLogger(EC2Util.class);
   private static final Charset charset = Charset.forName("UTF-8");
   private static final Random random = new Random();
+  public static final Regions REGION = Regions.fromName(System.getProperty("AWS_REGION", Regions.US_WEST_2.getName()));
   private static volatile KeyPair keyPair = null;
 
   /**
@@ -463,7 +465,7 @@ public class EC2Util {
           try {
             if (0 < localControlPort) session.delPortForwardingL(localControlPort);
           } catch (JSchException e1) {
-            logger.debug("Error cleaning up",e1);
+            logger.debug("Error cleaning up", e1);
           }
           session.disconnect();
           session = null;
@@ -856,7 +858,7 @@ public class EC2Util {
       channel.setCommand(script);
       this.outBuffer = outBuffer;
       channel.setOutputStream(this.outBuffer);
-      env.forEach((k,v)->channel.setEnv(k,v));
+      env.forEach((k, v) -> channel.setEnv(k, v));
       channel.setExtOutputStream(new CloseShieldOutputStream(System.err));
       channel.connect();
     }
