@@ -463,7 +463,7 @@ public class EC2Util {
           try {
             if (0 < localControlPort) session.delPortForwardingL(localControlPort);
           } catch (JSchException e1) {
-            throw new RuntimeException(e1);
+            logger.debug("Error cleaning up",e1);
           }
           session.disconnect();
           session = null;
