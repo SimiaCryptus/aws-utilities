@@ -55,7 +55,7 @@ public class S3Util {
 
   public static Map<File, URL> upload(NotebookOutput log) {
     synchronized (log) {
-      return upload(log, AmazonS3ClientBuilder.standard().withRegion(Regions.US_WEST_2).build());
+      return upload(log, AmazonS3ClientBuilder.standard().withRegion(EC2Util.REGION).build());
     }
   }
 

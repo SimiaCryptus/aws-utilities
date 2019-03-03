@@ -322,7 +322,7 @@ public class Tendril {
         try {
           stage(node, entryFile, remote, s3, bucket, keyspace);
         } catch (Throwable e) {
-          logger.warn(String.format("Error staging %s to %s", entryFile, remote), e);
+          logger.warn(String.format("Error staging %s to %s/%s", entryFile, bucket, remote), e);
         }
         return Arrays.asList(remote);
       } else {

@@ -78,9 +78,9 @@ public class RemoteExecutionDemo {
    * @param log the log
    */
   public void demo(final NotebookOutput log) {
-    AmazonEC2 ec2 = AmazonEC2ClientBuilder.standard().withRegion(Regions.US_EAST_1).build();
-    AmazonIdentityManagement iam = AmazonIdentityManagementClientBuilder.standard().withRegion(Regions.US_EAST_1).build();
-    AmazonS3 s3 = AmazonS3ClientBuilder.standard().build();
+    AmazonEC2 ec2 = AmazonEC2ClientBuilder.standard().withRegion(EC2Util.REGION).build();
+    AmazonIdentityManagement iam = AmazonIdentityManagementClientBuilder.standard().withRegion(EC2Util.REGION).build();
+    AmazonS3 s3 = AmazonS3ClientBuilder.standard().withRegion(EC2Util.REGION).build();
 
     AwsTendrilNodeSettings settings = log.eval(() -> {
       return JsonUtil.cache(new File("settings.json"), AwsTendrilNodeSettings.class,
