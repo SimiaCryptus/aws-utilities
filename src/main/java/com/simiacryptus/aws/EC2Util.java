@@ -60,7 +60,7 @@ public class EC2Util {
   private static final Logger logger = LoggerFactory.getLogger(EC2Util.class);
   private static final Charset charset = Charset.forName("UTF-8");
   private static final Random random = new Random();
-  public static final Regions REGION = Regions.fromName(System.getProperty("AWS_REGION", Regions.US_WEST_2.getName()));
+  public static final Regions REGION = Regions.fromName(System.getProperty("AWS_REGION", Regions.US_EAST_1.getName()));
   private static volatile KeyPair keyPair = null;
 
   /**

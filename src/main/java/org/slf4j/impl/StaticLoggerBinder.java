@@ -25,6 +25,6 @@ public class StaticLoggerBinder {
   }
 
   public String getLoggerFactoryClassStr() {
-    return "org.slf4j.impl.Log4jLoggerFactory";
+    return "do not use log4j";
   }
 }
