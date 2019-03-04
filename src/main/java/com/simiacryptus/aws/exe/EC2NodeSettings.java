@@ -40,9 +40,9 @@ public class EC2NodeSettings {
   private static String AMI_AMAZON_LINUX() {
     switch(EC2Util.REGION) {
       case US_EAST_1:
-        return "ami-0f78717cb15ab06bd";
+        return "ami-0622127045c41c9c7";
       case US_WEST_2:
-        return "ami-0f6fdb60db10bbd03";
+        return "ami-03465eaeb7b2fe8ca";
     }
     throw new IllegalArgumentException("EC2Util.REGION: " + EC2Util.REGION);
   }

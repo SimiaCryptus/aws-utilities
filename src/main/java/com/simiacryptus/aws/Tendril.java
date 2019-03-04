@@ -51,8 +51,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
@@ -290,15 +289,28 @@ public class Tendril {
   @Nonnull
   public static String stageRemoteClasspath(final EC2Node node, final String localClasspath, final Predicate<String> classpathFilter, final String libPrefix, final boolean parallel, final AmazonS3 s3, final String bucket, final String keyspace) {
     logger.info(String.format("Mkdir %s: %s", libPrefix, node.exec("mkdir -p " + libPrefix)));
-    Stream<String> stream = Arrays.stream(localClasspath.split(File.pathSeparator)).filter(classpathFilter);
+    ExecutorService executorService = Executors.newFixedThreadPool(4);
     PrintStream out = SysOutInterceptor.INSTANCE.currentHandler();
-    if (parallel) stream = stream.parallel();
-    return stream.flatMap(entryPath -> {
-      PrintStream prev = SysOutInterceptor.INSTANCE.setCurrentHandler(out);
-      List<String> classpathEntry = stageClasspathEntry(node, libPrefix, entryPath, s3, bucket, keyspace);
-      SysOutInterceptor.INSTANCE.setCurrentHandler(prev);
-      return classpathEntry.stream();
-    }).reduce((a, b) -> a + ":" + b).get();
+    try {
+      return Arrays.stream(localClasspath.split(File.pathSeparator)).filter(classpathFilter).map(entryPath->{
+        return executorService.submit(()->{
+          PrintStream prev = SysOutInterceptor.INSTANCE.setCurrentHandler(out);
+          List<String> classpathEntry = stageClasspathEntry(node, libPrefix, entryPath, s3, bucket, keyspace);
+          SysOutInterceptor.INSTANCE.setCurrentHandler(prev);
+          return classpathEntry.stream().reduce((a, b) -> a + ":" + b).get();
+        });
+      }).map(x-> {
+        try {
+          return (String)((Future) x).get();
+        } catch (InterruptedException e) {
+          throw new RuntimeException(e);
+        } catch (ExecutionException e) {
+          throw new RuntimeException(e);
+        }
+      }).reduce((a, b) -> a + ":" + b).get();
+    } finally {
+      executorService.shutdown();
+    }
   }
 
   /**
@@ -322,7 +334,8 @@ public class Tendril {
         try {
           stage(node, entryFile, remote, s3, bucket, keyspace);
         } catch (Throwable e) {
-          logger.warn(String.format("Error staging %s to %s/%s", entryFile, bucket, remote), e);
+          throw new IOException(String.format("Error staging %s to %s/%s", entryFile, bucket, remote), e);
+          //logger.warn(String.format("Error staging %s to %s/%s", entryFile, bucket, remote), e);
         }
         return Arrays.asList(remote);
       } else {
@@ -411,7 +424,7 @@ public class Tendril {
     } catch (Throwable e) {
       if (retries > 0) {
         logger.debug("Retrying " + remote, e);
-        sleep(5000);
+        sleep((int) (Math.random() * 15000));
         stage(node, entryFile, remote, retries - 1, s3, bucket, keyspace);
       } else {
         throw new RuntimeException(e);
