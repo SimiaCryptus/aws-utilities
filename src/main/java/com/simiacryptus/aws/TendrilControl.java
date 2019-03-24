@@ -100,9 +100,9 @@ public class TendrilControl implements AutoCloseable {
       scheduledExecutorService.schedule(new PollerTask<>(taskKey, localPromise), 10, TimeUnit.SECONDS);
       return localPromise;
     } catch (Throwable e) {
-      if(retries >0){
-        logger.warn("Error starting " + task,e);
-        return start(task, retries-1);
+      if (retries > 0) {
+        logger.warn("Error starting " + task, e);
+        return start(task, retries - 1);
       } else {
         throw new RuntimeException(e);
       }

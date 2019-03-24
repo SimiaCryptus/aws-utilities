@@ -53,7 +53,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.function.Predicate;
-import java.util.stream.Stream;
 
 import static com.simiacryptus.aws.EC2Util.*;
 
@@ -292,16 +291,16 @@ public class Tendril {
     ExecutorService executorService = Executors.newFixedThreadPool(4);
     PrintStream out = SysOutInterceptor.INSTANCE.currentHandler();
     try {
-      return Arrays.stream(localClasspath.split(File.pathSeparator)).filter(classpathFilter).map(entryPath->{
-        return executorService.submit(()->{
+      return Arrays.stream(localClasspath.split(File.pathSeparator)).filter(classpathFilter).map(entryPath -> {
+        return executorService.submit(() -> {
           PrintStream prev = SysOutInterceptor.INSTANCE.setCurrentHandler(out);
           List<String> classpathEntry = stageClasspathEntry(node, libPrefix, entryPath, s3, bucket, keyspace);
           SysOutInterceptor.INSTANCE.setCurrentHandler(prev);
           return classpathEntry.stream().reduce((a, b) -> a + ":" + b).get();
         });
-      }).map(x-> {
+      }).map(x -> {
         try {
-          return (String)((Future) x).get();
+          return (String) ((Future) x).get();
         } catch (InterruptedException e) {
           throw new RuntimeException(e);
         } catch (ExecutionException e) {
