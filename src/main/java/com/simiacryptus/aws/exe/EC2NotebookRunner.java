@@ -95,7 +95,7 @@ public class EC2NotebookRunner {
     }
     String runnerName = EC2NotebookRunner.class.getSimpleName();
     File reportFile = new File("target/report/" + Util.dateStr("yyyyMMddHHmmss") + "/" + runnerName);
-    try (NotebookOutput log = new MarkdownNotebookOutput(reportFile, ReportingUtil.AUTO_BROWSE)) {
+    try (NotebookOutput log = new MarkdownNotebookOutput(reportFile, true)) {
       new EC2NotebookRunner(reportTasks).launchNotebook(log);
     }
   }

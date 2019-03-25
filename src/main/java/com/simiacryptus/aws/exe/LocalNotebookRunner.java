@@ -22,7 +22,6 @@ package com.simiacryptus.aws.exe;
 import com.simiacryptus.lang.SerializableConsumer;
 import com.simiacryptus.notebook.MarkdownNotebookOutput;
 import com.simiacryptus.notebook.NotebookOutput;
-import com.simiacryptus.util.ReportingUtil;
 import com.simiacryptus.util.Util;
 import com.simiacryptus.util.test.SysOutInterceptor;
 import org.slf4j.Logger;
@@ -68,8 +67,7 @@ public class LocalNotebookRunner {
   public static void run(Consumer<NotebookOutput>... fns) throws Exception {
     for (final Consumer<NotebookOutput> fn : fns) {
       try (NotebookOutput log = new MarkdownNotebookOutput(
-          new File("report/" + Util.dateStr("yyyyMMddHHmmss") + "/index"),
-          ReportingUtil.AUTO_BROWSE
+          new File("report/" + Util.dateStr("yyyyMMddHHmmss") + "/index"), true
       )) {
         fn.accept(log);
         log.setFrontMatterProperty("status", "OK");

@@ -28,7 +28,6 @@ import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.simiacryptus.notebook.MarkdownNotebookOutput;
 import com.simiacryptus.notebook.NotebookOutput;
 import com.simiacryptus.util.JsonUtil;
-import com.simiacryptus.util.ReportingUtil;
 import com.simiacryptus.util.Util;
 import com.simiacryptus.util.test.SysOutInterceptor;
 import org.slf4j.Logger;
@@ -65,8 +64,8 @@ public class RemoteExecutionDemo {
    */
   public static void main(String... args) throws Exception {
     try (NotebookOutput log = new MarkdownNotebookOutput(
-        new File("target/report/" + Util.dateStr("yyyyMMddHHmmss") + "/index"),
-        ReportingUtil.AUTO_BROWSE)) {
+        new File("target/report/" + Util.dateStr("yyyyMMddHHmmss") + "/index"), true
+    )) {
       new RemoteExecutionDemo().demo(log);
     }
   }
