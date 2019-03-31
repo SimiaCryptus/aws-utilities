@@ -199,6 +199,10 @@ public class EC2NotebookRunner {
       );
     });
     s3bucket = settings.bucket;
+    settings.imageId = EC2NodeSettings.AMI_AMAZON_DEEP_LEARNING;
+    settings.instanceType = EC2NodeSettings.P2_XL.machineType;
+    settings.username = EC2NodeSettings.P2_XL.username;
+
     Tendril.JvmConfig jvmConfig = settings.newJvmConfig();
     jvmConfig.javaOpts += JAVA_OPTS;
     int localControlPort = new Random().nextInt(1024) + 1024;
