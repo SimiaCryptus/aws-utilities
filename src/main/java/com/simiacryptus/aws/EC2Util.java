@@ -57,7 +57,15 @@ import java.util.stream.Stream;
  */
 public class EC2Util {
 
-  public static final Regions REGION = Regions.fromName(System.getProperty("AWS_REGION", Regions.US_EAST_1.getName()));
+  public static final Regions REGION = Regions.fromName(System.getProperty("AWS_REGION", getCurrentRegion()));
+  private static String getCurrentRegion() {
+    try {
+      return Regions.getCurrentRegion().getName();
+    } catch (Throwable e) {
+      return Regions.US_EAST_1.getName();
+    }
+  }
+
   private static final Logger logger = LoggerFactory.getLogger(EC2Util.class);
   private static final Charset charset = Charset.forName("UTF-8");
   private static final Random random = new Random();
@@ -572,7 +580,9 @@ public class EC2Util {
       sleep(10000);
       instance.set(getInstance(ec2, instance.get()));
     }
-    return instance.get();
+    Instance info = instance.get();
+    logger.info(String.format("Instance started: %s @ http://%s:1080/ - %s", info.getInstanceId(), info.getPublicDnsName(), info));
+    return info;
   }
 
   /**
