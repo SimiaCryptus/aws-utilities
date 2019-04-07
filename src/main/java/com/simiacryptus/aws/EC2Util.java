@@ -58,6 +58,11 @@ import java.util.stream.Stream;
 public class EC2Util {
 
   public static final Regions REGION = Regions.fromName(System.getProperty("AWS_REGION", getCurrentRegion()));
+  private static final Logger logger = LoggerFactory.getLogger(EC2Util.class);
+  private static final Charset charset = Charset.forName("UTF-8");
+  private static final Random random = new Random();
+  private static volatile KeyPair keyPair = null;
+
   private static String getCurrentRegion() {
     try {
       return Regions.getCurrentRegion().getName();
@@ -65,11 +70,6 @@ public class EC2Util {
       return Regions.US_EAST_1.getName();
     }
   }
-
-  private static final Logger logger = LoggerFactory.getLogger(EC2Util.class);
-  private static final Charset charset = Charset.forName("UTF-8");
-  private static final Random random = new Random();
-  private static volatile KeyPair keyPair = null;
 
   /**
    * Stage.
