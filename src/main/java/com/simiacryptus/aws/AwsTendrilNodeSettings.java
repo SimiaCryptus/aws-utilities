@@ -23,26 +23,11 @@ import com.amazonaws.services.ec2.AmazonEC2;
 
 import javax.annotation.Nonnull;
 
-/**
- * The type Aws tendril settings.
- */
 public final class AwsTendrilNodeSettings extends AwsTendrilEnvSettings {
-  /**
-   * The Image id.
-   */
   public String imageId;
-  /**
-   * The Instance type.
-   */
   public String instanceType;
-  /**
-   * The Username.
-   */
   public String username;
 
-  /**
-   * Instantiates a new Aws tendril settings.
-   */
   protected AwsTendrilNodeSettings() {
     super();
   }
@@ -55,23 +40,11 @@ public final class AwsTendrilNodeSettings extends AwsTendrilEnvSettings {
     super(parent.securityGroup, parent.instanceProfileArn, parent.bucket);
   }
 
-  /**
-   * Jvm config tendril . jvm config.
-   *
-   * @return the tendril . jvm config
-   */
   @Nonnull
   public Tendril.JvmConfig newJvmConfig() {
     return new Tendril.JvmConfig(this.imageId, this.instanceType, this.username);
   }
 
-  /**
-   * Start node ec 2 util . ec 2 node.
-   *
-   * @param ec2              the ec 2
-   * @param localControlPort the local control port
-   * @return the ec 2 util . ec 2 node
-   */
   public EC2Util.EC2Node startNode(final AmazonEC2 ec2, final int localControlPort) {
     return EC2Util.start(ec2, newJvmConfig(), getServiceConfig(ec2), localControlPort);
   }

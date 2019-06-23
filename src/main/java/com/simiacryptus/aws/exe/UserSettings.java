@@ -25,24 +25,13 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Scanner;
 
-/**
- * The type User settings.
- */
 public class UserSettings {
-  /**
-   * The Email address.
-   */
   public String emailAddress;
 
   private UserSettings() {
 
   }
 
-  /**
-   * Load user settings.
-   *
-   * @return the user settings
-   */
   public static UserSettings load() {
     try {
       return JsonUtil.cache(new File("user-settings.json"), UserSettings.class, () -> {

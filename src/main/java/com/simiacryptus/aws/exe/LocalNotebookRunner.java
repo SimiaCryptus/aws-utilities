@@ -30,9 +30,6 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.util.function.Consumer;
 
-/**
- * The type Local runner.
- */
 public class LocalNotebookRunner {
   private static final Logger logger = LoggerFactory.getLogger(LocalNotebookRunner.class);
 
@@ -40,17 +37,6 @@ public class LocalNotebookRunner {
     SysOutInterceptor.INSTANCE.init();
   }
 
-  /**
-   * Gets task.
-   *
-   * @param <T>          the type parameter
-   * @param defaultClass the default class
-   * @param args         the args
-   * @return the task
-   * @throws InstantiationException the instantiation exception
-   * @throws IllegalAccessException the illegal access exception
-   * @throws ClassNotFoundException the class not found exception
-   */
   public static <T extends SerializableConsumer> SerializableConsumer<NotebookOutput> getTask(
       final Class<T> defaultClass,
       final String... args
@@ -58,12 +44,6 @@ public class LocalNotebookRunner {
     return (SerializableConsumer<NotebookOutput>) (args.length == 0 ? defaultClass : Class.forName(args[0])).newInstance();
   }
 
-  /**
-   * Run.
-   *
-   * @param fns the fns
-   * @throws Exception the exception
-   */
   public static void run(Consumer<NotebookOutput>... fns) throws Exception {
     for (final Consumer<NotebookOutput> fn : fns) {
       try (NotebookOutput log = new MarkdownNotebookOutput(

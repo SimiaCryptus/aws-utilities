@@ -21,9 +21,6 @@ package com.simiacryptus.aws.exe;
 
 import com.simiacryptus.aws.EC2Util;
 
-/**
- * The type Ec 2 settings.
- */
 public class EC2NodeSettings {
 
   public static final String AMI_AMAZON_DEEP_LEARNING = System.getProperty("AMI_AMAZON_DEEP_LEARNING", AMI_AMAZON_DEEP_LEARNING());
@@ -41,17 +38,8 @@ public class EC2NodeSettings {
   public static final EC2NodeSettings R5_L = new EC2NodeSettings("r5.large", AMI_AMAZON_LINUX, "ec2-user");
   public static final EC2NodeSettings R5_XL = new EC2NodeSettings("r5.xlarge", AMI_AMAZON_LINUX, "ec2-user");
   public static final EC2NodeSettings R5_2XL = new EC2NodeSettings("r5.2xlarge", AMI_AMAZON_LINUX, "ec2-user");
-  /**
-   * The constant EC2_TYPE.
-   */
   public final String machineType;
-  /**
-   * The constant EC2_AMI.
-   */
   public final String imageId;
-  /**
-   * The constant EC2_LOGIN.
-   */
   public final String username;
 
   public EC2NodeSettings(final String ec2_type, final String ec2_ami, final String ec2_login) {

@@ -30,9 +30,6 @@ import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.*;
 
-/**
- * The type Tendril control.
- */
 public class TendrilControl implements AutoCloseable {
 
   private static final Logger logger = LoggerFactory.getLogger(TendrilControl.class);
@@ -40,32 +37,14 @@ public class TendrilControl implements AutoCloseable {
   private final static ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(1, new ThreadFactoryBuilder().setDaemon(true).build());
   private final Tendril.TendrilLink inner;
 
-  /**
-   * Instantiates a new Tendril control.
-   *
-   * @param inner the inner
-   */
   public TendrilControl(final Tendril.TendrilLink inner) {
     this.inner = inner;
   }
 
-  /**
-   * Time long.
-   *
-   * @return the long
-   */
   public long time() {
     return inner.time();
   }
 
-  /**
-   * Run t.
-   *
-   * @param <T>  the type parameter
-   * @param task the task
-   * @return the t
-   * @throws Exception the exception
-   */
   public <T> T eval(final SerializableCallable<T> task) throws Exception {
     assert inner.isAlive();
     return inner.run(task);

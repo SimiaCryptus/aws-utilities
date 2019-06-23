@@ -45,9 +45,6 @@ import java.util.Map;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-/**
- * The type S3 util.
- */
 public class S3Util {
 
   private final static Logger logger = LoggerFactory.getLogger(S3Util.class);
