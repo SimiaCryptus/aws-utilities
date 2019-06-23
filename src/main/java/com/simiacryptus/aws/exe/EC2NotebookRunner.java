@@ -54,9 +54,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
-/**
- * The type Ec 2 runner.
- */
 public class EC2NotebookRunner {
 
   private static final Logger logger = LoggerFactory.getLogger(EC2NotebookRunner.class);
@@ -67,28 +64,14 @@ public class EC2NotebookRunner {
   }
 
   private final String emailAddress = UserSettings.load().emailAddress;
-  /**
-   * The Fns.
-   */
   SerializableConsumer<NotebookOutput>[] fns;
   private String s3bucket = "";
   private boolean emailFiles = false;
 
-  /**
-   * Instantiates a new Ec 2 runner.
-   *
-   * @param fns the fns
-   */
   public EC2NotebookRunner(final SerializableConsumer<NotebookOutput>... fns) {
     this.fns = fns;
   }
 
-  /**
-   * Run.
-   *
-   * @param reportTasks the report tasks
-   * @throws IOException the io exception
-   */
   public static void run(final SerializableConsumer<NotebookOutput>... reportTasks) throws IOException {
     for (final SerializableConsumer<NotebookOutput> reportTask : reportTasks) {
       Tendril.getKryo().copy(reportTask);
@@ -100,39 +83,18 @@ public class EC2NotebookRunner {
     }
   }
 
-  /**
-   * Gets ec 2.
-   *
-   * @return the ec 2
-   */
   public static AmazonEC2 getEc2() {
     return AmazonEC2ClientBuilder.standard().withRegion(EC2Util.REGION).build();
   }
 
-  /**
-   * Gets iam.
-   *
-   * @return the iam
-   */
   public static AmazonIdentityManagement getIam() {
     return AmazonIdentityManagementClientBuilder.standard().withRegion(EC2Util.REGION).build();
   }
 
-  /**
-   * Gets s 3.
-   *
-   * @return the s 3
-   */
   public static AmazonS3 getS3() {
     return AmazonS3ClientBuilder.standard().withRegion(EC2Util.REGION).build();
   }
 
-  /**
-   * Gets test name.
-   *
-   * @param fn the fn
-   * @return the test name
-   */
   public static String getTestName(final SerializableConsumer<NotebookOutput> fn) {
     String name = fn.getClass().getCanonicalName();
     if (null == name || name.isEmpty()) name = fn.getClass().getSimpleName();
@@ -140,11 +102,6 @@ public class EC2NotebookRunner {
     return name;
   }
 
-  /**
-   * Log files.
-   *
-   * @param f the f
-   */
   public static void logFiles(final File f) {
     if (f.isDirectory()) {
       for (final File child : f.listFiles()) {
@@ -155,12 +112,6 @@ public class EC2NotebookRunner {
     }
   }
 
-  /**
-   * Run.
-   *
-   * @param consumer the consumer
-   * @param testName the test name
-   */
   public static void run(final SerializableConsumer<NotebookOutput> consumer, final String testName) {
     try {
       String dateStr = Util.dateStr("yyyyMMddHHmmss");
@@ -178,11 +129,6 @@ public class EC2NotebookRunner {
     }
   }
 
-  /**
-   * Launch notebook.
-   *
-   * @param log the log
-   */
   public void launchNotebook(final NotebookOutput log) {
     AwsTendrilNodeSettings settings = log.eval(() -> {
       EC2NodeSettings nodeSettings = EC2NodeSettings.P3_2XL;

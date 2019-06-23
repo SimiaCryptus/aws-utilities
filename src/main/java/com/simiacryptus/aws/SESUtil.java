@@ -46,22 +46,9 @@ import java.util.List;
 import java.util.Properties;
 import java.util.stream.Stream;
 
-/**
- * The type Ses util.
- */
 public class SESUtil {
   private static final Logger logger = LoggerFactory.getLogger(SESUtil.class);
 
-  /**
-   * Send.
-   *
-   * @param ses         the ses
-   * @param subject     the subject
-   * @param to          the to
-   * @param body        the body
-   * @param html        the html
-   * @param attachments the attachments
-   */
   public static void send(final AmazonSimpleEmailService ses, final String subject, final String to, final String body, final String html, final File... attachments) {
     try {
       Stream<MimeBodyPart> attachmentStream = Arrays.stream(attachments).filter(x -> x.exists() && x.length() < 1024 * 1024 * 4).map(SESUtil::toAttachment);
@@ -74,16 +61,6 @@ public class SESUtil {
     }
   }
 
-  /**
-   * Gets message.
-   *
-   * @param session the session
-   * @param subject the subject
-   * @param to      the to
-   * @param content the content
-   * @return the message
-   * @throws MessagingException the messaging exception
-   */
   public static MimeMessage getMessage(final Session session, final String subject, final String to, final MimeMultipart content) throws MessagingException {
     MimeMessage message = new MimeMessage(session);
     message.setSubject(subject, "UTF-8");
@@ -93,14 +70,6 @@ public class SESUtil {
     return message;
   }
 
-  /**
-   * Gets email body.
-   *
-   * @param body the body
-   * @param html the html
-   * @return the email body
-   * @throws MessagingException the messaging exception
-   */
   public static MimeMultipart getEmailBody(final String body, final String html) throws MessagingException {
     MimeMultipart multipart = new MimeMultipart("alternative");
     MimeBodyPart textPart = new MimeBodyPart();
@@ -114,14 +83,6 @@ public class SESUtil {
     return multipart;
   }
 
-  /**
-   * To raw raw message.
-   *
-   * @param message the message
-   * @return the raw message
-   * @throws IOException        the io exception
-   * @throws MessagingException the messaging exception
-   */
   @Nonnull
   public static RawMessage toRaw(final MimeMessage message) throws IOException, MessagingException {
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
@@ -129,13 +90,6 @@ public class SESUtil {
     return new RawMessage(ByteBuffer.wrap(outputStream.toByteArray()));
   }
 
-  /**
-   * Mix mime multipart.
-   *
-   * @param parts the parts
-   * @return the mime multipart
-   * @throws MessagingException the messaging exception
-   */
   public static MimeMultipart mix(final MimeBodyPart... parts) throws MessagingException {
     MimeMultipart multipart = new MimeMultipart("mixed");
     for (final MimeBodyPart part : parts) {
@@ -144,25 +98,12 @@ public class SESUtil {
     return multipart;
   }
 
-  /**
-   * Wrap mime body part.
-   *
-   * @param content the content
-   * @return the mime body part
-   * @throws MessagingException the messaging exception
-   */
   public static MimeBodyPart wrap(final MimeMultipart content) throws MessagingException {
     MimeBodyPart mimeBodyPart = new MimeBodyPart();
     mimeBodyPart.setContent(content);
     return mimeBodyPart;
   }
 
-  /**
-   * To attachment mime body part.
-   *
-   * @param attachment the attachment
-   * @return the mime body part
-   */
   public static MimeBodyPart toAttachment(final File attachment) {
     MimeBodyPart att = new MimeBodyPart();
     DataSource fds = new FileDataSource(attachment);

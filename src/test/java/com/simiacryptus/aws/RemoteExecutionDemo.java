@@ -37,14 +37,8 @@ import java.io.File;
 import java.util.Date;
 import java.util.Random;
 
-/**
- * The type Remote execution demo.
- */
 public class RemoteExecutionDemo {
 
-  /**
-   * The Logger.
-   */
   static final Logger logger = LoggerFactory.getLogger(RemoteExecutionDemo.class);
   private static final String default_bucket = "simiacryptus";
   private static final String default_instanceType = "t2.micro";
@@ -56,12 +50,6 @@ public class RemoteExecutionDemo {
     SysOutInterceptor.INSTANCE.init();
   }
 
-  /**
-   * The entry point of application.
-   *
-   * @param args the input arguments
-   * @throws Exception the exception
-   */
   public static void main(String... args) throws Exception {
     try (NotebookOutput log = new MarkdownNotebookOutput(
         new File("target/report/" + Util.dateStr("yyyyMMddHHmmss") + "/index"), true
@@ -70,11 +58,6 @@ public class RemoteExecutionDemo {
     }
   }
 
-  /**
-   * Demo.
-   *
-   * @param log the log
-   */
   public void demo(final NotebookOutput log) {
     AmazonEC2 ec2 = AmazonEC2ClientBuilder.standard().withRegion(EC2Util.REGION).build();
     AmazonIdentityManagement iam = AmazonIdentityManagementClientBuilder.standard().withRegion(EC2Util.REGION).build();

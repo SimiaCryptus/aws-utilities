@@ -32,17 +32,8 @@ import static com.simiacryptus.aws.EC2Util.randomHex;
 import static com.simiacryptus.aws.EC2Util.sleep;
 
 public class AwsTendrilEnvSettings implements Serializable {
-  /**
-   * The Security group.
-   */
   public String securityGroup;
-  /**
-   * The Instance profile arn.
-   */
   public String instanceProfileArn;
-  /**
-   * The Bucket.
-   */
   public String bucket;
 
   public AwsTendrilEnvSettings(final String securityGroup, final String instanceProfileArn, final String bucket) {
@@ -57,17 +48,6 @@ public class AwsTendrilEnvSettings implements Serializable {
     this.bucket = "";
   }
 
-  /**
-   * Sets .
-   *
-   * @param ec2          the ec 2
-   * @param iam          the iam
-   * @param s3           the s3
-   * @param instanceType the instance type
-   * @param imageId      the image id
-   * @param username     the username
-   * @return the
-   */
   public static AwsTendrilNodeSettings setup(
       AmazonEC2 ec2,
       final AmazonIdentityManagement iam,
@@ -79,17 +59,6 @@ public class AwsTendrilEnvSettings implements Serializable {
     return setup(ec2, iam, s3.createBucket("data-" + randomHex()).getName(), instanceType, imageId, username);
   }
 
-  /**
-   * Sets .
-   *
-   * @param ec2          the ec 2
-   * @param iam          the iam
-   * @param bucket       the bucket
-   * @param instanceType the instance type
-   * @param imageId      the image id
-   * @param username     the username
-   * @return the
-   */
   public static AwsTendrilNodeSettings setup(
       AmazonEC2 ec2,
       final AmazonIdentityManagement iam,
@@ -108,36 +77,14 @@ public class AwsTendrilEnvSettings implements Serializable {
     );
   }
 
-  /**
-   * Sets .
-   *
-   * @param ec2 the ec 2
-   * @param iam the iam
-   * @param s3  the s3
-   * @return the
-   */
   public static AwsTendrilEnvSettings setup(AmazonEC2 ec2, final AmazonIdentityManagement iam, final AmazonS3 s3) {
     return setup(ec2, iam, s3.createBucket("data-" + randomHex()).getName());
   }
 
-  /**
-   * Sets .
-   *
-   * @param ec2    the ec 2
-   * @param iam    the iam
-   * @param bucket the bucket
-   * @return the
-   */
   public static AwsTendrilEnvSettings setup(AmazonEC2 ec2, final AmazonIdentityManagement iam, final String bucket) {
     return setup(bucket, EC2Util.newSecurityGroup(ec2, 22, 1080, 4040, 8080), EC2Util.newIamRole(iam, defaultPolicy(bucket)).getArn());
   }
 
-  /**
-   * Default policy string.
-   *
-   * @param bucket the bucket
-   * @return the string
-   */
   @Nonnull
   public static String defaultPolicy(final String bucket) {
     return "{\n" +
@@ -162,17 +109,6 @@ public class AwsTendrilEnvSettings implements Serializable {
         "}";
   }
 
-  /**
-   * Sets .
-   *
-   * @param bucket             the bucket
-   * @param instanceType       the instance type
-   * @param imageId            the image id
-   * @param username           the username
-   * @param securityGroup      the security group
-   * @param instanceProfileArn the instance profile arn
-   * @return the
-   */
   public static AwsTendrilNodeSettings setup(
       final String bucket,
       final String instanceType,
@@ -206,12 +142,6 @@ public class AwsTendrilEnvSettings implements Serializable {
     return JsonUtil.toJson(this).toString();
   }
 
-  /**
-   * Gets service config.
-   *
-   * @param ec2 the ec 2
-   * @return the service config
-   */
   @Nonnull
   public EC2Util.ServiceConfig getServiceConfig(final AmazonEC2 ec2) {
     return new EC2Util.ServiceConfig(ec2, this.bucket, this.securityGroup, new InstanceProfile().withArn(this.instanceProfileArn));

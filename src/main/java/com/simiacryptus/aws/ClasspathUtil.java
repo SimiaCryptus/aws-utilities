@@ -209,13 +209,6 @@ public class ClasspathUtil {
     Tendril.stage(entryFile, remote, 10);
   }
 
-  /**
-   * To jar file.
-   *
-   * @param entry the entry
-   * @return the file
-   * @throws IOException the io exception
-   */
   @Nonnull
   public static File toJar(@Nonnull final File entry) throws IOException {
     File tempJar = File.createTempFile(UUID.randomUUID().toString(), ".jar").getAbsoluteFile();
@@ -251,14 +244,6 @@ public class ClasspathUtil {
 
   }
 
-  /**
-   * Hash string.
-   *
-   * @param classpath the classpath
-   * @return the string
-   * @throws NoSuchAlgorithmException the no such algorithm exception
-   * @throws IOException              the io exception
-   */
   public static String hash(final File classpath) throws NoSuchAlgorithmException, IOException {
     MessageDigest digest = MessageDigest.getInstance("MD5");
     InputStream fis = new FileInputStream(classpath);

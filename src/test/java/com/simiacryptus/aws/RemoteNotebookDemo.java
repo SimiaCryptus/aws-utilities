@@ -44,14 +44,8 @@ import java.nio.charset.Charset;
 import java.util.Date;
 import java.util.Random;
 
-/**
- * The type Remote notebook demo.
- */
 public class RemoteNotebookDemo {
 
-  /**
-   * The Logger.
-   */
   static final Logger logger = LoggerFactory.getLogger(RemoteNotebookDemo.class);
   private static final String to = "acharneski+mindseye@gmail.com";
   private static final String gitBase = "https://github.com/SimiaCryptus/aws-utilities";
@@ -65,12 +59,6 @@ public class RemoteNotebookDemo {
     SysOutInterceptor.INSTANCE.init();
   }
 
-  /**
-   * The entry point of application.
-   *
-   * @param args the input arguments
-   * @throws Exception the exception
-   */
   public static void main(String... args) throws Exception {
     try (NotebookOutput log = new MarkdownNotebookOutput(
         new File("target/report/" + Util.dateStr("yyyyMMddHHmmss") + "/index"), true
@@ -79,38 +67,18 @@ public class RemoteNotebookDemo {
     }
   }
 
-  /**
-   * Gets ec 2.
-   *
-   * @return the ec 2
-   */
   public static AmazonEC2 getEc2() {
     return AmazonEC2ClientBuilder.standard().withRegion(EC2Util.REGION).build();
   }
 
-  /**
-   * Gets iam.
-   *
-   * @return the iam
-   */
   public static AmazonIdentityManagement getIam() {
     return AmazonIdentityManagementClientBuilder.standard().withRegion(EC2Util.REGION).build();
   }
 
-  /**
-   * Gets s 3.
-   *
-   * @return the s 3
-   */
   public static AmazonS3 getS3() {
     return AmazonS3ClientBuilder.standard().withRegion(EC2Util.REGION).build();
   }
 
-  /**
-   * Launcher notebook.
-   *
-   * @param log the log
-   */
   public void launcherNotebook(final NotebookOutput log) {
     AwsTendrilNodeSettings settings = log.eval(() -> {
       return JsonUtil.cache(new File("settings.json"), AwsTendrilNodeSettings.class,
@@ -186,11 +154,6 @@ public class RemoteNotebookDemo {
     }
   }
 
-  /**
-   * Node task notebook.
-   *
-   * @param log the log
-   */
   public void nodeTaskNotebook(final NotebookOutput log) {
     logger.info("Running worker process");
     for (int i = 0; i < 10; i++) {
