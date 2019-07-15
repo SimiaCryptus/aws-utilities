@@ -20,15 +20,13 @@
 package com.simiacryptus.aws;
 
 import com.amazonaws.services.ec2.AmazonEC2;
-import com.amazonaws.services.identitymanagement.AmazonIdentityManagement;
 import com.amazonaws.services.identitymanagement.model.InstanceProfile;
-import com.amazonaws.services.s3.AmazonS3;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.simiacryptus.util.JsonUtil;
 
 import javax.annotation.Nonnull;
 import java.io.Serializable;
 
-import static com.simiacryptus.aws.EC2Util.randomHex;
 import static com.simiacryptus.aws.EC2Util.sleep;
 
 public class AwsTendrilEnvSettings implements Serializable {
@@ -49,73 +47,12 @@ public class AwsTendrilEnvSettings implements Serializable {
   }
 
   public static AwsTendrilNodeSettings setup(
-      AmazonEC2 ec2,
-      final AmazonIdentityManagement iam,
-      final AmazonS3 s3,
-      final String instanceType,
-      final String imageId,
-      final String username
-  ) {
-    return setup(ec2, iam, s3.createBucket("data-" + randomHex()).getName(), instanceType, imageId, username);
-  }
-
-  public static AwsTendrilNodeSettings setup(
-      AmazonEC2 ec2,
-      final AmazonIdentityManagement iam,
-      final String bucket,
-      final String instanceType,
-      final String imageId,
-      final String username
-  ) {
-    return setup(
-        bucket,
-        instanceType,
-        imageId,
-        username,
-        EC2Util.newSecurityGroup(ec2, 22, 1080, 4040, 8080),
-        EC2Util.newIamRole(iam, defaultPolicy(bucket)).getArn()
-    );
-  }
-
-  public static AwsTendrilEnvSettings setup(AmazonEC2 ec2, final AmazonIdentityManagement iam, final AmazonS3 s3) {
-    return setup(ec2, iam, s3.createBucket("data-" + randomHex()).getName());
-  }
-
-  public static AwsTendrilEnvSettings setup(AmazonEC2 ec2, final AmazonIdentityManagement iam, final String bucket) {
-    return setup(bucket, EC2Util.newSecurityGroup(ec2, 22, 1080, 4040, 8080), EC2Util.newIamRole(iam, defaultPolicy(bucket)).getArn());
-  }
-
-  @Nonnull
-  public static String defaultPolicy(final String bucket) {
-    return "{\n" +
-        "  \"Version\": \"2012-10-17\",\n" +
-        "  \"Statement\": [\n" +
-        "    {\n" +
-        "      \"Action\": \"s3:*\",\n" +
-        "      \"Effect\": \"Allow\",\n" +
-        "      \"Resource\": \"arn:aws:s3:::" + bucket + "*\"\n" +
-        "    },\n" +
-        "    {\n" +
-        "      \"Action\": \"s3:ListBucket*\",\n" +
-        "      \"Effect\": \"Allow\",\n" +
-        "      \"Resource\": \"arn:aws:s3:::*\"\n" +
-        "    },\n" +
-        "    {\n" +
-        "      \"Action\": [\"ses:SendEmail\",\"ses:SendRawEmail\"],\n" +
-        "      \"Effect\": \"Allow\",\n" +
-        "      \"Resource\": \"*\"\n" +
-        "    }\n" +
-        "  ]\n" +
-        "}";
-  }
-
-  public static AwsTendrilNodeSettings setup(
-      final String bucket,
       final String instanceType,
       final String imageId,
       final String username,
       final String securityGroup,
-      final String instanceProfileArn
+      final String instanceProfileArn,
+      final String bucket
   ) {
     AwsTendrilNodeSettings self = new AwsTendrilNodeSettings();
     self.securityGroup = securityGroup;
@@ -128,7 +65,7 @@ public class AwsTendrilEnvSettings implements Serializable {
     return self;
   }
 
-  public static AwsTendrilEnvSettings setup(final String bucket, final String securityGroup, final String instanceProfileArn) {
+  public static AwsTendrilEnvSettings setup(final String securityGroup, final String instanceProfileArn, final String bucket) {
     AwsTendrilEnvSettings self = new AwsTendrilEnvSettings();
     self.securityGroup = securityGroup;
     self.bucket = bucket;
@@ -143,7 +80,8 @@ public class AwsTendrilEnvSettings implements Serializable {
   }
 
   @Nonnull
+  @JsonIgnore
   public EC2Util.ServiceConfig getServiceConfig(final AmazonEC2 ec2) {
-    return new EC2Util.ServiceConfig(ec2, this.bucket, this.securityGroup, new InstanceProfile().withArn(this.instanceProfileArn));
+    return new EC2Util.ServiceConfig(ec2, this.securityGroup, new InstanceProfile().withArn(this.instanceProfileArn), this.bucket);
   }
 }

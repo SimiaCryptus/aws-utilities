@@ -118,14 +118,15 @@ public class Tendril {
       final String keyspace,
       final Predicate<String> classpathFilter,
       final AmazonS3 s3,
-      final String bucket, final HashMap<String, String> env
+      final HashMap<String, String> env,
+      final String[] bucket
   ) {
     String localClasspath = System.getProperty("java.class.path");
     Arrays.stream(new File(".").listFiles()).filter(x -> x.getName().endsWith(".json")).forEach(file -> {
       logger.info("Deploy " + file.getAbsoluteFile());
       node.scp(file, file.getName());
     });
-    String remoteClasspath = stageRemoteClasspath(node, localClasspath, classpathFilter, libPrefix, true, s3, bucket, keyspace);
+    String remoteClasspath = stageRemoteClasspath(node, localClasspath, classpathFilter, libPrefix, true, s3, bucket[0], keyspace);
     String commandLine = String.format(
         "nohup java %s -cp %s %s %s",
         javaOpts,
@@ -367,8 +368,8 @@ public class Tendril {
       final int localControlPort,
       final Predicate<String> shouldTransfer,
       final AmazonS3 s3,
-      final String bucket,
-      final HashMap<String, String> env
+      final HashMap<String, String> env,
+      final String... bucket
   ) {
     return startRemoteJvm(
         node,
@@ -379,8 +380,8 @@ public class Tendril {
         jvmConfig.keyspace,
         shouldTransfer,
         s3,
-        bucket,
-        env
+        env,
+        bucket
     );
   }
 

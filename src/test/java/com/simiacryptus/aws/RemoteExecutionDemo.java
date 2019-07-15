@@ -66,7 +66,7 @@ public class RemoteExecutionDemo {
     AwsTendrilNodeSettings settings = log.eval(() -> {
       return JsonUtil.cache(new File("settings.json"), AwsTendrilNodeSettings.class,
           () -> {
-            return AwsTendrilNodeSettings.setup(ec2, iam, default_bucket, default_instanceType, default_imageId, default_username);
+            return EC2Util.setup(ec2, iam, default_bucket, default_instanceType, default_imageId, default_username);
           });
     });
 

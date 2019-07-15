@@ -33,6 +33,7 @@ import com.jcraft.jsch.*;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.CloseShieldOutputStream;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -160,11 +161,7 @@ public class EC2Util {
     return start(ec2, imageId, instanceType, username, newIamRole(iam, ("{\n" +
         "  \"Version\": \"2012-10-17\",\n" +
         "  \"Statement\": [\n" +
-        "    {\n" +
-        "      \"Action\": \"s3:*\",\n" +
-        "      \"Effect\": \"Allow\",\n" +
-        "      \"Resource\": \"arn:aws:s3:::BUCKET*\"\n" +
-        "    }\n" +
+        "    " + bucketGrantStr(bucket) + "\n" +
         "  ]\n" +
         "}").replaceAll("BUCKET", bucket)), localControlPort, ports);
   }
@@ -190,11 +187,7 @@ public class EC2Util {
     return start(ec2, imageId, instanceType, username, keyPair, groupId, newIamRole(iam, ("{\n" +
         "  \"Version\": \"2012-10-17\",\n" +
         "  \"Statement\": [\n" +
-        "    {\n" +
-        "      \"Action\": \"s3:*\",\n" +
-        "      \"Effect\": \"Allow\",\n" +
-        "      \"Resource\": \"arn:aws:s3:::BUCKET*\"\n" +
-        "    }\n" +
+        "    " + bucketGrantStr(bucket) + "\n" +
         "  ]\n" +
         "}").replaceAll("BUCKET", bucket)), 1319);
   }
@@ -251,17 +244,18 @@ public class EC2Util {
         "                  \"Action\": [ \"sts:AssumeRole\" ]\n" +
         "               } ]\n" +
         "            }";
+    String id = randomHex();
     Role role = iam.createRole(new CreateRoleRequest()
-        .withRoleName("role_" + randomHex())
+        .withRoleName("role_" + id)
         .withAssumeRolePolicyDocument(initialDocument)
     ).getRole();
     while (!getRole(iam, role.getRoleName()).isPresent()) sleep(10000);
     Policy policy = iam.createPolicy(new CreatePolicyRequest()
         .withPolicyDocument(policyDocument.replaceAll("ROLEARN", role.getArn()))
-        .withPolicyName("policy-" + randomHex())
+        .withPolicyName("policy-" + id)
     ).getPolicy();
     iam.attachRolePolicy(new AttachRolePolicyRequest().withPolicyArn(policy.getArn()).withRoleName(role.getRoleName()));
-    InstanceProfile instanceProfile = iam.createInstanceProfile(new CreateInstanceProfileRequest().withInstanceProfileName("runpol-" + randomHex())).getInstanceProfile();
+    InstanceProfile instanceProfile = iam.createInstanceProfile(new CreateInstanceProfileRequest().withInstanceProfileName("runpol-" + id)).getInstanceProfile();
     iam.addRoleToInstanceProfile(new AddRoleToInstanceProfileRequest()
         .withInstanceProfileName(instanceProfile.getInstanceProfileName())
         .withRoleName(role.getRoleName())
@@ -332,17 +326,22 @@ public class EC2Util {
     }
   }
 
-  public static Instance start(final AmazonEC2 ec2, final String ami, final String instanceType, final String groupId, final KeyPair keyPair, final AmazonIdentityManagement iam, final String bucket) {
+  public static Instance start(final AmazonEC2 ec2, final String ami, final String instanceType, final String groupId, final KeyPair keyPair, final AmazonIdentityManagement iam, final String... bucket) {
     return start(ec2, ami, instanceType, groupId, keyPair, newIamRole(iam, ("{\n" +
         "  \"Version\": \"2012-10-17\",\n" +
         "  \"Statement\": [\n" +
-        "    {\n" +
+        "    " + bucketGrantStr(bucket) + "\n" +
+        "  ]\n" +
+        "}")));
+  }
+
+  @NotNull
+  public static String bucketGrantStr(String... bucket) {
+    return Arrays.stream(bucket).map(b -> String.format("{\n" +
         "      \"Action\": \"s3:*\",\n" +
         "      \"Effect\": \"Allow\",\n" +
-        "      \"Resource\": \"arn:aws:s3:::BUCKET*\"\n" +
-        "    }\n" +
-        "  ]\n" +
-        "}").replaceAll("BUCKET", bucket)));
+        "      \"Resource\": \"arn:aws:s3:::%s*\"\n" +
+        "    }", b)).reduce((a, b) -> a + ", " + b).get();
   }
 
   public static void sleep(final int millis) {
@@ -447,6 +446,43 @@ public class EC2Util {
     return start(ec2, jvmConfig.imageId, jvmConfig.instanceType, jvmConfig.username, serviceConfig.keyPair, serviceConfig.groupId, serviceConfig.instanceProfile, localControlPort);
   }
 
+  public static AwsTendrilNodeSettings setup(
+      AmazonEC2 ec2,
+      final AmazonIdentityManagement iam,
+      final AmazonS3 s3,
+      final String instanceType,
+      final String imageId,
+      final String username
+  ) {
+    return setup(ec2, iam, s3.createBucket("data-" + randomHex()).getName(), instanceType, imageId, username);
+  }
+
+  public static AwsTendrilNodeSettings setup(
+      AmazonEC2 ec2,
+      final AmazonIdentityManagement iam,
+      final String bucket,
+      final String instanceType,
+      final String imageId,
+      final String username
+  ) {
+    return AwsTendrilEnvSettings.setup(
+        instanceType,
+        imageId,
+        username,
+        newSecurityGroup(ec2, 22, 1080, 4040, 8080),
+        newIamRole(iam, S3Util.defaultPolicy(bucket)).getArn(),
+        bucket
+    );
+  }
+
+  public static AwsTendrilEnvSettings setup(AmazonEC2 ec2, final AmazonIdentityManagement iam, final AmazonS3 s3) {
+    return setup(ec2, iam, s3.createBucket("data-" + randomHex()).getName());
+  }
+
+  public static AwsTendrilEnvSettings setup(AmazonEC2 ec2, final AmazonIdentityManagement iam, final String bucket) {
+    return AwsTendrilEnvSettings.setup(newSecurityGroup(ec2, 22, 1080, 4040, 8080), newIamRole(iam, S3Util.defaultPolicy(bucket)).getArn(), bucket);
+  }
+
   public static class EC2Node implements AutoCloseable {
     private final AmazonEC2 ec2;
     private final Session connection;
@@ -469,8 +505,8 @@ public class EC2Util {
           localControlPort,
           Tendril::defaultClasspathFilter,
           s3,
-          settings.getServiceConfig(ec2).bucket,
-          new HashMap<String, String>()
+          new HashMap<String, String>(),
+          settings.getServiceConfig(ec2).bucket
       );
     }
 
@@ -563,29 +599,27 @@ public class EC2Util {
   }
 
   public static class ServiceConfig {
-    public String bucket;
+    public String[] bucket;
     public InstanceProfile instanceProfile;
     public String groupId;
     public KeyPair keyPair;
 
-    public ServiceConfig(final AmazonEC2 ec2, final String bucket, final String roleArn) {
+    public ServiceConfig(final AmazonEC2 ec2, final String roleArn, final String... bucket) {
       this(
           ec2,
-          bucket,
-          roleArn,
-          EC2Util.newSecurityGroup(ec2, 22, 1080, 4040, 8080)
+          roleArn, EC2Util.newSecurityGroup(ec2, 22, 1080, 4040, 8080), bucket
       );
     }
 
-    public ServiceConfig(final AmazonEC2 ec2, final String bucket, final String roleArn, final String groupId) {
-      this(ec2, bucket, groupId, new InstanceProfile().withArn(roleArn));
+    public ServiceConfig(final AmazonEC2 ec2, final String roleArn, final String groupId, final String... bucket) {
+      this(ec2, groupId, new InstanceProfile().withArn(roleArn), bucket);
     }
 
-    public ServiceConfig(final AmazonEC2 ec2, final String bucket, final String groupId, final InstanceProfile instanceProfile) {
-      this(bucket, groupId, instanceProfile, EC2Util.getKeyPair(ec2));
+    public ServiceConfig(final AmazonEC2 ec2, final String groupId, final InstanceProfile instanceProfile, final String... bucket) {
+      this(groupId, instanceProfile, EC2Util.getKeyPair(ec2), bucket);
     }
 
-    public ServiceConfig(final String bucket, final String groupId, final InstanceProfile instanceProfile, final KeyPair keyPair) {
+    public ServiceConfig(final String groupId, final InstanceProfile instanceProfile, final KeyPair keyPair, final String... bucket) {
       this.bucket = bucket;
       this.groupId = groupId;
       this.instanceProfile = instanceProfile;
