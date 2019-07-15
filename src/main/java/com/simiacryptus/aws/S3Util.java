@@ -33,12 +33,14 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -163,4 +165,28 @@ public class S3Util {
     return localFile;
   }
 
+  @Nonnull
+  public static String defaultPolicy(final String... bucket) {
+    String bucketGrant = Arrays.stream(bucket).map(b -> "{\n" +
+        "      \"Action\": \"s3:*\",\n" +
+        "      \"Effect\": \"Allow\",\n" +
+        "      \"Resource\": \"arn:aws:s3:::" + b + "*\"\n" +
+        "    }").reduce((a, b) -> a + "," + b).get();
+    return "{\n" +
+        "  \"Version\": \"2012-10-17\",\n" +
+        "  \"Statement\": [\n" +
+        "    " + bucketGrant + ",\n" +
+        "    {\n" +
+        "      \"Action\": \"s3:ListBucket*\",\n" +
+        "      \"Effect\": \"Allow\",\n" +
+        "      \"Resource\": \"arn:aws:s3:::*\"\n" +
+        "    },\n" +
+        "    {\n" +
+        "      \"Action\": [\"ses:SendEmail\",\"ses:SendRawEmail\"],\n" +
+        "      \"Effect\": \"Allow\",\n" +
+        "      \"Resource\": \"*\"\n" +
+        "    }\n" +
+        "  ]\n" +
+        "}";
+  }
 }

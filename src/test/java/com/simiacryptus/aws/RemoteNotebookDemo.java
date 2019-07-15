@@ -82,7 +82,7 @@ public class RemoteNotebookDemo {
   public void launcherNotebook(final NotebookOutput log) {
     AwsTendrilNodeSettings settings = log.eval(() -> {
       return JsonUtil.cache(new File("settings.json"), AwsTendrilNodeSettings.class,
-          () -> AwsTendrilNodeSettings.setup(
+          () -> EC2Util.setup(
               getEc2(),
               getIam(),
               default_bucket,

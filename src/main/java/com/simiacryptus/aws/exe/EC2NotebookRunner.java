@@ -134,7 +134,7 @@ public class EC2NotebookRunner {
       EC2NodeSettings nodeSettings = EC2NodeSettings.P3_2XL;
 
       return JsonUtil.cache(new File("ec2-settings." + EC2Util.REGION.toString() + ".json"), AwsTendrilNodeSettings.class,
-          () -> AwsTendrilNodeSettings.setup(
+          () -> EC2Util.setup(
               getEc2(),
               getIam(),
               getS3(),
@@ -161,8 +161,8 @@ public class EC2NotebookRunner {
             localControlPort,
             Tendril::defaultClasspathFilter,
             getS3(),
-            settings.getServiceConfig(getEc2()).bucket,
-            new HashMap<String, String>()
+            new HashMap<String, String>(),
+            settings.getServiceConfig(getEc2()).bucket
         );
         tendrilControl.start(() -> {
           this.nodeMain();
