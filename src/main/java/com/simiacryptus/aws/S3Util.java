@@ -21,10 +21,7 @@ package com.simiacryptus.aws;
 
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
-import com.amazonaws.services.s3.model.CannedAccessControlList;
-import com.amazonaws.services.s3.model.ListObjectsRequest;
-import com.amazonaws.services.s3.model.PutObjectRequest;
-import com.amazonaws.services.s3.model.S3ObjectSummary;
+import com.amazonaws.services.s3.model.*;
 import com.simiacryptus.notebook.NotebookOutput;
 import com.simiacryptus.util.Util;
 import com.simiacryptus.util.io.TeeInputStream;
@@ -88,6 +85,10 @@ public class S3Util {
   }
 
   public static Map<File, URL> upload(final AmazonS3 s3, final URI path, final File file) {
+    return upload(s3, path, file, 3);
+  }
+
+  public static Map<File, URL> upload(final AmazonS3 s3, final URI path, final File file, int retries) {
     try {
       HashMap<File, URL> map = new HashMap<>();
       if (!file.exists()) throw new RuntimeException(file.toString());
@@ -97,6 +98,14 @@ public class S3Util {
         String reportPath = path.resolve(file.getName()).getPath().replaceAll("//", "/").replaceAll("^/", "");
         if (scheme.startsWith("s3")) {
           logger.info(String.format("Uploading file %s to s3 %s/%s", file.getAbsolutePath(), bucket, reportPath));
+          try {
+            ObjectMetadata existingMetadata = s3.getObjectMetadata(bucket, reportPath);
+            if (null != existingMetadata && existingMetadata.getContentLength() != file.length()) {
+              logger.info(String.format("Removing outdated file %s/%s", bucket, reportPath));
+              s3.deleteObject(bucket, reportPath);
+            }
+          } catch (AmazonS3Exception e) {
+          }
           s3.putObject(new PutObjectRequest(bucket, reportPath, file).withCannedAcl(CannedAccessControlList.PublicRead));
           map.put(file.getAbsoluteFile(), s3.getUrl(bucket, reportPath));
         } else {
@@ -123,9 +132,13 @@ public class S3Util {
         for (File subfile : file.listFiles()) {
           map.putAll(upload(s3, filePath, subfile));
         }
+
       }
       return map;
     } catch (Throwable e) {
+      if (retries > 0) {
+        return upload(s3, path, file, retries - 1);
+      }
       throw new RuntimeException("Error uploading " + file + " to " + path, e);
     }
   }

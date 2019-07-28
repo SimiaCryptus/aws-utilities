@@ -42,6 +42,7 @@ import javax.annotation.Nullable;
 import java.io.*;
 import java.net.InetAddress;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
 import java.util.Arrays;
@@ -81,13 +82,29 @@ public class EC2Util {
 
   public static String publicHostname() {
     try {
-      return IOUtils.toString(new URI("http://169.254.169.254/latest/meta-data/public-hostname"), "UTF-8");
+      return getInstanceMetadata("public-hostname");
     } catch (Throwable e) {
       try {
         return InetAddress.getLocalHost().getHostName();
       } catch (UnknownHostException e1) {
         throw new RuntimeException(e1);
       }
+    }
+  }
+
+  public static String instanceId() {
+    try {
+      return getInstanceMetadata("instance-id");
+    } catch (Throwable e) {
+      return "";
+    }
+  }
+
+  public static String getInstanceMetadata(String key) throws IOException {
+    try {
+      return IOUtils.toString(new URI("http://169.254.169.254/latest/meta-data/" + key), "UTF-8");
+    } catch (URISyntaxException e) {
+      throw new RuntimeException(e);
     }
   }
 

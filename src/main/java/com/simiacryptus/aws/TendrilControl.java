@@ -51,18 +51,25 @@ public class TendrilControl implements AutoCloseable {
   }
 
   public <T> Future<T> start(SerializableSupplier<T> task) {
-    return start(task, 10);
+    return start(task, 10, UUID.randomUUID().toString());
   }
 
-  public <T> Future<T> start(SerializableSupplier<T> task, int retries) {
+  public <T> Future<T> start(SerializableSupplier<T> task, int retries, String key) {
     if (null == task) return null;
     assert inner.isAlive();
     try {
       String taskKey = inner.run(() -> {
         Promise<T> promise = new Promise<>();
-        String key = UUID.randomUUID().toString();
-        currentOperations.put(key, promise);
-        new Thread(() -> {
+        boolean run;
+        synchronized (currentOperations) {
+          if (!currentOperations.containsKey(key)) {
+            currentOperations.put(key, promise);
+            run = true;
+          } else {
+            run = false;
+          }
+        }
+        if (run) new Thread(() -> {
           try {
             if (null == promise) throw new AssertionError();
             logger.warn(String.format("Task Start: %s = %s", key, JsonUtil.toJson(task)));
@@ -81,7 +88,7 @@ public class TendrilControl implements AutoCloseable {
     } catch (Throwable e) {
       if (retries > 0) {
         logger.warn("Error starting " + task, e);
-        return start(task, retries - 1);
+        return start(task, retries - 1, key);
       } else {
         throw new RuntimeException(e);
       }
