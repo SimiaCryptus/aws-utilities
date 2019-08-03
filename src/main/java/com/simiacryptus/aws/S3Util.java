@@ -60,15 +60,17 @@ public class S3Util {
       File root = log.getRoot();
       URI archiveHome = log.getArchiveHome();
       logger.info(String.format("Files in %s to be archived in %s", root.getAbsolutePath(), archiveHome));
-      logFiles(root);
       HashMap<File, URL> map = new HashMap<>();
-      if (null == archiveHome || (archiveHome.getScheme().startsWith("s3") && (null == archiveHome.getHost() || archiveHome.getHost().isEmpty() || "null".equals(archiveHome.getHost())))) {
-        logger.info(String.format("No archive destination to publish to: %s", archiveHome));
-        return map;
-      }
-      logger.info(String.format("Resolved %s / %s = %s", archiveHome, root.getName(), archiveHome));
-      for (File file : root.listFiles()) {
-        map.putAll(S3Util.upload(s3, archiveHome, file));
+      if (null != archiveHome) {
+        logFiles(root);
+        if (null == archiveHome || (archiveHome.getScheme().startsWith("s3") && (null == archiveHome.getHost() || archiveHome.getHost().isEmpty() || "null".equals(archiveHome.getHost())))) {
+          logger.info(String.format("No archive destination to publish to: %s", archiveHome));
+          return map;
+        }
+        logger.info(String.format("Resolved %s / %s", archiveHome, log.getName()));
+        for (File file : root.listFiles()) {
+          map.putAll(S3Util.upload(s3, archiveHome, file));
+        }
       }
       return map;
     } catch (IOException e) {
@@ -92,22 +94,39 @@ public class S3Util {
     try {
       HashMap<File, URL> map = new HashMap<>();
       if (!file.exists()) throw new RuntimeException(file.toString());
+      if (null == path) return map;
       String bucket = path.getHost();
       String scheme = path.getScheme();
       if (file.isFile()) {
         String reportPath = path.resolve(file.getName()).getPath().replaceAll("//", "/").replaceAll("^/", "");
         if (scheme.startsWith("s3")) {
           logger.info(String.format("Uploading file %s to s3 %s/%s", file.getAbsolutePath(), bucket, reportPath));
+          boolean upload;
           try {
-            ObjectMetadata existingMetadata = s3.getObjectMetadata(bucket, reportPath);
-            if (null != existingMetadata && existingMetadata.getContentLength() != file.length()) {
-              logger.info(String.format("Removing outdated file %s/%s", bucket, reportPath));
-              s3.deleteObject(bucket, reportPath);
+            ObjectMetadata existingMetadata;
+            if (s3.doesObjectExist(bucket, reportPath)) existingMetadata = s3.getObjectMetadata(bucket, reportPath);
+            else existingMetadata = null;
+            if (null != existingMetadata) {
+              if (existingMetadata.getContentLength() != file.length()) {
+                logger.info(String.format("Removing outdated file %s/%s", bucket, reportPath));
+                s3.deleteObject(bucket, reportPath);
+                upload = true;
+              } else {
+                logger.info(String.format("Existing file %s/%s", bucket, reportPath));
+                upload = false;
+              }
+            } else {
+              logger.info(String.format("Not found file %s/%s", bucket, reportPath));
+              upload = true;
             }
           } catch (AmazonS3Exception e) {
+            logger.info(String.format("Error listing %s/%s", bucket, reportPath), e);
+            upload = true;
           }
-          s3.putObject(new PutObjectRequest(bucket, reportPath, file).withCannedAcl(CannedAccessControlList.PublicRead));
-          map.put(file.getAbsoluteFile(), s3.getUrl(bucket, reportPath));
+          if (upload) {
+            s3.putObject(new PutObjectRequest(bucket, reportPath, file).withCannedAcl(CannedAccessControlList.PublicRead));
+            map.put(file.getAbsoluteFile(), s3.getUrl(bucket, reportPath));
+          }
         } else {
           try {
             logger.info(String.format("Copy file %s to %s", file.getAbsolutePath(), reportPath));
@@ -132,7 +151,6 @@ public class S3Util {
         for (File subfile : file.listFiles()) {
           map.putAll(upload(s3, filePath, subfile));
         }
-
       }
       return map;
     } catch (Throwable e) {

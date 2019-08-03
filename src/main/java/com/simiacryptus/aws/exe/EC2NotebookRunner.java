@@ -46,10 +46,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -114,10 +111,10 @@ public class EC2NotebookRunner {
 
   public static void run(final SerializableConsumer<NotebookOutput> consumer, final String testName) {
     try {
-      String dateStr = Util.dateStr("yyyyMMddHHmmss");
+      final File file = new File(String.format("report/%s_%s", testName, UUID.randomUUID().toString()));
       try (NotebookOutput log = new MarkdownNotebookOutput(
-          new File("report/" + dateStr + "/" + testName),
-          1080, true
+          file,
+          1080, true, file.getName()
       )) {
         consumer.accept(log);
         logger.info("Finished worker tiledTexturePaintingPhase");
@@ -212,7 +209,7 @@ public class EC2NotebookRunner {
   ) {
     long startTime = System.currentTimeMillis();
     return log -> {
-      log.setArchiveHome(URI.create("s3://" + s3bucket + "/reports/"));
+      log.setArchiveHome(URI.create("s3://" + s3bucket + "/reports/" + UUID.randomUUID() + "/"));
       log.onComplete(() -> {
         logFiles(log.getRoot());
         Map<File, URL> uploads = S3Util.upload(getS3(), log.getArchiveHome(), log.getRoot());
