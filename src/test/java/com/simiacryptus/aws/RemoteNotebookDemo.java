@@ -43,6 +43,7 @@ import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.util.Date;
 import java.util.Random;
+import java.util.UUID;
 
 public class RemoteNotebookDemo {
 
@@ -121,11 +122,11 @@ public class RemoteNotebookDemo {
 
   private void nodeMain() {
     try {
-      String dateStr = Util.dateStr("yyyyMMddHHmmss");
+      final File file = new File(String.format("report/%s_%s", testName, UUID.randomUUID().toString()));
       try (MarkdownNotebookOutput log = new MarkdownNotebookOutput(
-          new File("report/" + dateStr + "/" + testName),
-          1080, true)) {
-        log.setArchiveHome(URI.create("s3://" + default_bucket + "/reports/"));
+          file,
+          1080, true, file.getName())) {
+        log.setArchiveHome(URI.create("s3://" + default_bucket + "/reports/" + UUID.randomUUID() + "/"));
         log.onComplete(() -> {
           S3Util.upload(getS3(), log.getArchiveHome(), log.getRoot());
         });
