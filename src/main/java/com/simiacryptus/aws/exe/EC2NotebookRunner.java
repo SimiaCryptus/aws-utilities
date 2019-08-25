@@ -114,7 +114,7 @@ public class EC2NotebookRunner {
       final File file = new File(String.format("report/%s_%s", testName, UUID.randomUUID().toString()));
       try (NotebookOutput log = new MarkdownNotebookOutput(
           file,
-          1080, true, file.getName()
+          1080, true, file.getName(), UUID.randomUUID()
       )) {
         consumer.accept(log);
         logger.info("Finished worker tiledTexturePaintingPhase");
