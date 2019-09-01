@@ -104,6 +104,8 @@ public class TendrilControl implements AutoCloseable {
   private class PollerTask<T> implements Runnable {
     private final String taskKey;
     private final Promise<T> localPromise;
+    private final int maxRetries = 4;
+    int failures = 0;
 
     public PollerTask(String taskKey, Promise<T> localPromise) {
       this.taskKey = taskKey;
@@ -112,31 +114,37 @@ public class TendrilControl implements AutoCloseable {
 
     @Override
     public void run() {
-      poll(10);
-    }
-
-    private void poll(int retries) {
+      Object result;
       try {
-        Object result = inner.run(() -> {
+        result = inner.run(() -> {
           try {
-            return currentOperations.get(taskKey).get(1, TimeUnit.SECONDS);
-          } catch (TimeoutException e) {
+            Promise promise = currentOperations.get(taskKey);
+            if (promise.isDone()) {
+              Object o = promise.get();
+              failures = 0;
+              return o;
+            } else {
+              failures = 0;
+              return null;
+            }
+          } catch (com.esotericsoftware.kryonet.rmi.TimeoutException e) {
             return null;
           }
         });
-        if (null != result) {
-          localPromise.set((T) result);
-        } else {
-          scheduledExecutorService.schedule(PollerTask.this, 10, TimeUnit.SECONDS);
-        }
       } catch (Throwable e) {
-        if (retries > 0) {
-          logger.info("Error polling task", e);
-          poll(retries - 1);
+        if (failures < maxRetries) {
+          logger.info(String.format("Error polling task; %s failures", failures), e);
+          result = null;
         } else {
-          logger.warn("Error polling task", e);
+          logger.warn(String.format("Error polling task; %s failures", failures), e);
           throw e instanceof RuntimeException ? (RuntimeException) e : new RuntimeException(e);
         }
+      }
+      if (null != result) {
+        failures = 0;
+        localPromise.set((T) result);
+      } else {
+        scheduledExecutorService.schedule(PollerTask.this, (int)(15 * Math.pow(2, ++failures)), TimeUnit.SECONDS);
       }
     }
   }

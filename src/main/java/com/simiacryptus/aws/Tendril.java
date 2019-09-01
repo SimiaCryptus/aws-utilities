@@ -53,6 +53,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 import static com.simiacryptus.aws.EC2Util.*;
 
@@ -192,7 +193,7 @@ public class Tendril {
       Client client = new Client(BUFFER_SIZE, BUFFER_SIZE, new KryoSerialization(getKryo()));
       client.start();
       client.setTimeout((int) TimeUnit.SECONDS.toMillis(timeoutSeconds));
-      client.setKeepAliveTCP((int) TimeUnit.SECONDS.toMillis(30));
+      client.setKeepAliveTCP((int) TimeUnit.SECONDS.toMillis(15));
       new Thread(() -> {
         try {
           while (!Thread.interrupted()) {
@@ -207,7 +208,7 @@ public class Tendril {
           throwable.printStackTrace();
         }
       }).start();
-      client.connect((int) TimeUnit.SECONDS.toMillis(30), "127.0.0.1", localControlPort, -1);
+      client.connect((int) TimeUnit.SECONDS.toMillis(90), "127.0.0.1", localControlPort, -1);
       TendrilLink remoteObject = ObjectSpace.getRemoteObject(client, 1318, TendrilLink.class);
       if (!remoteObject.isAlive()) throw new RuntimeException("Not Alive");
       return remoteObject;
@@ -245,7 +246,9 @@ public class Tendril {
     ExecutorService executorService = Executors.newFixedThreadPool(4);
     PrintStream out = SysOutInterceptor.INSTANCE.currentHandler();
     try {
-      return Arrays.stream(localClasspath.split(File.pathSeparator)).filter(classpathFilter).map(entryPath -> {
+      Stream<String> stream = Arrays.stream(localClasspath.split(File.pathSeparator)).filter(classpathFilter);
+      if(null != bucket && !bucket.isEmpty()) stream = stream.parallel();
+      return stream.map(entryPath -> {
         return executorService.submit(() -> {
           PrintStream prev = SysOutInterceptor.INSTANCE.setCurrentHandler(out);
           List<String> classpathEntry = stageClasspathEntry(node, libPrefix, entryPath, s3, bucket, keyspace);
