@@ -28,7 +28,10 @@ import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.UUID;
-import java.util.concurrent.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class TendrilControl implements AutoCloseable {
 
@@ -144,7 +147,7 @@ public class TendrilControl implements AutoCloseable {
         failures = 0;
         localPromise.set((T) result);
       } else {
-        scheduledExecutorService.schedule(PollerTask.this, (int)(15 * Math.pow(2, ++failures)), TimeUnit.SECONDS);
+        scheduledExecutorService.schedule(PollerTask.this, (int) (15 * Math.pow(2, ++failures)), TimeUnit.SECONDS);
       }
     }
   }
