@@ -247,7 +247,7 @@ public class Tendril {
     PrintStream out = SysOutInterceptor.INSTANCE.currentHandler();
     try {
       Stream<String> stream = Arrays.stream(localClasspath.split(File.pathSeparator)).filter(classpathFilter);
-      if(null != bucket && !bucket.isEmpty()) stream = stream.parallel();
+      if (null != bucket && !bucket.isEmpty()) stream = stream.parallel();
       return stream.map(entryPath -> {
         return executorService.submit(() -> {
           PrintStream prev = SysOutInterceptor.INSTANCE.setCurrentHandler(out);
