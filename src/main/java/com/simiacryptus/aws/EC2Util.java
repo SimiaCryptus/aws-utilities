@@ -19,6 +19,7 @@
 
 package com.simiacryptus.aws;
 
+import com.amazonaws.regions.Region;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.ec2.AmazonEC2;
 import com.amazonaws.services.ec2.model.*;
@@ -64,7 +65,9 @@ public class EC2Util {
 
   private static String getCurrentRegion() {
     try {
-      return Regions.getCurrentRegion().getName();
+      Region currentRegion = Regions.getCurrentRegion();
+      if(null == currentRegion) return Regions.US_EAST_1.getName();
+      return currentRegion.getName();
     } catch (Throwable e) {
       return Regions.US_EAST_1.getName();
     }
