@@ -146,7 +146,11 @@
             <version>${project.version}</version>
             <scope>compile</scope>
         </dependency>
-
+        <dependency>
+            <groupId>com.simiacryptus</groupId>
+            <artifactId>refcount-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 
 </project>

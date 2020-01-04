@@ -21,9 +21,11 @@ package com.simiacryptus.aws.exe;
 
 import com.simiacryptus.aws.EC2Util;
 
-public class EC2NodeSettings {
+public @com.simiacryptus.ref.lang.RefAware
+class EC2NodeSettings {
 
-  public static final String AMI_AMAZON_DEEP_LEARNING = System.getProperty("AMI_AMAZON_DEEP_LEARNING", AMI_AMAZON_DEEP_LEARNING());
+  public static final String AMI_AMAZON_DEEP_LEARNING = System.getProperty("AMI_AMAZON_DEEP_LEARNING",
+      AMI_AMAZON_DEEP_LEARNING());
   public static final String AMI_AMAZON_LINUX = System.getProperty("AMI_AMAZON_LINUX", AMI_AMAZON_LINUX());
   public static final EC2NodeSettings P3_2XL = new EC2NodeSettings("p3.2xlarge", AMI_AMAZON_DEEP_LEARNING, "ec2-user");
   public static final EC2NodeSettings P3_8XL = new EC2NodeSettings("p3.8xlarge", AMI_AMAZON_DEEP_LEARNING, "ec2-user");

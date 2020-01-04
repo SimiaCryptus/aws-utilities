@@ -37,7 +37,8 @@ import java.io.File;
 import java.util.Date;
 import java.util.Random;
 
-public class RemoteExecutionDemo {
+public @com.simiacryptus.ref.lang.RefAware
+class RemoteExecutionDemo {
 
   static final Logger logger = LoggerFactory.getLogger(RemoteExecutionDemo.class);
   private static final String default_bucket = "simiacryptus";
@@ -52,8 +53,7 @@ public class RemoteExecutionDemo {
 
   public static void main(String... args) throws Exception {
     try (NotebookOutput log = new MarkdownNotebookOutput(
-        new File("target/report/" + Util.dateStr("yyyyMMddHHmmss") + "/index"), true
-    )) {
+        new File("target/report/" + Util.dateStr("yyyyMMddHHmmss") + "/index"), true)) {
       new RemoteExecutionDemo().demo(log);
     }
   }
@@ -64,10 +64,9 @@ public class RemoteExecutionDemo {
     AmazonS3 s3 = AmazonS3ClientBuilder.standard().withRegion(EC2Util.REGION).build();
 
     AwsTendrilNodeSettings settings = log.eval(() -> {
-      return JsonUtil.cache(new File("settings.json"), AwsTendrilNodeSettings.class,
-          () -> {
-            return EC2Util.setup(ec2, iam, default_bucket, default_instanceType, default_imageId, default_username);
-          });
+      return JsonUtil.cache(new File("settings.json"), AwsTendrilNodeSettings.class, () -> {
+        return EC2Util.setup(ec2, iam, default_bucket, default_instanceType, default_imageId, default_username);
+      });
     });
 
     log.eval(() -> {
@@ -87,7 +86,8 @@ public class RemoteExecutionDemo {
           for (int i = 0; i < 10; i++) {
             String state = node.getStatus().getState().getName();
             logger.info("Current Machine State: " + state);
-            if (!"running".equals(state)) break;
+            if (!"running".equals(state))
+              break;
             try {
               Thread.sleep(15 * 1000);
             } catch (InterruptedException e) {

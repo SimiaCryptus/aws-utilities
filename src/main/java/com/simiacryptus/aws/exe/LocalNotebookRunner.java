@@ -28,9 +28,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.util.function.Consumer;
 
-public class LocalNotebookRunner {
+public @com.simiacryptus.ref.lang.RefAware
+class LocalNotebookRunner {
   private static final Logger logger = LoggerFactory.getLogger(LocalNotebookRunner.class);
 
   static {
@@ -38,17 +38,16 @@ public class LocalNotebookRunner {
   }
 
   public static <T extends SerializableConsumer> SerializableConsumer<NotebookOutput> getTask(
-      final Class<T> defaultClass,
-      final String... args
-  ) throws InstantiationException, IllegalAccessException, ClassNotFoundException {
-    return (SerializableConsumer<NotebookOutput>) (args.length == 0 ? defaultClass : Class.forName(args[0])).newInstance();
+      final Class<T> defaultClass, final String... args)
+      throws InstantiationException, IllegalAccessException, ClassNotFoundException {
+    return (SerializableConsumer<NotebookOutput>) (args.length == 0 ? defaultClass : Class.forName(args[0]))
+        .newInstance();
   }
 
-  public static void run(Consumer<NotebookOutput>... fns) throws Exception {
-    for (final Consumer<NotebookOutput> fn : fns) {
+  public static void run(com.simiacryptus.ref.wrappers.RefConsumer<NotebookOutput>... fns) throws Exception {
+    for (final com.simiacryptus.ref.wrappers.RefConsumer<NotebookOutput> fn : fns) {
       try (NotebookOutput log = new MarkdownNotebookOutput(
-          new File("report/" + Util.dateStr("yyyyMMddHHmmss") + "/index"), true
-      )) {
+          new File("report/" + Util.dateStr("yyyyMMddHHmmss") + "/index"), true)) {
         fn.accept(log);
         log.setFrontMatterProperty("status", "OK");
       } finally {

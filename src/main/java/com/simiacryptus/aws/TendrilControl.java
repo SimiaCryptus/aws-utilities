@@ -26,18 +26,19 @@ import com.simiacryptus.util.JsonUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-public class TendrilControl implements AutoCloseable {
+public @com.simiacryptus.ref.lang.RefAware
+class TendrilControl implements AutoCloseable {
 
   private static final Logger logger = LoggerFactory.getLogger(TendrilControl.class);
-  private final static HashMap<String, Promise> currentOperations = new HashMap<String, Promise>();
-  private final static ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(1, new ThreadFactoryBuilder().setDaemon(true).build());
+  private final static com.simiacryptus.ref.wrappers.RefHashMap<String, Promise> currentOperations = new com.simiacryptus.ref.wrappers.RefHashMap<String, Promise>();
+  private final static ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(1,
+      new ThreadFactoryBuilder().setDaemon(true).build());
   private final Tendril.TendrilLink inner;
 
   public TendrilControl(final Tendril.TendrilLink inner) {
@@ -58,7 +59,8 @@ public class TendrilControl implements AutoCloseable {
   }
 
   public <T> Future<T> start(SerializableSupplier<T> task, int retries, String key) {
-    if (null == task) return null;
+    if (null == task)
+      return null;
     assert inner.isAlive();
     try {
       String taskKey = inner.run(() -> {
@@ -72,17 +74,19 @@ public class TendrilControl implements AutoCloseable {
             run = false;
           }
         }
-        if (run) new Thread(() -> {
-          try {
-            if (null == promise) throw new AssertionError();
-            logger.warn(String.format("Task Start: %s = %s", key, JsonUtil.toJson(task)));
-            promise.set(task.get());
-          } catch (Exception e) {
-            logger.warn("Task Error", e);
-          } finally {
-            logger.warn("Task Exit: " + key);
-          }
-        }).start();
+        if (run)
+          new Thread(() -> {
+            try {
+              if (null == promise)
+                throw new AssertionError();
+              logger.warn(String.format("Task Start: %s = %s", key, JsonUtil.toJson(task)));
+              promise.set(task.get());
+            } catch (Exception e) {
+              logger.warn("Task Error", e);
+            } finally {
+              logger.warn("Task Exit: " + key);
+            }
+          }).start();
         return key;
       });
       Promise<T> localPromise = new Promise<>();
@@ -104,7 +108,8 @@ public class TendrilControl implements AutoCloseable {
     inner.exit();
   }
 
-  private class PollerTask<T> implements Runnable {
+  private @com.simiacryptus.ref.lang.RefAware
+  class PollerTask<T> implements Runnable {
     private final String taskKey;
     private final Promise<T> localPromise;
     private final int maxRetries = 4;

@@ -23,7 +23,8 @@ import com.amazonaws.services.ec2.AmazonEC2;
 
 import javax.annotation.Nonnull;
 
-public final class AwsTendrilNodeSettings extends AwsTendrilEnvSettings {
+public final @com.simiacryptus.ref.lang.RefAware
+class AwsTendrilNodeSettings extends AwsTendrilEnvSettings {
   public String imageId;
   public String instanceType;
   public String username;

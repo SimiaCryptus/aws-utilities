@@ -33,17 +33,18 @@ import java.io.*;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.Date;
+import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-public class ClasspathUtil {
+public @com.simiacryptus.ref.lang.RefAware
+class ClasspathUtil {
 
   private static final Logger logger = LoggerFactory.getLogger(Tendril.class);
   private static final AtomicReference<File> localClasspath = new AtomicReference<>();
@@ -52,107 +53,44 @@ public class ClasspathUtil {
   public static File summarizeLocalClasspath() {
     synchronized (localClasspath) {
       return localClasspath.updateAndGet(f -> {
-        if (f != null) return f;
+        if (f != null)
+          return f;
         String localClasspath = System.getProperty("java.class.path");
         logger.info("Java Local Classpath: " + localClasspath);
         File lib = new File("lib");
         lib.mkdirs();
-        String remoteClasspath = stageLocalClasspath(localClasspath, entry -> true, lib.getAbsolutePath() + File.separator, true);
+        String remoteClasspath = stageLocalClasspath(localClasspath, entry -> true,
+            lib.getAbsolutePath() + File.separator, true);
         logger.info("Java Remote Classpath: " + remoteClasspath);
-        File file = new File(lib, new SimpleDateFormat("yyyyMMddHHmmss").format(new Date()) + "_" + Integer.toHexString(new Random().nextInt(0xFFFF)) + ".jar");
+        File file = new File(lib, new SimpleDateFormat("yyyyMMddHHmmss").format(new Date()) + "_"
+            + Integer.toHexString(new Random().nextInt(0xFFFF)) + ".jar");
         summarize(remoteClasspath.split(":(?!\\\\)"), file);
         return file;
       });
     }
   }
 
-  private static void summarize(String[] jarFiles, File summary) {
-    try {
-      JarOutputStream jarOutputStream = new JarOutputStream(new FileOutputStream(summary));
-      List<JarFile> files = Arrays.stream(jarFiles).map(x -> {
-        try {
-          return new JarFile(new File(x));
-        } catch (IOException e) {
-          logger.warn("Error processing " + x, e);
-          return null;
-        }
-      }).filter(x -> x != null).collect(Collectors.toList());
-      ArrayList<String[]> conflicts = new ArrayList<>();
-      files.stream().flatMap(file -> {
-        return file.stream()
-            //.filter(x -> !x.isDirectory())
-            .map(jarEntry -> new ClasspathEntry(file, jarEntry));
-      }).sorted(Comparator.comparing(x -> x.jarEntry.getName() + ":" + x.file.getName()))
-          .collect(Collectors.groupingBy(x -> x.jarEntry.getName())).values().stream().map(x -> {
-        if (x.size() > 1 && !x.get(0).jarEntry.isDirectory()) {
-          conflicts.add(new String[]{
-              x.stream().map(y -> new File(y.file.getName()).getName()).sorted().reduce((a, b) -> a + ", " + b).get(),
-              x.get(0).jarEntry.getName()
-          });
-        }
-        return x.get(0);
-      }).filter(x -> {
-        String name = x.jarEntry.getName();
-        return !name.startsWith("java/")
-            && !name.startsWith("sun/")
-            && !name.toUpperCase().endsWith(".DSA")
-            && !name.toUpperCase().endsWith(".RSA");
-      })
-          .forEach(entry -> {
-            java.util.jar.JarEntry jarEntry = entry.getJarEntry();
-            String jarEntryName = jarEntry.getName();
-            try {
-              if (jarEntry.isDirectory()) {
-                jarOutputStream.putNextEntry(jarEntry);
-                //logger.info(String.format("Wrote directory %s from %s", jarEntryName, entry.getFile().getName()));
-              } else {
-                InputStream inputStream = entry.getFile().getInputStream(jarEntry);
-                byte[] bytes = IOUtils.toByteArray(inputStream);
-                inputStream.close();
-                if (jarEntry.getSize() != (long) bytes.length) logger.warn(String.format(
-                    "Size wrong for %s: %s != %s",
-                    new File(jarEntryName).getName(),
-                    jarEntry.getSize(),
-                    bytes.length));
-                jarOutputStream.putNextEntry(jarEntry);
-                //logger.info(String.format("Wrote file %s from %s", jarEntryName, entry.getFile().getName()));
-                IOUtils.write(bytes, jarOutputStream);
-              }
-            } catch (Throwable e) {
-              logger.info(String.format("Error putting class %s with length %s", jarEntryName, jarEntry.getSize()), e);
-            }
-          });
-      conflicts.stream().collect(Collectors.groupingBy(y -> y[0])).entrySet().stream().forEach(e -> {
-        logger.info("Conflict between " + e.getKey() + " for " + e.getValue().stream().map(y -> y[1]).sorted().reduce((a, b) -> a + ", " + b).get());
-      });
-      jarOutputStream.close();
-      files.forEach(x -> {
-        try {
-          x.close();
-        } catch (IOException e) {
-          logger.info("Error closing " + x.getName(), e);
-        }
-      });
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  public static String stageLocalClasspath(final String localClasspath, final Predicate<String> classpathFilter, final String libPrefix, final boolean parallel) {
+  public static String stageLocalClasspath(final String localClasspath, final Predicate<String> classpathFilter,
+                                           final String libPrefix, final boolean parallel) {
     new File(libPrefix).mkdirs();
-    Stream<String> stream = Arrays.stream(localClasspath.split(File.pathSeparator)).filter(classpathFilter);
+    com.simiacryptus.ref.wrappers.RefStream<String> stream = com.simiacryptus.ref.wrappers.RefArrays
+        .stream(localClasspath.split(File.pathSeparator)).filter(classpathFilter);
     PrintStream out = SysOutInterceptor.INSTANCE.currentHandler();
-    if (parallel) stream = stream.parallel();
+    if (parallel)
+      stream = stream.parallel();
     return stream.flatMap(entryPath -> {
       PrintStream prev = SysOutInterceptor.INSTANCE.setCurrentHandler(out);
-      List<String> classpathEntry = (new File(entryPath).isDirectory()) ? stageClasspathEntry(libPrefix, entryPath) : Arrays.asList(entryPath);
+      com.simiacryptus.ref.wrappers.RefList<String> classpathEntry = (new File(entryPath).isDirectory())
+          ? stageClasspathEntry(libPrefix, entryPath)
+          : com.simiacryptus.ref.wrappers.RefArrays.asList(entryPath);
       SysOutInterceptor.INSTANCE.setCurrentHandler(prev);
       return classpathEntry.stream();
     }).reduce((a, b) -> a + ":" + b).get();
   }
 
   @Nonnull
-  public static List<String> stageClasspathEntry(final String libPrefix, final String entryPath) {
+  public static com.simiacryptus.ref.wrappers.RefList<String> stageClasspathEntry(final String libPrefix,
+                                                                                  final String entryPath) {
     final File entryFile = new File(entryPath);
     try {
       if (entryFile.isFile()) {
@@ -163,22 +101,26 @@ public class ClasspathUtil {
         } catch (Throwable e) {
           logger.warn(String.format("Error staging %s to %s", entryFile, remote), e);
         }
-        return Arrays.asList(remote);
+        return com.simiacryptus.ref.wrappers.RefArrays.asList(remote);
       } else {
         logger.info(String.format("Processing %s", entryPath));
-        ArrayList<String> list = new ArrayList<>();
+        com.simiacryptus.ref.wrappers.RefArrayList<String> list = new com.simiacryptus.ref.wrappers.RefArrayList<>();
         File parentFile = entryFile.getParentFile().getParentFile();
         if (entryFile.getName().equals("classes") && entryFile.getParentFile().getName().equals("target")) {
           File javaSrc = new File(new File(new File(parentFile, "src"), "main"), "java");
-          if (javaSrc.exists()) list.add(addDir(libPrefix, javaSrc));
+          if (javaSrc.exists())
+            list.add(addDir(libPrefix, javaSrc));
           File scalaSrc = new File(new File(new File(parentFile, "src"), "main"), "scala");
-          if (scalaSrc.exists()) list.add(addDir(libPrefix, scalaSrc));
+          if (scalaSrc.exists())
+            list.add(addDir(libPrefix, scalaSrc));
         }
         if (entryFile.getName().equals("test-classes") && entryFile.getParentFile().getName().equals("target")) {
           File javaSrc = new File(new File(new File(parentFile, "src"), "test"), "java");
-          if (javaSrc.exists()) list.add(addDir(libPrefix, javaSrc));
+          if (javaSrc.exists())
+            list.add(addDir(libPrefix, javaSrc));
           File scalaSrc = new File(new File(new File(parentFile, "src"), "test"), "scala");
-          if (scalaSrc.exists()) list.add(addDir(libPrefix, scalaSrc));
+          if (scalaSrc.exists())
+            list.add(addDir(libPrefix, scalaSrc));
         }
         list.add(addDir(libPrefix, entryFile));
         return list;
@@ -189,7 +131,8 @@ public class ClasspathUtil {
   }
 
   @Nonnull
-  public static String addDir(final String libPrefix, final File entryFile) throws IOException, NoSuchAlgorithmException {
+  public static String addDir(final String libPrefix, final File entryFile)
+      throws IOException, NoSuchAlgorithmException {
     File tempJar = toJar(entryFile);
     try {
       String remote = libPrefix + hash(tempJar) + ".jar";
@@ -214,34 +157,22 @@ public class ClasspathUtil {
     File tempJar = File.createTempFile(UUID.randomUUID().toString(), ".jar").getAbsoluteFile();
     logger.info(String.format("Archiving %s to %s", entry, tempJar));
     try (ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(tempJar))) {
-      for (final File file : Arrays.stream(entry.listFiles()).sorted().collect(Collectors.toList())) {
+      for (final File file : com.simiacryptus.ref.wrappers.RefArrays.stream(entry.listFiles()).sorted()
+          .collect(com.simiacryptus.ref.wrappers.RefCollectors.toList())) {
         write(zip, "", file);
       }
       zip.putNextEntry(new ZipEntry("META-INF/CodeUtil/classSourceInfo.json"));
-      try (InputStream input = new ByteArrayInputStream(JsonUtil.toJson(CodeUtil.classSourceInfo).toString().getBytes("UTF-8"))) {
+      try (InputStream input = new ByteArrayInputStream(
+          JsonUtil.toJson(CodeUtil.classSourceInfo).toString().getBytes("UTF-8"))) {
         IOUtils.copy(input, zip);
       }
       zip.closeEntry();
     } catch (Throwable e) {
-      if (tempJar.exists()) tempJar.delete();
+      if (tempJar.exists())
+        tempJar.delete();
       throw new RuntimeException(e);
     }
     return tempJar;
-  }
-
-  private static void write(final ZipOutputStream zip, final String base, final File entry) throws IOException {
-    if (entry.isFile()) {
-      zip.putNextEntry(new ZipEntry(base + entry.getName()));
-      try (FileInputStream input = new FileInputStream(entry)) {
-        IOUtils.copy(input, zip);
-      }
-      zip.closeEntry();
-    } else {
-      for (final File file : Arrays.stream(entry.listFiles()).sorted().collect(Collectors.toList())) {
-        write(zip, base + entry.getName() + "/", file);
-      }
-    }
-
   }
 
   public static String hash(final File classpath) throws NoSuchAlgorithmException, IOException {
@@ -258,7 +189,94 @@ public class ClasspathUtil {
     return new String(Hex.encodeHex(digest.digest()));
   }
 
-  private static class ClasspathEntry {
+  private static void summarize(String[] jarFiles, File summary) {
+    try {
+      JarOutputStream jarOutputStream = new JarOutputStream(new FileOutputStream(summary));
+      com.simiacryptus.ref.wrappers.RefList<JarFile> files = com.simiacryptus.ref.wrappers.RefArrays.stream(jarFiles)
+          .map(x -> {
+            try {
+              return new JarFile(new File(x));
+            } catch (IOException e) {
+              logger.warn("Error processing " + x, e);
+              return null;
+            }
+          }).filter(x -> x != null).collect(com.simiacryptus.ref.wrappers.RefCollectors.toList());
+      com.simiacryptus.ref.wrappers.RefArrayList<String[]> conflicts = new com.simiacryptus.ref.wrappers.RefArrayList<>();
+      files.stream().flatMap(file -> {
+        return file.stream()
+            //.filter(x -> !x.isDirectory())
+            .map(jarEntry -> new ClasspathEntry(file, jarEntry));
+      }).sorted(
+          com.simiacryptus.ref.wrappers.RefComparator.comparing(x -> x.jarEntry.getName() + ":" + x.file.getName()))
+          .collect(com.simiacryptus.ref.wrappers.RefCollectors.groupingBy(x -> x.jarEntry.getName())).values().stream()
+          .map(x -> {
+            if (x.size() > 1 && !x.get(0).jarEntry.isDirectory()) {
+              conflicts.add(new String[]{x.stream().map(y -> new File(y.file.getName()).getName()).sorted()
+                  .reduce((a, b) -> a + ", " + b).get(), x.get(0).jarEntry.getName()});
+            }
+            return x.get(0);
+          }).filter(x -> {
+        String name = x.jarEntry.getName();
+        return !name.startsWith("java/") && !name.startsWith("sun/") && !name.toUpperCase().endsWith(".DSA")
+            && !name.toUpperCase().endsWith(".RSA");
+      }).forEach(entry -> {
+        java.util.jar.JarEntry jarEntry = entry.getJarEntry();
+        String jarEntryName = jarEntry.getName();
+        try {
+          if (jarEntry.isDirectory()) {
+            jarOutputStream.putNextEntry(jarEntry);
+            //logger.info(String.format("Wrote directory %s from %s", jarEntryName, entry.getFile().getName()));
+          } else {
+            InputStream inputStream = entry.getFile().getInputStream(jarEntry);
+            byte[] bytes = IOUtils.toByteArray(inputStream);
+            inputStream.close();
+            if (jarEntry.getSize() != (long) bytes.length)
+              logger.warn(String.format("Size wrong for %s: %s != %s", new File(jarEntryName).getName(),
+                  jarEntry.getSize(), bytes.length));
+            jarOutputStream.putNextEntry(jarEntry);
+            //logger.info(String.format("Wrote file %s from %s", jarEntryName, entry.getFile().getName()));
+            IOUtils.write(bytes, jarOutputStream);
+          }
+        } catch (Throwable e) {
+          logger.info(String.format("Error putting class %s with length %s", jarEntryName, jarEntry.getSize()), e);
+        }
+      });
+      conflicts.stream().collect(com.simiacryptus.ref.wrappers.RefCollectors.groupingBy(y -> y[0])).entrySet().stream()
+          .forEach(e -> {
+            logger.info("Conflict between " + e.getKey() + " for "
+                + e.getValue().stream().map(y -> y[1]).sorted().reduce((a, b) -> a + ", " + b).get());
+          });
+      jarOutputStream.close();
+      files.forEach(x -> {
+        try {
+          x.close();
+        } catch (IOException e) {
+          logger.info("Error closing " + x.getName(), e);
+        }
+      });
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private static void write(final ZipOutputStream zip, final String base, final File entry) throws IOException {
+    if (entry.isFile()) {
+      zip.putNextEntry(new ZipEntry(base + entry.getName()));
+      try (FileInputStream input = new FileInputStream(entry)) {
+        IOUtils.copy(input, zip);
+      }
+      zip.closeEntry();
+    } else {
+      for (final File file : com.simiacryptus.ref.wrappers.RefArrays.stream(entry.listFiles()).sorted()
+          .collect(com.simiacryptus.ref.wrappers.RefCollectors.toList())) {
+        write(zip, base + entry.getName() + "/", file);
+      }
+    }
+
+  }
+
+  private static @com.simiacryptus.ref.lang.RefAware
+  class ClasspathEntry {
     private final JarFile file;
     private final java.util.jar.JarEntry jarEntry;
 

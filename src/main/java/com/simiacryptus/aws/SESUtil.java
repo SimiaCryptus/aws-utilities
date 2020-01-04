@@ -41,27 +41,30 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
-import java.util.stream.Stream;
 
-public class SESUtil {
+public @com.simiacryptus.ref.lang.RefAware
+class SESUtil {
   private static final Logger logger = LoggerFactory.getLogger(SESUtil.class);
 
-  public static void send(final AmazonSimpleEmailService ses, final String subject, final String to, final String body, final String html, final File... attachments) {
+  public static void send(final AmazonSimpleEmailService ses, final String subject, final String to, final String body,
+                          final String html, final File... attachments) {
     try {
-      Stream<MimeBodyPart> attachmentStream = Arrays.stream(attachments).filter(x -> x.exists() && x.length() < 1024 * 1024 * 4).map(SESUtil::toAttachment);
-      ses.sendRawEmail(new SendRawEmailRequest(toRaw(getMessage(
-          Session.getDefaultInstance(new Properties()), subject, to,
-          mix(Stream.concat(Stream.of(wrap(getEmailBody(body, html))), attachmentStream).toArray(i -> new MimeBodyPart[i]))
-      ))));
+      com.simiacryptus.ref.wrappers.RefStream<MimeBodyPart> attachmentStream = com.simiacryptus.ref.wrappers.RefArrays
+          .stream(attachments).filter(x -> x.exists() && x.length() < 1024 * 1024 * 4).map(SESUtil::toAttachment);
+      ses.sendRawEmail(
+          new SendRawEmailRequest(toRaw(getMessage(Session.getDefaultInstance(new Properties()), subject, to,
+              mix(com.simiacryptus.ref.wrappers.RefStream
+                  .concat(com.simiacryptus.ref.wrappers.RefStream.of(wrap(getEmailBody(body, html))), attachmentStream)
+                  .toArray(i -> new MimeBodyPart[i]))))));
     } catch (IOException | MessagingException e) {
       throw new RuntimeException(e);
     }
   }
 
-  public static MimeMessage getMessage(final Session session, final String subject, final String to, final MimeMultipart content) throws MessagingException {
+  public static MimeMessage getMessage(final Session session, final String subject, final String to,
+                                       final MimeMultipart content) throws MessagingException {
     MimeMessage message = new MimeMessage(session);
     message.setSubject(subject, "UTF-8");
     message.setFrom(new InternetAddress("acharneski@gmail.com"));
@@ -118,8 +121,10 @@ public class SESUtil {
 
   public static void setup(final AmazonSimpleEmailService ses, final String emailAddress) {
     try {
-      List<String> verifiedEmailAddresses = ses.listVerifiedEmailAddresses().getVerifiedEmailAddresses();
-      if (verifiedEmailAddresses.contains(emailAddress)) return;
+      List<String> verifiedEmailAddresses = ses.listVerifiedEmailAddresses()
+          .getVerifiedEmailAddresses();
+      if (verifiedEmailAddresses.contains(emailAddress))
+        return;
       ses.verifyEmailAddress(new VerifyEmailAddressRequest().withEmailAddress(emailAddress));
     } catch (Throwable e) {
       logger.warn("Error verifying " + emailAddress, e);

@@ -45,7 +45,8 @@ import java.util.Date;
 import java.util.Random;
 import java.util.UUID;
 
-public class RemoteNotebookDemo {
+public @com.simiacryptus.ref.lang.RefAware
+class RemoteNotebookDemo {
 
   static final Logger logger = LoggerFactory.getLogger(RemoteNotebookDemo.class);
   private static final String to = "acharneski+mindseye@gmail.com";
@@ -60,14 +61,6 @@ public class RemoteNotebookDemo {
     SysOutInterceptor.INSTANCE.init();
   }
 
-  public static void main(String... args) throws Exception {
-    try (NotebookOutput log = new MarkdownNotebookOutput(
-        new File("target/report/" + Util.dateStr("yyyyMMddHHmmss") + "/index"), true
-    )) {
-      new RemoteNotebookDemo().launcherNotebook(log);
-    }
-  }
-
   public static AmazonEC2 getEc2() {
     return AmazonEC2ClientBuilder.standard().withRegion(EC2Util.REGION).build();
   }
@@ -80,18 +73,17 @@ public class RemoteNotebookDemo {
     return AmazonS3ClientBuilder.standard().withRegion(EC2Util.REGION).build();
   }
 
+  public static void main(String... args) throws Exception {
+    try (NotebookOutput log = new MarkdownNotebookOutput(
+        new File("target/report/" + Util.dateStr("yyyyMMddHHmmss") + "/index"), true)) {
+      new RemoteNotebookDemo().launcherNotebook(log);
+    }
+  }
+
   public void launcherNotebook(final NotebookOutput log) {
     AwsTendrilNodeSettings settings = log.eval(() -> {
-      return JsonUtil.cache(new File("settings.json"), AwsTendrilNodeSettings.class,
-          () -> EC2Util.setup(
-              getEc2(),
-              getIam(),
-              default_bucket,
-              default_instanceType,
-              default_imageId,
-              default_username
-          )
-      );
+      return JsonUtil.cache(new File("settings.json"), AwsTendrilNodeSettings.class, () -> EC2Util.setup(getEc2(),
+          getIam(), default_bucket, default_instanceType, default_imageId, default_username));
     });
     int localControlPort = new Random().nextInt(1024) + 1024;
     EC2Util.EC2Node node = settings.startNode(getEc2(), localControlPort);
@@ -111,47 +103,13 @@ public class RemoteNotebookDemo {
       String state = log.eval(() -> {
         return node.getStatus().getState().getName();
       });
-      if (!"running".equals(state)) break;
+      if (!"running".equals(state))
+        break;
       try {
         Thread.sleep(15 * 1000);
       } catch (InterruptedException e) {
         e.printStackTrace();
       }
-    }
-  }
-
-  private void nodeMain() {
-    try {
-      final File file = new File(String.format("report/%s_%s", testName, UUID.randomUUID().toString()));
-      try (MarkdownNotebookOutput log = new MarkdownNotebookOutput(
-          file,
-          1080, true, file.getName(), UUID.randomUUID())) {
-        log.setArchiveHome(URI.create("s3://" + default_bucket + "/reports/" + UUID.randomUUID() + "/"));
-        log.onComplete(() -> {
-          S3Util.upload(getS3(), log.getArchiveHome(), log.getRoot());
-        });
-        log.onComplete(() -> {
-          String html = "";
-          try {
-            html = FileUtils.readFileToString(new File(log.getRoot(), testName + ".html"), Charset.defaultCharset());
-          } catch (IOException e) {
-            logger.warn("Error reading html", e);
-          }
-          SESUtil.send(AmazonSimpleEmailServiceClientBuilder.defaultClient(),
-              "Demo Report", to, "Test Report", html,
-              new File(log.getRoot(), testName + ".zip"),
-              new File(log.getRoot(), testName + ".pdf"));
-        });
-        nodeTaskNotebook(log);
-        logger.info("Finished worker process");
-      } catch (IOException e) {
-        logger.warn("Error!", e);
-      }
-    } catch (Throwable e) {
-      logger.warn("Error!", e);
-    } finally {
-      logger.warn("Exiting node worker", new RuntimeException("Stack Trace"));
-      System.exit(0);
     }
   }
 
@@ -168,6 +126,38 @@ public class RemoteNotebookDemo {
         }
       });
       logger.info("Finished worker loop " + i);
+    }
+  }
+
+  private void nodeMain() {
+    try {
+      final File file = new File(String.format("report/%s_%s", testName, UUID.randomUUID().toString()));
+      try (MarkdownNotebookOutput log = new MarkdownNotebookOutput(file, 1080, true, file.getName(),
+          UUID.randomUUID())) {
+        log.setArchiveHome(URI.create("s3://" + default_bucket + "/reports/" + UUID.randomUUID() + "/"));
+        log.onComplete(() -> {
+          S3Util.upload(getS3(), log.getArchiveHome(), log.getRoot());
+        });
+        log.onComplete(() -> {
+          String html = "";
+          try {
+            html = FileUtils.readFileToString(new File(log.getRoot(), testName + ".html"), Charset.defaultCharset());
+          } catch (IOException e) {
+            logger.warn("Error reading html", e);
+          }
+          SESUtil.send(AmazonSimpleEmailServiceClientBuilder.defaultClient(), "Demo Report", to, "Test Report", html,
+              new File(log.getRoot(), testName + ".zip"), new File(log.getRoot(), testName + ".pdf"));
+        });
+        nodeTaskNotebook(log);
+        logger.info("Finished worker process");
+      } catch (IOException e) {
+        logger.warn("Error!", e);
+      }
+    } catch (Throwable e) {
+      logger.warn("Error!", e);
+    } finally {
+      logger.warn("Exiting node worker", new RuntimeException("Stack Trace"));
+      System.exit(0);
     }
   }
 

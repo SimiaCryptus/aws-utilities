@@ -29,7 +29,8 @@ import java.io.Serializable;
 
 import static com.simiacryptus.aws.EC2Util.sleep;
 
-public class AwsTendrilEnvSettings implements Serializable {
+public @com.simiacryptus.ref.lang.RefAware
+class AwsTendrilEnvSettings implements Serializable {
   public String securityGroup;
   public String instanceProfileArn;
   public String bucket;
@@ -46,14 +47,8 @@ public class AwsTendrilEnvSettings implements Serializable {
     this.bucket = "";
   }
 
-  public static AwsTendrilNodeSettings setup(
-      final String instanceType,
-      final String imageId,
-      final String username,
-      final String securityGroup,
-      final String instanceProfileArn,
-      final String bucket
-  ) {
+  public static AwsTendrilNodeSettings setup(final String instanceType, final String imageId, final String username,
+                                             final String securityGroup, final String instanceProfileArn, final String bucket) {
     AwsTendrilNodeSettings self = new AwsTendrilNodeSettings();
     self.securityGroup = securityGroup;
     self.bucket = bucket;
@@ -65,7 +60,8 @@ public class AwsTendrilEnvSettings implements Serializable {
     return self;
   }
 
-  public static AwsTendrilEnvSettings setup(final String securityGroup, final String instanceProfileArn, final String bucket) {
+  public static AwsTendrilEnvSettings setup(final String securityGroup, final String instanceProfileArn,
+                                            final String bucket) {
     AwsTendrilEnvSettings self = new AwsTendrilEnvSettings();
     self.securityGroup = securityGroup;
     self.bucket = bucket;
@@ -82,6 +78,7 @@ public class AwsTendrilEnvSettings implements Serializable {
   @Nonnull
   @JsonIgnore
   public EC2Util.ServiceConfig getServiceConfig(final AmazonEC2 ec2) {
-    return new EC2Util.ServiceConfig(ec2, this.securityGroup, new InstanceProfile().withArn(this.instanceProfileArn), this.bucket);
+    return new EC2Util.ServiceConfig(ec2, this.securityGroup, new InstanceProfile().withArn(this.instanceProfileArn),
+        this.bucket);
   }
 }

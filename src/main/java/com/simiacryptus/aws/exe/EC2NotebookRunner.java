@@ -46,12 +46,14 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.*;
+import java.util.Date;
+import java.util.Random;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
-public class EC2NotebookRunner {
+public @com.simiacryptus.ref.lang.RefAware
+class EC2NotebookRunner {
 
   private static final Logger logger = LoggerFactory.getLogger(EC2NotebookRunner.class);
   public static String JAVA_OPTS = " -Xmx50g";
@@ -69,17 +71,6 @@ public class EC2NotebookRunner {
     this.fns = fns;
   }
 
-  public static void run(final SerializableConsumer<NotebookOutput>... reportTasks) throws IOException {
-    for (final SerializableConsumer<NotebookOutput> reportTask : reportTasks) {
-      Tendril.getKryo().copy(reportTask);
-    }
-    String runnerName = EC2NotebookRunner.class.getSimpleName();
-    File reportFile = new File("target/report/" + Util.dateStr("yyyyMMddHHmmss") + "/" + runnerName);
-    try (NotebookOutput log = new MarkdownNotebookOutput(reportFile, true)) {
-      new EC2NotebookRunner(reportTasks).launchNotebook(log);
-    }
-  }
-
   public static AmazonEC2 getEc2() {
     return AmazonEC2ClientBuilder.standard().withRegion(EC2Util.REGION).build();
   }
@@ -92,10 +83,32 @@ public class EC2NotebookRunner {
     return AmazonS3ClientBuilder.standard().withRegion(EC2Util.REGION).build();
   }
 
+  public boolean isEmailFiles() {
+    return emailFiles;
+  }
+
+  public EC2NotebookRunner setEmailFiles(boolean emailFiles) {
+    this.emailFiles = emailFiles;
+    return this;
+  }
+
+  public static void run(final SerializableConsumer<NotebookOutput>... reportTasks) throws IOException {
+    for (final SerializableConsumer<NotebookOutput> reportTask : reportTasks) {
+      Tendril.getKryo().copy(reportTask);
+    }
+    String runnerName = EC2NotebookRunner.class.getSimpleName();
+    File reportFile = new File("target/report/" + Util.dateStr("yyyyMMddHHmmss") + "/" + runnerName);
+    try (NotebookOutput log = new MarkdownNotebookOutput(reportFile, true)) {
+      new EC2NotebookRunner(reportTasks).launchNotebook(log);
+    }
+  }
+
   public static String getTestName(final SerializableConsumer<NotebookOutput> fn) {
     String name = fn.getClass().getCanonicalName();
-    if (null == name || name.isEmpty()) name = fn.getClass().getSimpleName();
-    if (null == name || name.isEmpty()) name = "index";
+    if (null == name || name.isEmpty())
+      name = fn.getClass().getSimpleName();
+    if (null == name || name.isEmpty())
+      name = "index";
     return name;
   }
 
@@ -112,10 +125,7 @@ public class EC2NotebookRunner {
   public static void run(final SerializableConsumer<NotebookOutput> consumer, final String testName) {
     try {
       final File file = new File(String.format("report/%s_%s", testName, UUID.randomUUID().toString()));
-      try (NotebookOutput log = new MarkdownNotebookOutput(
-          file,
-          1080, true, file.getName(), UUID.randomUUID()
-      )) {
+      try (NotebookOutput log = new MarkdownNotebookOutput(file, 1080, true, file.getName(), UUID.randomUUID())) {
         consumer.accept(log);
         logger.info("Finished worker tiledTexturePaintingPhase");
       } catch (Throwable e) {
@@ -130,16 +140,9 @@ public class EC2NotebookRunner {
     AwsTendrilNodeSettings settings = log.eval(() -> {
       EC2NodeSettings nodeSettings = EC2NodeSettings.P3_2XL;
 
-      return JsonUtil.cache(new File("ec2-settings." + EC2Util.REGION.toString() + ".json"), AwsTendrilNodeSettings.class,
-          () -> EC2Util.setup(
-              getEc2(),
-              getIam(),
-              getS3(),
-              nodeSettings.machineType,
-              nodeSettings.imageId,
-              nodeSettings.username
-          )
-      );
+      return JsonUtil.cache(new File("ec2-settings." + EC2Util.REGION.toString() + ".json"),
+          AwsTendrilNodeSettings.class, () -> EC2Util.setup(getEc2(), getIam(), getS3(), nodeSettings.machineType,
+              nodeSettings.imageId, nodeSettings.username));
     });
     s3bucket = settings.bucket;
     settings.imageId = EC2NodeSettings.AMI_AMAZON_DEEP_LEARNING;
@@ -153,14 +156,9 @@ public class EC2NotebookRunner {
     EC2Util.EC2Node node = settings.startNode(getEc2(), localControlPort);
     try {
       log.run(() -> {
-        TendrilControl tendrilControl = Tendril.startRemoteJvm(node,
-            jvmConfig,
-            localControlPort,
-            Tendril::defaultClasspathFilter,
-            getS3(),
-            new HashMap<String, String>(),
-            settings.getServiceConfig(getEc2()).bucket
-        );
+        TendrilControl tendrilControl = Tendril.startRemoteJvm(node, jvmConfig, localControlPort,
+            Tendril::defaultClasspathFilter, getS3(), new com.simiacryptus.ref.wrappers.RefHashMap<String, String>(),
+            settings.getServiceConfig(getEc2()).bucket);
         tendrilControl.start(() -> {
           this.nodeMain();
           return null;
@@ -175,11 +173,12 @@ public class EC2NotebookRunner {
     } catch (IOException | URISyntaxException e) {
       logger.info("Error opening browser", e);
     }
-    while ("running".equals(getStatus(log, node))) try {
-      Thread.sleep(30 * 1000);
-    } catch (InterruptedException e) {
-      e.printStackTrace();
-    }
+    while ("running".equals(getStatus(log, node)))
+      try {
+        Thread.sleep(30 * 1000);
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+      }
   }
 
   public String getStatus(final NotebookOutput log, final EC2Util.EC2Node node) {
@@ -203,16 +202,15 @@ public class EC2NotebookRunner {
     }
   }
 
-  private SerializableConsumer<NotebookOutput> notificationWrapper(
-      final String testName,
-      final SerializableConsumer<NotebookOutput> fn
-  ) {
+  private SerializableConsumer<NotebookOutput> notificationWrapper(final String testName,
+                                                                   final SerializableConsumer<NotebookOutput> fn) {
     long startTime = System.currentTimeMillis();
     return log -> {
       log.setArchiveHome(URI.create("s3://" + s3bucket + "/reports/" + UUID.randomUUID() + "/"));
       log.onComplete(() -> {
         logFiles(log.getRoot());
-        Map<File, URL> uploads = S3Util.upload(getS3(), log.getArchiveHome(), log.getRoot());
+        com.simiacryptus.ref.wrappers.RefMap<File, URL> uploads = S3Util.upload(getS3(), log.getArchiveHome(),
+            log.getRoot());
         sendCompleteEmail(testName, log.getRoot(), uploads, startTime);
       });
       try {
@@ -225,7 +223,8 @@ public class EC2NotebookRunner {
     };
   }
 
-  private void sendCompleteEmail(final String testName, final File workingDir, final Map<File, URL> uploads, final long startTime) {
+  private void sendCompleteEmail(final String testName, final File workingDir,
+                                 final com.simiacryptus.ref.wrappers.RefMap<File, URL> uploads, final long startTime) {
     String html = null;
     try {
       html = FileUtils.readFileToString(new File(workingDir, testName + ".html"), "UTF-8");
@@ -255,7 +254,8 @@ public class EC2NotebookRunner {
     File zip = new File(workingDir, testName + ".zip");
     File pdf = new File(workingDir, testName + ".pdf");
 
-    String append = "<hr/>" + Stream.of(zip, pdf, new File(workingDir, testName + ".html"))
+    String append = "<hr/>" + com.simiacryptus.ref.wrappers.RefStream
+        .of(zip, pdf, new File(workingDir, testName + ".html"))
         .map(file -> String.format("<p><a href=\"%s\">%s</a></p>", uploads.get(file.getAbsoluteFile()), file.getName()))
         .reduce((a, b) -> a + b).get();
     String endTag = "</body>";
@@ -265,38 +265,25 @@ public class EC2NotebookRunner {
       replacedHtml += append;
     }
     File[] attachments = isEmailFiles() ? new File[]{zip, pdf} : new File[]{};
-    SESUtil.send(AmazonSimpleEmailServiceClientBuilder.defaultClient(),
-        subject, emailAddress, replacedHtml, replacedHtml, attachments
-    );
+    SESUtil.send(AmazonSimpleEmailServiceClientBuilder.defaultClient(), subject, emailAddress, replacedHtml,
+        replacedHtml, attachments);
   }
 
-  private void sendStartEmail(final String testName, final SerializableConsumer<NotebookOutput> fn) throws IOException, URISyntaxException {
-    String publicHostname = IOUtils.toString(new URI("http://169.254.169.254/latest/meta-data/public-hostname"), "UTF-8");
+  private void sendStartEmail(final String testName, final SerializableConsumer<NotebookOutput> fn)
+      throws IOException, URISyntaxException {
+    String publicHostname = IOUtils.toString(new URI("http://169.254.169.254/latest/meta-data/public-hostname"),
+        "UTF-8");
     String instanceId = IOUtils.toString(new URI("http://169.254.169.254/latest/meta-data/instance-id"), "UTF-8");
-    String functionJson = new ObjectMapper()
-        .enableDefaultTyping(ObjectMapper.DefaultTyping.NON_FINAL)
+    String functionJson = new ObjectMapper().enableDefaultTyping(ObjectMapper.DefaultTyping.NON_FINAL)
         .enable(SerializationFeature.INDENT_OUTPUT).writer().writeValueAsString(fn);
     //https://console.aws.amazon.com/ec2/v2/home?region=us-east-1#Instances:search=i-00651bdfd6121e199
-    String html = "<html><body>" +
-        "<p><a href=\"http://" + publicHostname + ":1080/\">The tiledTexturePaintingPhase can be monitored at " + publicHostname + "</a></p><hr/>" +
-        "<p><a href=\"https://console.aws.amazon.com/ec2/v2/home?region=us-east-1#Instances:search=" + instanceId + "\">View instance " + instanceId + " on AWS Console</a></p><hr/>" +
-        "<p>Script Definition:" +
-        "<pre>" + functionJson + "</pre></p>" +
-        "</body></html>";
+    String html = "<html><body>" + "<p><a href=\"http://" + publicHostname
+        + ":1080/\">The tiledTexturePaintingPhase can be monitored at " + publicHostname + "</a></p><hr/>"
+        + "<p><a href=\"https://console.aws.amazon.com/ec2/v2/home?region=us-east-1#Instances:search=" + instanceId
+        + "\">View instance " + instanceId + " on AWS Console</a></p><hr/>" + "<p>Script Definition:" + "<pre>"
+        + functionJson + "</pre></p>" + "</body></html>";
     String txtBody = "Process Started at " + new Date();
     String subject = testName + " Starting";
-    SESUtil.send(AmazonSimpleEmailServiceClientBuilder.defaultClient(),
-        subject, emailAddress, txtBody,
-        html
-    );
-  }
-
-  public boolean isEmailFiles() {
-    return emailFiles;
-  }
-
-  public EC2NotebookRunner setEmailFiles(boolean emailFiles) {
-    this.emailFiles = emailFiles;
-    return this;
+    SESUtil.send(AmazonSimpleEmailServiceClientBuilder.defaultClient(), subject, emailAddress, txtBody, html);
   }
 }

@@ -37,33 +37,30 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
-public class S3Util {
+public @com.simiacryptus.ref.lang.RefAware
+class S3Util {
 
   private final static Logger logger = LoggerFactory.getLogger(S3Util.class);
 
-  public static Map<File, URL> upload(NotebookOutput log) {
+  public static com.simiacryptus.ref.wrappers.RefMap<File, URL> upload(NotebookOutput log) {
     synchronized (log) {
       return upload(log, AmazonS3ClientBuilder.standard().withRegion(EC2Util.REGION).build());
     }
   }
 
-  public static Map<File, URL> upload(NotebookOutput log, AmazonS3 s3) {
+  public static com.simiacryptus.ref.wrappers.RefMap<File, URL> upload(NotebookOutput log, AmazonS3 s3) {
     try {
       log.write();
       File root = log.getRoot();
       URI archiveHome = log.getArchiveHome();
       logger.info(String.format("Files in %s to be archived in %s", root.getAbsolutePath(), archiveHome));
-      HashMap<File, URL> map = new HashMap<>();
+      com.simiacryptus.ref.wrappers.RefHashMap<File, URL> map = new com.simiacryptus.ref.wrappers.RefHashMap<>();
       if (null != archiveHome) {
         logFiles(root);
-        if (null == archiveHome || (archiveHome.getScheme().startsWith("s3") && (null == archiveHome.getHost() || archiveHome.getHost().isEmpty() || "null".equals(archiveHome.getHost())))) {
+        if (null == archiveHome || (archiveHome.getScheme().startsWith("s3") && (null == archiveHome.getHost()
+            || archiveHome.getHost().isEmpty() || "null".equals(archiveHome.getHost())))) {
           logger.info(String.format("No archive destination to publish to: %s", archiveHome));
           return map;
         }
@@ -83,18 +80,23 @@ public class S3Util {
       for (File child : f.listFiles()) {
         logFiles(child);
       }
-    } else logger.info(String.format("File %s length %s", f.getAbsolutePath(), f.length()));
+    } else
+      logger.info(String.format("File %s length %s", f.getAbsolutePath(), f.length()));
   }
 
-  public static Map<File, URL> upload(final AmazonS3 s3, final URI path, final File file) {
+  public static com.simiacryptus.ref.wrappers.RefMap<File, URL> upload(final AmazonS3 s3, final URI path,
+                                                                       final File file) {
     return upload(s3, path, file, 3);
   }
 
-  public static Map<File, URL> upload(final AmazonS3 s3, final URI path, final File file, int retries) {
+  public static com.simiacryptus.ref.wrappers.RefMap<File, URL> upload(final AmazonS3 s3, final URI path,
+                                                                       final File file, int retries) {
     try {
-      HashMap<File, URL> map = new HashMap<>();
-      if (!file.exists()) throw new RuntimeException(file.toString());
-      if (null == path) return map;
+      com.simiacryptus.ref.wrappers.RefHashMap<File, URL> map = new com.simiacryptus.ref.wrappers.RefHashMap<>();
+      if (!file.exists())
+        throw new RuntimeException(file.toString());
+      if (null == path)
+        return map;
       String bucket = path.getHost();
       String scheme = path.getScheme();
       if (file.isFile()) {
@@ -104,8 +106,10 @@ public class S3Util {
           boolean upload;
           try {
             ObjectMetadata existingMetadata;
-            if (s3.doesObjectExist(bucket, reportPath)) existingMetadata = s3.getObjectMetadata(bucket, reportPath);
-            else existingMetadata = null;
+            if (s3.doesObjectExist(bucket, reportPath))
+              existingMetadata = s3.getObjectMetadata(bucket, reportPath);
+            else
+              existingMetadata = null;
             if (null != existingMetadata) {
               if (existingMetadata.getContentLength() != file.length()) {
                 logger.info(String.format("Removing outdated file %s/%s", bucket, reportPath));
@@ -124,7 +128,8 @@ public class S3Util {
             upload = true;
           }
           if (upload) {
-            s3.putObject(new PutObjectRequest(bucket, reportPath, file).withCannedAcl(CannedAccessControlList.PublicRead));
+            s3.putObject(
+                new PutObjectRequest(bucket, reportPath, file).withCannedAcl(CannedAccessControlList.PublicRead));
             map.put(file.getAbsoluteFile(), s3.getUrl(bucket, reportPath));
           }
         } else {
@@ -139,12 +144,15 @@ public class S3Util {
         URI filePath = path.resolve(file.getName() + "/");
         if (scheme.startsWith("s3")) {
           String reportPath = filePath.getPath().replaceAll("//", "/").replaceAll("^/", "");
-          logger.info(String.format("Scanning peer uploads to %s at s3 %s/%s", file.getAbsolutePath(), bucket, reportPath));
-          List<S3ObjectSummary> preexistingFiles = s3.listObjects(new ListObjectsRequest().withBucketName(bucket).withPrefix(reportPath))
-              .getObjectSummaries().stream().collect(Collectors.toList());
+          logger.info(
+              String.format("Scanning peer uploads to %s at s3 %s/%s", file.getAbsolutePath(), bucket, reportPath));
+          com.simiacryptus.ref.wrappers.RefList<S3ObjectSummary> preexistingFiles = s3
+              .listObjects(new ListObjectsRequest().withBucketName(bucket).withPrefix(reportPath)).getObjectSummaries()
+              .stream().collect(com.simiacryptus.ref.wrappers.RefCollectors.toList());
           for (S3ObjectSummary preexistingFile : preexistingFiles) {
             logger.info(String.format("Preexisting File: '%s' + '%s'", reportPath, preexistingFile.getKey()));
-            map.put(new File(file, preexistingFile.getKey()).getAbsoluteFile(), s3.getUrl(bucket, reportPath + preexistingFile.getKey()));
+            map.put(new File(file, preexistingFile.getKey()).getAbsoluteFile(),
+                s3.getUrl(bucket, reportPath + preexistingFile.getKey()));
           }
         }
         logger.info(String.format("Uploading folder %s to %s", file.getAbsolutePath(), filePath.toString()));
@@ -198,26 +206,14 @@ public class S3Util {
 
   @Nonnull
   public static String defaultPolicy(final String... bucket) {
-    String bucketGrant = Arrays.stream(bucket).map(b -> "{\n" +
-        "      \"Action\": \"s3:*\",\n" +
-        "      \"Effect\": \"Allow\",\n" +
-        "      \"Resource\": \"arn:aws:s3:::" + b + "*\"\n" +
-        "    }").reduce((a, b) -> a + "," + b).get();
-    return "{\n" +
-        "  \"Version\": \"2012-10-17\",\n" +
-        "  \"Statement\": [\n" +
-        "    " + bucketGrant + ",\n" +
-        "    {\n" +
-        "      \"Action\": \"s3:ListBucket*\",\n" +
-        "      \"Effect\": \"Allow\",\n" +
-        "      \"Resource\": \"arn:aws:s3:::*\"\n" +
-        "    },\n" +
-        "    {\n" +
-        "      \"Action\": [\"ses:SendEmail\",\"ses:SendRawEmail\"],\n" +
-        "      \"Effect\": \"Allow\",\n" +
-        "      \"Resource\": \"*\"\n" +
-        "    }\n" +
-        "  ]\n" +
-        "}";
+    String bucketGrant = com.simiacryptus.ref.wrappers.RefArrays.stream(bucket)
+        .map(b -> "{\n" + "      \"Action\": \"s3:*\",\n" + "      \"Effect\": \"Allow\",\n"
+            + "      \"Resource\": \"arn:aws:s3:::" + b + "*\"\n" + "    }")
+        .reduce((a, b) -> a + "," + b).get();
+    return "{\n" + "  \"Version\": \"2012-10-17\",\n" + "  \"Statement\": [\n" + "    " + bucketGrant + ",\n"
+        + "    {\n" + "      \"Action\": \"s3:ListBucket*\",\n" + "      \"Effect\": \"Allow\",\n"
+        + "      \"Resource\": \"arn:aws:s3:::*\"\n" + "    },\n" + "    {\n"
+        + "      \"Action\": [\"ses:SendEmail\",\"ses:SendRawEmail\"],\n" + "      \"Effect\": \"Allow\",\n"
+        + "      \"Resource\": \"*\"\n" + "    }\n" + "  ]\n" + "}";
   }
 }

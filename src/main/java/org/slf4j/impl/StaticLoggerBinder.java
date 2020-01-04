@@ -19,12 +19,13 @@
 
 package org.slf4j.impl;
 
-public class StaticLoggerBinder {
-  public static StaticLoggerBinder getSingleton() {
-    return new StaticLoggerBinder();
-  }
-
+public @com.simiacryptus.ref.lang.RefAware
+class StaticLoggerBinder {
   public String getLoggerFactoryClassStr() {
     return "do not use log4j";
+  }
+
+  public static StaticLoggerBinder getSingleton() {
+    return new StaticLoggerBinder();
   }
 }

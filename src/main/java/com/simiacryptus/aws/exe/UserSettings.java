@@ -25,7 +25,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Scanner;
 
-public class UserSettings {
+public @com.simiacryptus.ref.lang.RefAware
+class UserSettings {
   public String emailAddress;
 
   private UserSettings() {

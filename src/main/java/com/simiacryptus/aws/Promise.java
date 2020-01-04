@@ -27,19 +27,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
-public class Promise<T> implements Future<T> {
+public @com.simiacryptus.ref.lang.RefAware
+class Promise<T> implements Future<T> {
   public final Semaphore onReady = new Semaphore(0);
   public final AtomicReference<T> result = new AtomicReference<T>();
-
-  public void set(T obj) {
-    result.set(obj);
-    onReady.release();
-  }
-
-  @Override
-  public boolean cancel(boolean mayInterruptIfRunning) {
-    return false;
-  }
 
   @Override
   public boolean isCancelled() {
@@ -54,6 +45,16 @@ public class Promise<T> implements Future<T> {
     } else {
       return false;
     }
+  }
+
+  public void set(T obj) {
+    result.set(obj);
+    onReady.release();
+  }
+
+  @Override
+  public boolean cancel(boolean mayInterruptIfRunning) {
+    return false;
   }
 
   @Override
