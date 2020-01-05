@@ -32,8 +32,10 @@ import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.util.StringInputStream;
 import com.jcraft.jsch.*;
 import com.simiacryptus.ref.lang.RefAware;
+import com.simiacryptus.ref.lang.RefUtil;
 import com.simiacryptus.ref.wrappers.RefArrays;
 import com.simiacryptus.ref.wrappers.RefHashMap;
+import com.simiacryptus.ref.wrappers.RefList;
 import com.simiacryptus.ref.wrappers.RefStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -131,7 +133,7 @@ class EC2Util {
       channel.setExtOutputStream(new CloseShieldOutputStream(System.err));
       String header = String.format("C0644 %d %s\n", file.length(),
           RefArrays.stream(remote.split("/")).reduce((a, b) -> b).get());
-      com.simiacryptus.ref.wrappers.RefList<java.io.InputStream> temp_06_0003 = RefArrays
+      RefList<InputStream> temp_06_0003 = RefArrays
           .asList(new StringInputStream(header), new FileInputStream(file), new ByteArrayInputStream(new byte[]{0}));
       channel.setInputStream(temp_06_0003.stream().reduce((a, b) -> new SequenceInputStream(a, b)).get());
       if (null != temp_06_0003)
@@ -425,9 +427,9 @@ class EC2Util {
   }
 
   public static IpPermission getTcpPermission(final int port) {
-    com.simiacryptus.ref.wrappers.RefList<com.amazonaws.services.ec2.model.IpRange> temp_06_0005 = RefArrays
+    RefList<IpRange> temp_06_0005 = RefArrays
         .asList(new IpRange().withCidrIp("0.0.0.0/0"));
-    com.amazonaws.services.ec2.model.IpPermission temp_06_0004 = new IpPermission().withIpv4Ranges(temp_06_0005)
+    IpPermission temp_06_0004 = new IpPermission().withIpv4Ranges(temp_06_0005)
         .withIpProtocol("tcp").withFromPort(port).withToPort(port);
     if (null != temp_06_0005)
       temp_06_0005.freeRef();
@@ -454,8 +456,8 @@ class EC2Util {
 
   @Nonnull
   public static Process execAsync(final Session session, final String script, RefHashMap<String, String> env) {
-    com.simiacryptus.aws.EC2Util.Process temp_06_0001 = execAsync(session, script, new ByteArrayOutputStream(),
-        com.simiacryptus.ref.lang.RefUtil.addRef(env));
+    EC2Util.Process temp_06_0001 = execAsync(session, script, new ByteArrayOutputStream(),
+        RefUtil.addRef(env));
     if (null != env)
       env.freeRef();
     return temp_06_0001;
@@ -465,8 +467,8 @@ class EC2Util {
   public static Process execAsync(final Session session, final String script, final OutputStream outBuffer,
                                   RefHashMap<String, String> env) {
     try {
-      com.simiacryptus.aws.EC2Util.Process temp_06_0002 = new Process(session, script, outBuffer,
-          com.simiacryptus.ref.lang.RefUtil.addRef(com.simiacryptus.ref.lang.RefUtil.addRef(env)));
+      EC2Util.Process temp_06_0002 = new Process(session, script, outBuffer,
+          RefUtil.addRef(RefUtil.addRef(env)));
       if (null != env)
         env.freeRef();
       return temp_06_0002;

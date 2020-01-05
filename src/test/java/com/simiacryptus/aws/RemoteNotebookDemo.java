@@ -29,6 +29,7 @@ import com.amazonaws.services.simpleemail.AmazonSimpleEmailServiceClientBuilder;
 import com.simiacryptus.notebook.MarkdownNotebookOutput;
 import com.simiacryptus.notebook.NotebookOutput;
 import com.simiacryptus.ref.lang.RefAware;
+import com.simiacryptus.ref.lang.RefUtil;
 import com.simiacryptus.util.JsonUtil;
 import com.simiacryptus.util.Util;
 import com.simiacryptus.util.test.SysOutInterceptor;
@@ -137,7 +138,7 @@ class RemoteNotebookDemo {
           UUID.randomUUID())) {
         log.setArchiveHome(URI.create("s3://" + default_bucket + "/reports/" + UUID.randomUUID() + "/"));
         log.onComplete(() -> {
-          com.simiacryptus.ref.lang.RefUtil.freeRef(S3Util.upload(getS3(), log.getArchiveHome(), log.getRoot()));
+          RefUtil.freeRef(S3Util.upload(getS3(), log.getArchiveHome(), log.getRoot()));
         });
         log.onComplete(() -> {
           String html = "";

@@ -30,6 +30,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.simiacryptus.lang.SerializableCallable;
 import com.simiacryptus.lang.SerializableConsumer;
 import com.simiacryptus.ref.lang.RefAware;
+import com.simiacryptus.ref.lang.RefUtil;
 import com.simiacryptus.ref.wrappers.*;
 import com.simiacryptus.util.test.SysOutInterceptor;
 import com.twitter.chill.KryoInstantiator;
@@ -49,6 +50,7 @@ import java.io.Serializable;
 import java.lang.invoke.SerializedLambda;
 import java.net.InetSocketAddress;
 import java.security.NoSuchAlgorithmException;
+import java.util.Map;
 import java.util.concurrent.*;
 import java.util.function.Predicate;
 
@@ -142,19 +144,19 @@ class Tendril {
         Tendril.class.getCanonicalName(), programArguments);
     logger.info("Java Local Classpath: " + localClasspath);
     logger.info("Java Remote Classpath: " + remoteClasspath);
-    com.simiacryptus.ref.wrappers.RefHashSet<java.util.Map.Entry<java.lang.String, java.lang.String>> temp_05_0006 = env
+    RefHashSet<Map.Entry<String, String>> temp_05_0006 = env
         .entrySet();
     logger.info("Java Environment: " + temp_05_0006.stream().map(e -> {
-      java.lang.String temp_05_0001 = e.getKey() + " = " + e.getValue();
+      String temp_05_0001 = e.getKey() + " = " + e.getValue();
       if (null != e)
-        com.simiacryptus.ref.lang.RefUtil.freeRef(e);
+        RefUtil.freeRef(e);
       return temp_05_0001;
     }).reduce((a, b) -> a + "; " + b).orElse(""));
     if (null != temp_05_0006)
       temp_05_0006.freeRef();
     logger.info("Java Command Line: " + commandLine);
     execAsync(node.getConnection(), commandLine, new CloseShieldOutputStream(System.out),
-        com.simiacryptus.ref.lang.RefUtil.addRef(env));
+        RefUtil.addRef(env));
     if (null != env)
       env.freeRef();
     return new TendrilControl(getControl(localControlPort));
@@ -180,12 +182,12 @@ class Tendril {
           //ClasspathUtil.summarizeLocalClasspath().getAbsolutePath(),
           "-DcontrolPort=" + controlPort, Tendril.class.getCanonicalName()));
       RefArrays.stream(programArguments.split(" ")).forEach(cmd::add);
-      com.simiacryptus.ref.wrappers.RefHashSet<java.util.Map.Entry<java.lang.String, java.lang.String>> temp_05_0007 = env
+      RefHashSet<Map.Entry<String, String>> temp_05_0007 = env
           .entrySet();
       logger.info("Java Environment: " + temp_05_0007.stream().map(e -> {
-        java.lang.String temp_05_0002 = e.getKey() + " = " + e.getValue();
+        String temp_05_0002 = e.getKey() + " = " + e.getValue();
         if (null != e)
-          com.simiacryptus.ref.lang.RefUtil.freeRef(e);
+          RefUtil.freeRef(e);
         return temp_05_0002;
       }).reduce((a, b) -> a + "; " + b).orElse(""));
       if (null != temp_05_0007)
@@ -259,7 +261,7 @@ class Tendril {
           PrintStream prev = SysOutInterceptor.INSTANCE.setCurrentHandler(out);
           RefList<String> classpathEntry = stageClasspathEntry(node, libPrefix, entryPath, s3, bucket, keyspace);
           SysOutInterceptor.INSTANCE.setCurrentHandler(prev);
-          java.lang.String temp_05_0003 = classpathEntry.stream().reduce((a, b) -> a + ":" + b).get();
+          String temp_05_0003 = classpathEntry.stream().reduce((a, b) -> a + ":" + b).get();
           if (null != classpathEntry)
             classpathEntry.freeRef();
           return temp_05_0003;
@@ -388,9 +390,9 @@ class Tendril {
   public static TendrilControl startRemoteJvm(final EC2Node node, final JvmConfig jvmConfig, final int localControlPort,
                                               final Predicate<String> shouldTransfer, final AmazonS3 s3, final RefHashMap<String, String> env,
                                               final String... bucket) {
-    com.simiacryptus.aws.TendrilControl temp_05_0004 = startRemoteJvm(node, localControlPort, jvmConfig.javaOpts,
+    TendrilControl temp_05_0004 = startRemoteJvm(node, localControlPort, jvmConfig.javaOpts,
         jvmConfig.programArguments, jvmConfig.libPrefix, jvmConfig.keyspace, shouldTransfer, s3,
-        com.simiacryptus.ref.lang.RefUtil.addRef(env), bucket);
+        RefUtil.addRef(env), bucket);
     if (null != env)
       env.freeRef();
     return temp_05_0004;
@@ -399,8 +401,8 @@ class Tendril {
   @Nonnull
   public static TendrilControl startLocalJvm(final JvmConfig jvmConfig, final int localControlPort,
                                              final RefHashMap<String, String> env) {
-    com.simiacryptus.aws.TendrilControl temp_05_0005 = startLocalJvm(localControlPort, jvmConfig.javaOpts,
-        com.simiacryptus.ref.lang.RefUtil.addRef(env), new File("."));
+    TendrilControl temp_05_0005 = startLocalJvm(localControlPort, jvmConfig.javaOpts,
+        RefUtil.addRef(env), new File("."));
     if (null != env)
       env.freeRef();
     return temp_05_0005;

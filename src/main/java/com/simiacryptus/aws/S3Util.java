@@ -150,7 +150,7 @@ class S3Util {
           String reportPath = filePath.getPath().replaceAll("//", "/").replaceAll("^/", "");
           logger.info(
               String.format("Scanning peer uploads to %s at s3 %s/%s", file.getAbsolutePath(), bucket, reportPath));
-          com.simiacryptus.ref.wrappers.RefCollectors.RefCollector<com.amazonaws.services.s3.model.S3ObjectSummary, ?, com.simiacryptus.ref.wrappers.RefList<com.amazonaws.services.s3.model.S3ObjectSummary>> temp_07_0001 = RefCollectors
+          RefCollectors.RefCollector<S3ObjectSummary, ?, RefList<S3ObjectSummary>> temp_07_0001 = RefCollectors
               .toList();
           RefList<S3ObjectSummary> preexistingFiles = s3
               .listObjects(new ListObjectsRequest().withBucketName(bucket).withPrefix(reportPath)).getObjectSummaries()

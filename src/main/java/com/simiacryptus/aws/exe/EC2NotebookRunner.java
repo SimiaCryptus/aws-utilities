@@ -33,6 +33,7 @@ import com.simiacryptus.lang.SerializableConsumer;
 import com.simiacryptus.notebook.MarkdownNotebookOutput;
 import com.simiacryptus.notebook.NotebookOutput;
 import com.simiacryptus.ref.lang.RefAware;
+import com.simiacryptus.ref.lang.RefUtil;
 import com.simiacryptus.ref.wrappers.RefHashMap;
 import com.simiacryptus.ref.wrappers.RefMap;
 import com.simiacryptus.ref.wrappers.RefStream;
@@ -53,6 +54,7 @@ import java.net.URL;
 import java.util.Date;
 import java.util.Random;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -260,8 +262,8 @@ class EC2NotebookRunner {
     File pdf = new File(workingDir, testName + ".pdf");
 
     String append = "<hr/>" + RefStream.of(zip, pdf, new File(workingDir, testName + ".html"))
-        .map(com.simiacryptus.ref.lang.RefUtil.wrapInterface(
-            (java.util.function.Function<? super java.io.File, ? extends java.lang.String>) file -> String
+        .map(RefUtil.wrapInterface(
+            (Function<? super File, ? extends String>) file -> String
                 .format("<p><a href=\"%s\">%s</a></p>", uploads.get(file.getAbsoluteFile()), file.getName()),
             uploads == null ? null : uploads.addRef()))
         .reduce((a, b) -> a + b).get();

@@ -20,6 +20,7 @@
 package com.simiacryptus.aws;
 
 import com.simiacryptus.ref.lang.RefAware;
+import com.simiacryptus.ref.lang.RefUtil;
 import com.simiacryptus.ref.wrappers.*;
 import com.simiacryptus.util.CodeUtil;
 import com.simiacryptus.util.JsonUtil;
@@ -36,9 +37,11 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
@@ -82,13 +85,13 @@ class ClasspathUtil {
       stream = stream.parallel();
     return stream.flatMap(entryPath -> {
       PrintStream prev = SysOutInterceptor.INSTANCE.setCurrentHandler(out);
-      com.simiacryptus.ref.wrappers.RefList<java.lang.String> temp_04_0003 = RefArrays.asList(entryPath);
+      RefList<String> temp_04_0003 = RefArrays.asList(entryPath);
       RefList<String> classpathEntry = (new File(entryPath).isDirectory()) ? stageClasspathEntry(libPrefix, entryPath)
           : temp_04_0003.addRef();
       if (null != temp_04_0003)
         temp_04_0003.freeRef();
       SysOutInterceptor.INSTANCE.setCurrentHandler(prev);
-      com.simiacryptus.ref.wrappers.RefStream<java.lang.String> temp_04_0001 = classpathEntry.stream();
+      RefStream<String> temp_04_0001 = classpathEntry.stream();
       if (null != classpathEntry)
         classpathEntry.freeRef();
       return temp_04_0001;
@@ -168,7 +171,7 @@ class ClasspathUtil {
       }
       zip.putNextEntry(new ZipEntry("META-INF/CodeUtil/classSourceInfo.json"));
       try (InputStream input = new ByteArrayInputStream(JsonUtil
-          .toJson(com.simiacryptus.ref.lang.RefUtil.addRef(CodeUtil.classSourceInfo)).toString().getBytes("UTF-8"))) {
+          .toJson(RefUtil.addRef(CodeUtil.classSourceInfo)).toString().getBytes("UTF-8"))) {
         IOUtils.copy(input, zip);
       }
       zip.closeEntry();
@@ -206,22 +209,22 @@ class ClasspathUtil {
         }
       }).filter(x -> x != null).collect(RefCollectors.toList());
       RefArrayList<String[]> conflicts = new RefArrayList<>();
-      com.simiacryptus.ref.wrappers.RefMap<java.lang.String, com.simiacryptus.ref.wrappers.RefList<com.simiacryptus.aws.ClasspathUtil.ClasspathEntry>> temp_04_0004 = files
+      RefMap<String, RefList<ClasspathUtil.ClasspathEntry>> temp_04_0004 = files
           .stream().flatMap(file -> {
             return file.stream()
                 //.filter(x -> !x.isDirectory())
                 .map(jarEntry -> new ClasspathEntry(file, jarEntry));
           }).sorted(RefComparator.comparing(x -> x.jarEntry.getName() + ":" + x.file.getName()))
           .collect(RefCollectors.groupingBy(x -> x.jarEntry.getName()));
-      com.simiacryptus.ref.wrappers.RefCollection<com.simiacryptus.ref.wrappers.RefList<com.simiacryptus.aws.ClasspathUtil.ClasspathEntry>> temp_04_0005 = temp_04_0004
+      RefCollection<RefList<ClasspathUtil.ClasspathEntry>> temp_04_0005 = temp_04_0004
           .values();
-      temp_04_0005.stream().map(com.simiacryptus.ref.lang.RefUtil.wrapInterface(
-          (java.util.function.Function<? super com.simiacryptus.ref.wrappers.RefList<com.simiacryptus.aws.ClasspathUtil.ClasspathEntry>, ? extends com.simiacryptus.aws.ClasspathUtil.ClasspathEntry>) x -> {
+      temp_04_0005.stream().map(RefUtil.wrapInterface(
+          (Function<? super RefList<ClasspathUtil.ClasspathEntry>, ? extends ClasspathUtil.ClasspathEntry>) x -> {
             if (x.size() > 1 && !x.get(0).jarEntry.isDirectory()) {
               conflicts.add(new String[]{x.stream().map(y -> new File(y.file.getName()).getName()).sorted()
                   .reduce((a, b) -> a + ", " + b).get(), x.get(0).jarEntry.getName()});
             }
-            com.simiacryptus.aws.ClasspathUtil.ClasspathEntry temp_04_0002 = x.get(0);
+            ClasspathUtil.ClasspathEntry temp_04_0002 = x.get(0);
             if (null != x)
               x.freeRef();
             return temp_04_0002;
@@ -255,18 +258,18 @@ class ClasspathUtil {
         temp_04_0005.freeRef();
       if (null != temp_04_0004)
         temp_04_0004.freeRef();
-      com.simiacryptus.ref.wrappers.RefMap<java.lang.String, com.simiacryptus.ref.wrappers.RefList<java.lang.String[]>> temp_04_0006 = conflicts
+      RefMap<String, RefList<String[]>> temp_04_0006 = conflicts
           .stream().collect(RefCollectors.groupingBy(y -> y[0]));
-      com.simiacryptus.ref.wrappers.RefSet<java.util.Map.Entry<java.lang.String, com.simiacryptus.ref.wrappers.RefList<java.lang.String[]>>> temp_04_0007 = temp_04_0006
+      RefSet<Map.Entry<String, RefList<String[]>>> temp_04_0007 = temp_04_0006
           .entrySet();
       temp_04_0007.stream().forEach(e -> {
-        com.simiacryptus.ref.wrappers.RefList<java.lang.String[]> temp_04_0008 = e.getValue();
+        RefList<String[]> temp_04_0008 = e.getValue();
         logger.info("Conflict between " + e.getKey() + " for "
             + temp_04_0008.stream().map(y -> y[1]).sorted().reduce((a, b) -> a + ", " + b).get());
         if (null != temp_04_0008)
           temp_04_0008.freeRef();
         if (null != e)
-          com.simiacryptus.ref.lang.RefUtil.freeRef(e);
+          RefUtil.freeRef(e);
       });
       if (null != temp_04_0007)
         temp_04_0007.freeRef();
