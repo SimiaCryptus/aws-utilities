@@ -137,7 +137,7 @@ class RemoteNotebookDemo {
           UUID.randomUUID())) {
         log.setArchiveHome(URI.create("s3://" + default_bucket + "/reports/" + UUID.randomUUID() + "/"));
         log.onComplete(() -> {
-          S3Util.upload(getS3(), log.getArchiveHome(), log.getRoot());
+          com.simiacryptus.ref.lang.RefUtil.freeRef(S3Util.upload(getS3(), log.getArchiveHome(), log.getRoot()));
         });
         log.onComplete(() -> {
           String html = "";

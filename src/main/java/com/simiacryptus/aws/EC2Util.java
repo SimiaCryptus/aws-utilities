@@ -131,9 +131,11 @@ class EC2Util {
       channel.setExtOutputStream(new CloseShieldOutputStream(System.err));
       String header = String.format("C0644 %d %s\n", file.length(),
           RefArrays.stream(remote.split("/")).reduce((a, b) -> b).get());
-      channel.setInputStream(RefArrays
-          .asList(new StringInputStream(header), new FileInputStream(file), new ByteArrayInputStream(new byte[]{0}))
-          .stream().reduce((a, b) -> new SequenceInputStream(a, b)).get());
+      com.simiacryptus.ref.wrappers.RefList<java.io.InputStream> temp_06_0003 = RefArrays
+          .asList(new StringInputStream(header), new FileInputStream(file), new ByteArrayInputStream(new byte[]{0}));
+      channel.setInputStream(temp_06_0003.stream().reduce((a, b) -> new SequenceInputStream(a, b)).get());
+      if (null != temp_06_0003)
+        temp_06_0003.freeRef();
       channel.connect();
       join((Channel) channel);
       int exitStatus = channel.getExitStatus();
@@ -229,8 +231,8 @@ class EC2Util {
     if (null == keyPair) {
       synchronized (EC2Util.class) {
         if (null == keyPair) {
-          KeyPair key = RefArrays.stream(new File(".").listFiles())
-              .filter(x -> x.getName().endsWith(".pem")).map(pem -> {
+          KeyPair key = RefArrays.stream(new File(".").listFiles()).filter(x -> x.getName().endsWith(".pem"))
+              .map(pem -> {
                 String[] split = pem.getName().split("\\.");
                 return split.length > 0 ? split[0] : "";
               }).filter(x -> !x.isEmpty()).map(keyName -> loadKey(ec2, keyName)).filter(x -> x != null).findFirst()
@@ -311,12 +313,12 @@ class EC2Util {
     }
     ec2.authorizeSecurityGroupIngress(
         new AuthorizeSecurityGroupIngressRequest().withGroupId(groupId)
-            .withIpPermissions(RefStream
-                .concat(RefArrays.stream(ports).mapToObj(port -> getTcpPermission(port)),
-                    RefStream
-                        .of(new IpPermission().withUserIdGroupPairs(new UserIdGroupPair().withGroupId(groupId))
+            .withIpPermissions(
+                RefStream
+                    .concat(RefArrays.stream(ports).mapToObj(port -> getTcpPermission(port)),
+                        RefStream.of(new IpPermission().withUserIdGroupPairs(new UserIdGroupPair().withGroupId(groupId))
                             .withIpProtocol("tcp").withFromPort(0).withToPort(0xFFFF)))
-                .toArray(i -> new IpPermission[i])));
+                    .toArray(i -> new IpPermission[i])));
     return groupId;
   }
 
@@ -423,9 +425,13 @@ class EC2Util {
   }
 
   public static IpPermission getTcpPermission(final int port) {
-    return new IpPermission()
-        .withIpv4Ranges(RefArrays.asList(new IpRange().withCidrIp("0.0.0.0/0")))
+    com.simiacryptus.ref.wrappers.RefList<com.amazonaws.services.ec2.model.IpRange> temp_06_0005 = RefArrays
+        .asList(new IpRange().withCidrIp("0.0.0.0/0"));
+    com.amazonaws.services.ec2.model.IpPermission temp_06_0004 = new IpPermission().withIpv4Ranges(temp_06_0005)
         .withIpProtocol("tcp").withFromPort(port).withToPort(port);
+    if (null != temp_06_0005)
+      temp_06_0005.freeRef();
+    return temp_06_0004;
   }
 
   @Nonnull
@@ -447,16 +453,23 @@ class EC2Util {
   }
 
   @Nonnull
-  public static Process execAsync(final Session session, final String script,
-                                  RefHashMap<String, String> env) {
-    return execAsync(session, script, new ByteArrayOutputStream(), env);
+  public static Process execAsync(final Session session, final String script, RefHashMap<String, String> env) {
+    com.simiacryptus.aws.EC2Util.Process temp_06_0001 = execAsync(session, script, new ByteArrayOutputStream(),
+        com.simiacryptus.ref.lang.RefUtil.addRef(env));
+    if (null != env)
+      env.freeRef();
+    return temp_06_0001;
   }
 
   @Nonnull
   public static Process execAsync(final Session session, final String script, final OutputStream outBuffer,
                                   RefHashMap<String, String> env) {
     try {
-      return new Process(session, script, outBuffer, env);
+      com.simiacryptus.aws.EC2Util.Process temp_06_0002 = new Process(session, script, outBuffer,
+          com.simiacryptus.ref.lang.RefUtil.addRef(com.simiacryptus.ref.lang.RefUtil.addRef(env)));
+      if (null != env)
+        env.freeRef();
+      return temp_06_0002;
     } catch (JSchException e) {
       throw new RuntimeException(e);
     }
@@ -556,8 +569,7 @@ class EC2Util {
     }
 
     public Process execAsync(final String command) {
-      return EC2Util.execAsync(getConnection(), command,
-          new RefHashMap<String, String>());
+      return EC2Util.execAsync(getConnection(), command, new RefHashMap<String, String>());
     }
 
     public void stage(final File entryFile, final String remote, final String bucket, final String keyspace,
@@ -578,6 +590,8 @@ class EC2Util {
       this.outBuffer = outBuffer;
       channel.setOutputStream(this.outBuffer);
       env.forEach((k, v) -> channel.setEnv(k, v));
+      if (null != env)
+        env.freeRef();
       channel.setExtOutputStream(new CloseShieldOutputStream(System.err));
       channel.connect();
     }

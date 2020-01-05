@@ -86,19 +86,21 @@ class S3Util {
       logger.info(String.format("File %s length %s", f.getAbsolutePath(), f.length()));
   }
 
-  public static RefMap<File, URL> upload(final AmazonS3 s3, final URI path,
-                                         final File file) {
+  public static RefMap<File, URL> upload(final AmazonS3 s3, final URI path, final File file) {
     return upload(s3, path, file, 3);
   }
 
-  public static RefMap<File, URL> upload(final AmazonS3 s3, final URI path,
-                                         final File file, int retries) {
+  public static RefMap<File, URL> upload(final AmazonS3 s3, final URI path, final File file, int retries) {
     try {
       RefHashMap<File, URL> map = new RefHashMap<>();
-      if (!file.exists())
+      if (!file.exists()) {
+        if (null != map)
+          map.freeRef();
         throw new RuntimeException(file.toString());
-      if (null == path)
+      }
+      if (null == path) {
         return map;
+      }
       String bucket = path.getHost();
       String scheme = path.getScheme();
       if (file.isFile()) {
@@ -148,14 +150,20 @@ class S3Util {
           String reportPath = filePath.getPath().replaceAll("//", "/").replaceAll("^/", "");
           logger.info(
               String.format("Scanning peer uploads to %s at s3 %s/%s", file.getAbsolutePath(), bucket, reportPath));
+          com.simiacryptus.ref.wrappers.RefCollectors.RefCollector<com.amazonaws.services.s3.model.S3ObjectSummary, ?, com.simiacryptus.ref.wrappers.RefList<com.amazonaws.services.s3.model.S3ObjectSummary>> temp_07_0001 = RefCollectors
+              .toList();
           RefList<S3ObjectSummary> preexistingFiles = s3
               .listObjects(new ListObjectsRequest().withBucketName(bucket).withPrefix(reportPath)).getObjectSummaries()
-              .stream().collect(RefCollectors.toList());
+              .stream().collect(temp_07_0001);
+          if (null != temp_07_0001)
+            temp_07_0001.freeRef();
           for (S3ObjectSummary preexistingFile : preexistingFiles) {
             logger.info(String.format("Preexisting File: '%s' + '%s'", reportPath, preexistingFile.getKey()));
             map.put(new File(file, preexistingFile.getKey()).getAbsoluteFile(),
                 s3.getUrl(bucket, reportPath + preexistingFile.getKey()));
           }
+          if (null != preexistingFiles)
+            preexistingFiles.freeRef();
         }
         logger.info(String.format("Uploading folder %s to %s", file.getAbsolutePath(), filePath.toString()));
         for (File subfile : file.listFiles()) {
@@ -208,9 +216,8 @@ class S3Util {
 
   @Nonnull
   public static String defaultPolicy(final String... bucket) {
-    String bucketGrant = RefArrays.stream(bucket)
-        .map(b -> "{\n" + "      \"Action\": \"s3:*\",\n" + "      \"Effect\": \"Allow\",\n"
-            + "      \"Resource\": \"arn:aws:s3:::" + b + "*\"\n" + "    }")
+    String bucketGrant = RefArrays.stream(bucket).map(b -> "{\n" + "      \"Action\": \"s3:*\",\n"
+        + "      \"Effect\": \"Allow\",\n" + "      \"Resource\": \"arn:aws:s3:::" + b + "*\"\n" + "    }")
         .reduce((a, b) -> a + "," + b).get();
     return "{\n" + "  \"Version\": \"2012-10-17\",\n" + "  \"Statement\": [\n" + "    " + bucketGrant + ",\n"
         + "    {\n" + "      \"Action\": \"s3:ListBucket*\",\n" + "      \"Effect\": \"Allow\",\n"

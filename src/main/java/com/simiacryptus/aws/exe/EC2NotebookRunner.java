@@ -213,9 +213,10 @@ class EC2NotebookRunner {
       log.setArchiveHome(URI.create("s3://" + s3bucket + "/reports/" + UUID.randomUUID() + "/"));
       log.onComplete(() -> {
         logFiles(log.getRoot());
-        RefMap<File, URL> uploads = S3Util.upload(getS3(), log.getArchiveHome(),
-            log.getRoot());
-        sendCompleteEmail(testName, log.getRoot(), uploads, startTime);
+        RefMap<File, URL> uploads = S3Util.upload(getS3(), log.getArchiveHome(), log.getRoot());
+        sendCompleteEmail(testName, log.getRoot(), uploads == null ? null : uploads.addRef(), startTime);
+        if (null != uploads)
+          uploads.freeRef();
       });
       try {
         sendStartEmail(testName, fn);
@@ -227,8 +228,8 @@ class EC2NotebookRunner {
     };
   }
 
-  private void sendCompleteEmail(final String testName, final File workingDir,
-                                 final RefMap<File, URL> uploads, final long startTime) {
+  private void sendCompleteEmail(final String testName, final File workingDir, final RefMap<File, URL> uploads,
+                                 final long startTime) {
     String html = null;
     try {
       html = FileUtils.readFileToString(new File(workingDir, testName + ".html"), "UTF-8");
@@ -258,10 +259,14 @@ class EC2NotebookRunner {
     File zip = new File(workingDir, testName + ".zip");
     File pdf = new File(workingDir, testName + ".pdf");
 
-    String append = "<hr/>" + RefStream
-        .of(zip, pdf, new File(workingDir, testName + ".html"))
-        .map(file -> String.format("<p><a href=\"%s\">%s</a></p>", uploads.get(file.getAbsoluteFile()), file.getName()))
+    String append = "<hr/>" + RefStream.of(zip, pdf, new File(workingDir, testName + ".html"))
+        .map(com.simiacryptus.ref.lang.RefUtil.wrapInterface(
+            (java.util.function.Function<? super java.io.File, ? extends java.lang.String>) file -> String
+                .format("<p><a href=\"%s\">%s</a></p>", uploads.get(file.getAbsoluteFile()), file.getName()),
+            uploads == null ? null : uploads.addRef()))
         .reduce((a, b) -> a + b).get();
+    if (null != uploads)
+      uploads.freeRef();
     String endTag = "</body>";
     if (replacedHtml.contains(endTag)) {
       replacedHtml.replace(endTag, append + endTag);
