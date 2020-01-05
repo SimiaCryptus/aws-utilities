@@ -28,6 +28,7 @@ import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.simpleemail.AmazonSimpleEmailServiceClientBuilder;
 import com.simiacryptus.notebook.MarkdownNotebookOutput;
 import com.simiacryptus.notebook.NotebookOutput;
+import com.simiacryptus.ref.lang.RefAware;
 import com.simiacryptus.util.JsonUtil;
 import com.simiacryptus.util.Util;
 import com.simiacryptus.util.test.SysOutInterceptor;
@@ -45,7 +46,7 @@ import java.util.Date;
 import java.util.Random;
 import java.util.UUID;
 
-public @com.simiacryptus.ref.lang.RefAware
+public @RefAware
 class RemoteNotebookDemo {
 
   static final Logger logger = LoggerFactory.getLogger(RemoteNotebookDemo.class);

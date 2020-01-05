@@ -31,6 +31,10 @@ import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.util.StringInputStream;
 import com.jcraft.jsch.*;
+import com.simiacryptus.ref.lang.RefAware;
+import com.simiacryptus.ref.wrappers.RefArrays;
+import com.simiacryptus.ref.wrappers.RefHashMap;
+import com.simiacryptus.ref.wrappers.RefStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.CloseShieldOutputStream;
@@ -52,7 +56,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
-public @com.simiacryptus.ref.lang.RefAware
+public @RefAware
 class EC2Util {
 
   public static final Regions REGION = Regions.fromName(System.getProperty("AWS_REGION", getCurrentRegion()));
@@ -126,8 +130,8 @@ class EC2Util {
       channel.setOutputStream(out);
       channel.setExtOutputStream(new CloseShieldOutputStream(System.err));
       String header = String.format("C0644 %d %s\n", file.length(),
-          com.simiacryptus.ref.wrappers.RefArrays.stream(remote.split("/")).reduce((a, b) -> b).get());
-      channel.setInputStream(com.simiacryptus.ref.wrappers.RefArrays
+          RefArrays.stream(remote.split("/")).reduce((a, b) -> b).get());
+      channel.setInputStream(RefArrays
           .asList(new StringInputStream(header), new FileInputStream(file), new ByteArrayInputStream(new byte[]{0}))
           .stream().reduce((a, b) -> new SequenceInputStream(a, b)).get());
       channel.connect();
@@ -225,7 +229,7 @@ class EC2Util {
     if (null == keyPair) {
       synchronized (EC2Util.class) {
         if (null == keyPair) {
-          KeyPair key = com.simiacryptus.ref.wrappers.RefArrays.stream(new File(".").listFiles())
+          KeyPair key = RefArrays.stream(new File(".").listFiles())
               .filter(x -> x.getName().endsWith(".pem")).map(pem -> {
                 String[] split = pem.getName().split("\\.");
                 return split.length > 0 ? split[0] : "";
@@ -307,9 +311,9 @@ class EC2Util {
     }
     ec2.authorizeSecurityGroupIngress(
         new AuthorizeSecurityGroupIngressRequest().withGroupId(groupId)
-            .withIpPermissions(com.simiacryptus.ref.wrappers.RefStream
-                .concat(com.simiacryptus.ref.wrappers.RefArrays.stream(ports).mapToObj(port -> getTcpPermission(port)),
-                    com.simiacryptus.ref.wrappers.RefStream
+            .withIpPermissions(RefStream
+                .concat(RefArrays.stream(ports).mapToObj(port -> getTcpPermission(port)),
+                    RefStream
                         .of(new IpPermission().withUserIdGroupPairs(new UserIdGroupPair().withGroupId(groupId))
                             .withIpProtocol("tcp").withFromPort(0).withToPort(0xFFFF)))
                 .toArray(i -> new IpPermission[i])));
@@ -364,7 +368,7 @@ class EC2Util {
 
   @NotNull
   public static String bucketGrantStr(String... bucket) {
-    return com.simiacryptus.ref.wrappers.RefArrays
+    return RefArrays
         .stream(bucket).map(b -> String.format("{\n" + "      \"Action\": \"s3:*\",\n"
             + "      \"Effect\": \"Allow\",\n" + "      \"Resource\": \"arn:aws:s3:::%s*\"\n" + "    }", b))
         .reduce((a, b) -> a + ", " + b).get();
@@ -420,7 +424,7 @@ class EC2Util {
 
   public static IpPermission getTcpPermission(final int port) {
     return new IpPermission()
-        .withIpv4Ranges(com.simiacryptus.ref.wrappers.RefArrays.asList(new IpRange().withCidrIp("0.0.0.0/0")))
+        .withIpv4Ranges(RefArrays.asList(new IpRange().withCidrIp("0.0.0.0/0")))
         .withIpProtocol("tcp").withFromPort(port).withToPort(port);
   }
 
@@ -428,7 +432,7 @@ class EC2Util {
   public static String exec(final Session session, final String script) {
     try {
       logger.debug("Executing: " + script);
-      Process process = execAsync(session, script, new com.simiacryptus.ref.wrappers.RefHashMap<String, String>());
+      Process process = execAsync(session, script, new RefHashMap<String, String>());
       join(process.getChannel());
       String output = new String(process.getOutBuffer().toByteArray(), charset);
       int exitStatus = process.getChannel().getExitStatus();
@@ -444,13 +448,13 @@ class EC2Util {
 
   @Nonnull
   public static Process execAsync(final Session session, final String script,
-                                  com.simiacryptus.ref.wrappers.RefHashMap<String, String> env) {
+                                  RefHashMap<String, String> env) {
     return execAsync(session, script, new ByteArrayOutputStream(), env);
   }
 
   @Nonnull
   public static Process execAsync(final Session session, final String script, final OutputStream outBuffer,
-                                  com.simiacryptus.ref.wrappers.RefHashMap<String, String> env) {
+                                  RefHashMap<String, String> env) {
     try {
       return new Process(session, script, outBuffer, env);
     } catch (JSchException e) {
@@ -490,7 +494,7 @@ class EC2Util {
         newIamRole(iam, S3Util.defaultPolicy(bucket)).getArn(), bucket);
   }
 
-  public static @com.simiacryptus.ref.lang.RefAware
+  public static @RefAware
   class EC2Node implements AutoCloseable {
     private final AmazonEC2 ec2;
     private final Session connection;
@@ -518,7 +522,7 @@ class EC2Util {
     public TendrilControl startJvm(final AmazonEC2 ec2, final AmazonS3 s3, final AwsTendrilNodeSettings settings,
                                    final int localControlPort) {
       return Tendril.startRemoteJvm(this, settings.newJvmConfig(), localControlPort, Tendril::defaultClasspathFilter,
-          s3, new com.simiacryptus.ref.wrappers.RefHashMap<String, String>(), settings.getServiceConfig(ec2).bucket);
+          s3, new RefHashMap<String, String>(), settings.getServiceConfig(ec2).bucket);
     }
 
     public <T> T runAndTerminate(final Function<Session, T> task) {
@@ -553,7 +557,7 @@ class EC2Util {
 
     public Process execAsync(final String command) {
       return EC2Util.execAsync(getConnection(), command,
-          new com.simiacryptus.ref.wrappers.RefHashMap<String, String>());
+          new RefHashMap<String, String>());
     }
 
     public void stage(final File entryFile, final String remote, final String bucket, final String keyspace,
@@ -562,13 +566,13 @@ class EC2Util {
     }
   }
 
-  public static @com.simiacryptus.ref.lang.RefAware
+  public static @RefAware
   class Process {
     private final ChannelExec channel;
     private final OutputStream outBuffer;
 
     public Process(final Session session, final String script, final OutputStream outBuffer,
-                   com.simiacryptus.ref.wrappers.RefHashMap<String, String> env) throws JSchException {
+                   RefHashMap<String, String> env) throws JSchException {
       channel = (ChannelExec) session.openChannel("exec");
       channel.setCommand(script);
       this.outBuffer = outBuffer;
@@ -601,7 +605,7 @@ class EC2Util {
     }
   }
 
-  public static @com.simiacryptus.ref.lang.RefAware
+  public static @RefAware
   class ServiceConfig {
     public String[] bucket;
     public InstanceProfile instanceProfile;
@@ -630,7 +634,7 @@ class EC2Util {
     }
   }
 
-  public static @com.simiacryptus.ref.lang.RefAware
+  public static @RefAware
   class NodeConfig {
     public String imageId;
     public String instanceType;

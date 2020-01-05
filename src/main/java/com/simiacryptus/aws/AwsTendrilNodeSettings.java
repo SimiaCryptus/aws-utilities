@@ -20,10 +20,11 @@
 package com.simiacryptus.aws;
 
 import com.amazonaws.services.ec2.AmazonEC2;
+import com.simiacryptus.ref.lang.RefAware;
 
 import javax.annotation.Nonnull;
 
-public final @com.simiacryptus.ref.lang.RefAware
+public final @RefAware
 class AwsTendrilNodeSettings extends AwsTendrilEnvSettings {
   public String imageId;
   public String instanceType;

@@ -29,6 +29,8 @@ import com.esotericsoftware.kryonet.rmi.ObjectSpace;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.simiacryptus.lang.SerializableCallable;
 import com.simiacryptus.lang.SerializableConsumer;
+import com.simiacryptus.ref.lang.RefAware;
+import com.simiacryptus.ref.wrappers.*;
 import com.simiacryptus.util.test.SysOutInterceptor;
 import com.twitter.chill.KryoInstantiator;
 import com.twitter.chill.java.Java8ClosureRegistrar;
@@ -52,7 +54,7 @@ import java.util.function.Predicate;
 
 import static com.simiacryptus.aws.EC2Util.*;
 
-public @com.simiacryptus.ref.lang.RefAware
+public @RefAware
 class Tendril {
 
   private static final Logger logger = LoggerFactory.getLogger(Tendril.class);
@@ -128,9 +130,9 @@ class Tendril {
   public static TendrilControl startRemoteJvm(final EC2Node node, final int localControlPort, final String javaOpts,
                                               final String programArguments, final String libPrefix, final String keyspace,
                                               final Predicate<String> classpathFilter, final AmazonS3 s3,
-                                              final com.simiacryptus.ref.wrappers.RefHashMap<String, String> env, final String[] bucket) {
+                                              final RefHashMap<String, String> env, final String[] bucket) {
     String localClasspath = System.getProperty("java.class.path");
-    com.simiacryptus.ref.wrappers.RefArrays.stream(new File(".").listFiles()).filter(x -> x.getName().endsWith(".json"))
+    RefArrays.stream(new File(".").listFiles()).filter(x -> x.getName().endsWith(".json"))
         .forEach(file -> {
           logger.info("Deploy " + file.getAbsoluteFile());
           node.scp(file, file.getName());
@@ -150,26 +152,26 @@ class Tendril {
 
   @Nonnull
   public static TendrilControl startLocalJvm(final int controlPort, final String javaOpts,
-                                             final com.simiacryptus.ref.wrappers.RefHashMap<String, String> env, File workingDir) {
+                                             final RefHashMap<String, String> env, File workingDir) {
     final String programArguments = "";
     File javaBin = new File(new File(System.getProperty("java.home")), "bin");
-    String javaExePath = com.simiacryptus.ref.wrappers.RefArrays.stream(javaBin.listFiles()).filter(x -> {
+    String javaExePath = RefArrays.stream(javaBin.listFiles()).filter(x -> {
       String name = x.getName();
       String[] split = name.split("\\.");
       return split[0].equals("java") && (name.endsWith("exe") || name.equals("java"));
     }).findFirst().get().getAbsolutePath();
     try {
-      com.simiacryptus.ref.wrappers.RefArrayList<String> cmd = new com.simiacryptus.ref.wrappers.RefArrayList<>(
-          com.simiacryptus.ref.wrappers.RefArrays.asList(javaExePath));
-      com.simiacryptus.ref.wrappers.RefArrays.stream(javaOpts.split(" ")).forEach(cmd::add);
-      String classpath = com.simiacryptus.ref.wrappers.RefArrays
+      RefArrayList<String> cmd = new RefArrayList<>(
+          RefArrays.asList(javaExePath));
+      RefArrays.stream(javaOpts.split(" ")).forEach(cmd::add);
+      String classpath = RefArrays
           .stream(System.getProperty("java.class.path").split(File.pathSeparator))
           .map(path -> workingDir.toURI().relativize(new File(path).toURI()).getPath())
           .reduce((a, b) -> a + File.pathSeparator + b).get();
-      cmd.addAll(com.simiacryptus.ref.wrappers.RefArrays.asList("-cp", classpath,
+      cmd.addAll(RefArrays.asList("-cp", classpath,
           //ClasspathUtil.summarizeLocalClasspath().getAbsolutePath(),
           "-DcontrolPort=" + controlPort, Tendril.class.getCanonicalName()));
-      com.simiacryptus.ref.wrappers.RefArrays.stream(programArguments.split(" ")).forEach(cmd::add);
+      RefArrays.stream(programArguments.split(" ")).forEach(cmd::add);
       logger.info("Java Environment: " + env.entrySet().stream().map(e -> e.getKey() + " = " + e.getValue())
           .reduce((a, b) -> a + "; " + b).orElse(""));
       logger.info(String.format("Java Command Line (from %s): %s", workingDir.getAbsolutePath(),
@@ -229,14 +231,14 @@ class Tendril {
     ExecutorService executorService = Executors.newFixedThreadPool(4);
     PrintStream out = SysOutInterceptor.INSTANCE.currentHandler();
     try {
-      com.simiacryptus.ref.wrappers.RefStream<String> stream = com.simiacryptus.ref.wrappers.RefArrays
+      RefStream<String> stream = RefArrays
           .stream(localClasspath.split(File.pathSeparator)).filter(classpathFilter);
       if (null != bucket && !bucket.isEmpty())
         stream = stream.parallel();
       return stream.map(entryPath -> {
         return executorService.submit(() -> {
           PrintStream prev = SysOutInterceptor.INSTANCE.setCurrentHandler(out);
-          com.simiacryptus.ref.wrappers.RefList<String> classpathEntry = stageClasspathEntry(node, libPrefix, entryPath,
+          RefList<String> classpathEntry = stageClasspathEntry(node, libPrefix, entryPath,
               s3, bucket, keyspace);
           SysOutInterceptor.INSTANCE.setCurrentHandler(prev);
           return classpathEntry.stream().reduce((a, b) -> a + ":" + b).get();
@@ -256,8 +258,8 @@ class Tendril {
   }
 
   @Nonnull
-  public static com.simiacryptus.ref.wrappers.RefList<String> stageClasspathEntry(final EC2Node node,
-                                                                                  final String libPrefix, final String entryPath, final AmazonS3 s3, final String bucket, final String keyspace) {
+  public static RefList<String> stageClasspathEntry(final EC2Node node,
+                                                    final String libPrefix, final String entryPath, final AmazonS3 s3, final String bucket, final String keyspace) {
     final File entryFile = new File(entryPath);
     try {
       if (entryFile.isFile()) {
@@ -269,10 +271,10 @@ class Tendril {
           throw new IOException(String.format("Error staging %s to %s/%s", entryFile, bucket, remote), e);
           //logger.warn(String.format("Error staging %s to %s/%s", entryFile, bucket, remote), e);
         }
-        return com.simiacryptus.ref.wrappers.RefArrays.asList(remote);
+        return RefArrays.asList(remote);
       } else {
         logger.info(String.format("Processing %s", entryPath));
-        com.simiacryptus.ref.wrappers.RefArrayList<String> list = new com.simiacryptus.ref.wrappers.RefArrayList<>();
+        RefArrayList<String> list = new RefArrayList<>();
         if (entryFile.getName().equals("classes") && entryFile.getParentFile().getName().equals("target")) {
           File javaSrc = new File(new File(new File(entryFile.getParentFile().getParentFile(), "src"), "main"), "java");
           if (javaSrc.exists())
@@ -364,18 +366,18 @@ class Tendril {
   @Nonnull
   public static TendrilControl startRemoteJvm(final EC2Node node, final JvmConfig jvmConfig, final int localControlPort,
                                               final Predicate<String> shouldTransfer, final AmazonS3 s3,
-                                              final com.simiacryptus.ref.wrappers.RefHashMap<String, String> env, final String... bucket) {
+                                              final RefHashMap<String, String> env, final String... bucket) {
     return startRemoteJvm(node, localControlPort, jvmConfig.javaOpts, jvmConfig.programArguments, jvmConfig.libPrefix,
         jvmConfig.keyspace, shouldTransfer, s3, env, bucket);
   }
 
   @Nonnull
   public static TendrilControl startLocalJvm(final JvmConfig jvmConfig, final int localControlPort,
-                                             final com.simiacryptus.ref.wrappers.RefHashMap<String, String> env) {
+                                             final RefHashMap<String, String> env) {
     return startLocalJvm(localControlPort, jvmConfig.javaOpts, env, new File("."));
   }
 
-  public @com.simiacryptus.ref.lang.RefAware
+  public @RefAware
   interface TendrilLink {
     boolean isAlive();
 
@@ -386,7 +388,7 @@ class Tendril {
     <T> T run(SerializableCallable<T> task) throws Exception;
   }
 
-  public static @com.simiacryptus.ref.lang.RefAware
+  public static @RefAware
   class JvmConfig extends NodeConfig {
     public String javaOpts;
     public String programArguments;
@@ -402,7 +404,7 @@ class Tendril {
     }
   }
 
-  protected static @com.simiacryptus.ref.lang.RefAware
+  protected static @RefAware
   class TendrilLinkImpl implements TendrilLink {
     public boolean contacted = false;
 

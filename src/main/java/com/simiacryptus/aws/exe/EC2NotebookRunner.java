@@ -32,6 +32,10 @@ import com.simiacryptus.aws.*;
 import com.simiacryptus.lang.SerializableConsumer;
 import com.simiacryptus.notebook.MarkdownNotebookOutput;
 import com.simiacryptus.notebook.NotebookOutput;
+import com.simiacryptus.ref.lang.RefAware;
+import com.simiacryptus.ref.wrappers.RefHashMap;
+import com.simiacryptus.ref.wrappers.RefMap;
+import com.simiacryptus.ref.wrappers.RefStream;
 import com.simiacryptus.util.JsonUtil;
 import com.simiacryptus.util.ReportingUtil;
 import com.simiacryptus.util.Util;
@@ -52,7 +56,7 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public @com.simiacryptus.ref.lang.RefAware
+public @RefAware
 class EC2NotebookRunner {
 
   private static final Logger logger = LoggerFactory.getLogger(EC2NotebookRunner.class);
@@ -157,7 +161,7 @@ class EC2NotebookRunner {
     try {
       log.run(() -> {
         TendrilControl tendrilControl = Tendril.startRemoteJvm(node, jvmConfig, localControlPort,
-            Tendril::defaultClasspathFilter, getS3(), new com.simiacryptus.ref.wrappers.RefHashMap<String, String>(),
+            Tendril::defaultClasspathFilter, getS3(), new RefHashMap<String, String>(),
             settings.getServiceConfig(getEc2()).bucket);
         tendrilControl.start(() -> {
           this.nodeMain();
@@ -209,7 +213,7 @@ class EC2NotebookRunner {
       log.setArchiveHome(URI.create("s3://" + s3bucket + "/reports/" + UUID.randomUUID() + "/"));
       log.onComplete(() -> {
         logFiles(log.getRoot());
-        com.simiacryptus.ref.wrappers.RefMap<File, URL> uploads = S3Util.upload(getS3(), log.getArchiveHome(),
+        RefMap<File, URL> uploads = S3Util.upload(getS3(), log.getArchiveHome(),
             log.getRoot());
         sendCompleteEmail(testName, log.getRoot(), uploads, startTime);
       });
@@ -224,7 +228,7 @@ class EC2NotebookRunner {
   }
 
   private void sendCompleteEmail(final String testName, final File workingDir,
-                                 final com.simiacryptus.ref.wrappers.RefMap<File, URL> uploads, final long startTime) {
+                                 final RefMap<File, URL> uploads, final long startTime) {
     String html = null;
     try {
       html = FileUtils.readFileToString(new File(workingDir, testName + ".html"), "UTF-8");
@@ -254,7 +258,7 @@ class EC2NotebookRunner {
     File zip = new File(workingDir, testName + ".zip");
     File pdf = new File(workingDir, testName + ".pdf");
 
-    String append = "<hr/>" + com.simiacryptus.ref.wrappers.RefStream
+    String append = "<hr/>" + RefStream
         .of(zip, pdf, new File(workingDir, testName + ".html"))
         .map(file -> String.format("<p><a href=\"%s\">%s</a></p>", uploads.get(file.getAbsoluteFile()), file.getName()))
         .reduce((a, b) -> a + b).get();

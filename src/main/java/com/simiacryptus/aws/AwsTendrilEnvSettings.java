@@ -22,6 +22,7 @@ package com.simiacryptus.aws;
 import com.amazonaws.services.ec2.AmazonEC2;
 import com.amazonaws.services.identitymanagement.model.InstanceProfile;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.simiacryptus.ref.lang.RefAware;
 import com.simiacryptus.util.JsonUtil;
 
 import javax.annotation.Nonnull;
@@ -29,7 +30,7 @@ import java.io.Serializable;
 
 import static com.simiacryptus.aws.EC2Util.sleep;
 
-public @com.simiacryptus.ref.lang.RefAware
+public @RefAware
 class AwsTendrilEnvSettings implements Serializable {
   public String securityGroup;
   public String instanceProfileArn;

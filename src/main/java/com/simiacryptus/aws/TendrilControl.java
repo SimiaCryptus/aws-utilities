@@ -19,9 +19,12 @@
 
 package com.simiacryptus.aws;
 
+import com.esotericsoftware.kryonet.rmi.TimeoutException;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.simiacryptus.lang.SerializableCallable;
 import com.simiacryptus.lang.SerializableSupplier;
+import com.simiacryptus.ref.lang.RefAware;
+import com.simiacryptus.ref.wrappers.RefHashMap;
 import com.simiacryptus.util.JsonUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,11 +35,11 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-public @com.simiacryptus.ref.lang.RefAware
+public @RefAware
 class TendrilControl implements AutoCloseable {
 
   private static final Logger logger = LoggerFactory.getLogger(TendrilControl.class);
-  private final static com.simiacryptus.ref.wrappers.RefHashMap<String, Promise> currentOperations = new com.simiacryptus.ref.wrappers.RefHashMap<String, Promise>();
+  private final static RefHashMap<String, Promise> currentOperations = new RefHashMap<String, Promise>();
   private final static ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(1,
       new ThreadFactoryBuilder().setDaemon(true).build());
   private final Tendril.TendrilLink inner;
@@ -108,7 +111,7 @@ class TendrilControl implements AutoCloseable {
     inner.exit();
   }
 
-  private @com.simiacryptus.ref.lang.RefAware
+  private @RefAware
   class PollerTask<T> implements Runnable {
     private final String taskKey;
     private final Promise<T> localPromise;
@@ -135,7 +138,7 @@ class TendrilControl implements AutoCloseable {
               failures = 0;
               return null;
             }
-          } catch (com.esotericsoftware.kryonet.rmi.TimeoutException e) {
+          } catch (TimeoutException e) {
             return null;
           }
         });

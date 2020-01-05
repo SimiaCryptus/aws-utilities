@@ -20,8 +20,9 @@
 package com.simiacryptus.aws.exe;
 
 import com.simiacryptus.aws.EC2Util;
+import com.simiacryptus.ref.lang.RefAware;
 
-public @com.simiacryptus.ref.lang.RefAware
+public @RefAware
 class EC2NodeSettings {
 
   public static final String AMI_AMAZON_DEEP_LEARNING = System.getProperty("AMI_AMAZON_DEEP_LEARNING",

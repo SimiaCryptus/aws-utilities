@@ -22,6 +22,8 @@ package com.simiacryptus.aws.exe;
 import com.simiacryptus.lang.SerializableConsumer;
 import com.simiacryptus.notebook.MarkdownNotebookOutput;
 import com.simiacryptus.notebook.NotebookOutput;
+import com.simiacryptus.ref.lang.RefAware;
+import com.simiacryptus.ref.wrappers.RefConsumer;
 import com.simiacryptus.util.Util;
 import com.simiacryptus.util.test.SysOutInterceptor;
 import org.slf4j.Logger;
@@ -29,7 +31,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 
-public @com.simiacryptus.ref.lang.RefAware
+public @RefAware
 class LocalNotebookRunner {
   private static final Logger logger = LoggerFactory.getLogger(LocalNotebookRunner.class);
 
@@ -44,8 +46,8 @@ class LocalNotebookRunner {
         .newInstance();
   }
 
-  public static void run(com.simiacryptus.ref.wrappers.RefConsumer<NotebookOutput>... fns) throws Exception {
-    for (final com.simiacryptus.ref.wrappers.RefConsumer<NotebookOutput> fn : fns) {
+  public static void run(RefConsumer<NotebookOutput>... fns) throws Exception {
+    for (final RefConsumer<NotebookOutput> fn : fns) {
       try (NotebookOutput log = new MarkdownNotebookOutput(
           new File("report/" + Util.dateStr("yyyyMMddHHmmss") + "/index"), true)) {
         fn.accept(log);

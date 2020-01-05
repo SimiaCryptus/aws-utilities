@@ -23,6 +23,8 @@ import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.*;
 import com.simiacryptus.notebook.NotebookOutput;
+import com.simiacryptus.ref.lang.RefAware;
+import com.simiacryptus.ref.wrappers.*;
 import com.simiacryptus.util.Util;
 import com.simiacryptus.util.io.TeeInputStream;
 import org.apache.commons.io.FileUtils;
@@ -39,24 +41,24 @@ import java.net.URI;
 import java.net.URL;
 import java.util.function.Supplier;
 
-public @com.simiacryptus.ref.lang.RefAware
+public @RefAware
 class S3Util {
 
   private final static Logger logger = LoggerFactory.getLogger(S3Util.class);
 
-  public static com.simiacryptus.ref.wrappers.RefMap<File, URL> upload(NotebookOutput log) {
+  public static RefMap<File, URL> upload(NotebookOutput log) {
     synchronized (log) {
       return upload(log, AmazonS3ClientBuilder.standard().withRegion(EC2Util.REGION).build());
     }
   }
 
-  public static com.simiacryptus.ref.wrappers.RefMap<File, URL> upload(NotebookOutput log, AmazonS3 s3) {
+  public static RefMap<File, URL> upload(NotebookOutput log, AmazonS3 s3) {
     try {
       log.write();
       File root = log.getRoot();
       URI archiveHome = log.getArchiveHome();
       logger.info(String.format("Files in %s to be archived in %s", root.getAbsolutePath(), archiveHome));
-      com.simiacryptus.ref.wrappers.RefHashMap<File, URL> map = new com.simiacryptus.ref.wrappers.RefHashMap<>();
+      RefHashMap<File, URL> map = new RefHashMap<>();
       if (null != archiveHome) {
         logFiles(root);
         if (null == archiveHome || (archiveHome.getScheme().startsWith("s3") && (null == archiveHome.getHost()
@@ -84,15 +86,15 @@ class S3Util {
       logger.info(String.format("File %s length %s", f.getAbsolutePath(), f.length()));
   }
 
-  public static com.simiacryptus.ref.wrappers.RefMap<File, URL> upload(final AmazonS3 s3, final URI path,
-                                                                       final File file) {
+  public static RefMap<File, URL> upload(final AmazonS3 s3, final URI path,
+                                         final File file) {
     return upload(s3, path, file, 3);
   }
 
-  public static com.simiacryptus.ref.wrappers.RefMap<File, URL> upload(final AmazonS3 s3, final URI path,
-                                                                       final File file, int retries) {
+  public static RefMap<File, URL> upload(final AmazonS3 s3, final URI path,
+                                         final File file, int retries) {
     try {
-      com.simiacryptus.ref.wrappers.RefHashMap<File, URL> map = new com.simiacryptus.ref.wrappers.RefHashMap<>();
+      RefHashMap<File, URL> map = new RefHashMap<>();
       if (!file.exists())
         throw new RuntimeException(file.toString());
       if (null == path)
@@ -146,9 +148,9 @@ class S3Util {
           String reportPath = filePath.getPath().replaceAll("//", "/").replaceAll("^/", "");
           logger.info(
               String.format("Scanning peer uploads to %s at s3 %s/%s", file.getAbsolutePath(), bucket, reportPath));
-          com.simiacryptus.ref.wrappers.RefList<S3ObjectSummary> preexistingFiles = s3
+          RefList<S3ObjectSummary> preexistingFiles = s3
               .listObjects(new ListObjectsRequest().withBucketName(bucket).withPrefix(reportPath)).getObjectSummaries()
-              .stream().collect(com.simiacryptus.ref.wrappers.RefCollectors.toList());
+              .stream().collect(RefCollectors.toList());
           for (S3ObjectSummary preexistingFile : preexistingFiles) {
             logger.info(String.format("Preexisting File: '%s' + '%s'", reportPath, preexistingFile.getKey()));
             map.put(new File(file, preexistingFile.getKey()).getAbsoluteFile(),
@@ -206,7 +208,7 @@ class S3Util {
 
   @Nonnull
   public static String defaultPolicy(final String... bucket) {
-    String bucketGrant = com.simiacryptus.ref.wrappers.RefArrays.stream(bucket)
+    String bucketGrant = RefArrays.stream(bucket)
         .map(b -> "{\n" + "      \"Action\": \"s3:*\",\n" + "      \"Effect\": \"Allow\",\n"
             + "      \"Resource\": \"arn:aws:s3:::" + b + "*\"\n" + "    }")
         .reduce((a, b) -> a + "," + b).get();

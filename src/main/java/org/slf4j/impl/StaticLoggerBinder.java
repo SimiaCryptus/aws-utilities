@@ -19,7 +19,9 @@
 
 package org.slf4j.impl;
 
-public @com.simiacryptus.ref.lang.RefAware
+import com.simiacryptus.ref.lang.RefAware;
+
+public @RefAware
 class StaticLoggerBinder {
   public String getLoggerFactoryClassStr() {
     return "do not use log4j";

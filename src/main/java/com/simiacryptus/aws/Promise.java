@@ -19,6 +19,7 @@
 
 package com.simiacryptus.aws;
 
+import com.simiacryptus.ref.lang.RefAware;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.Future;
@@ -27,7 +28,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
-public @com.simiacryptus.ref.lang.RefAware
+public @RefAware
 class Promise<T> implements Future<T> {
   public final Semaphore onReady = new Semaphore(0);
   public final AtomicReference<T> result = new AtomicReference<T>();

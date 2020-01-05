@@ -23,6 +23,9 @@ import com.amazonaws.services.simpleemail.AmazonSimpleEmailService;
 import com.amazonaws.services.simpleemail.model.RawMessage;
 import com.amazonaws.services.simpleemail.model.SendRawEmailRequest;
 import com.amazonaws.services.simpleemail.model.VerifyEmailAddressRequest;
+import com.simiacryptus.ref.lang.RefAware;
+import com.simiacryptus.ref.wrappers.RefArrays;
+import com.simiacryptus.ref.wrappers.RefStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,19 +47,19 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Properties;
 
-public @com.simiacryptus.ref.lang.RefAware
+public @RefAware
 class SESUtil {
   private static final Logger logger = LoggerFactory.getLogger(SESUtil.class);
 
   public static void send(final AmazonSimpleEmailService ses, final String subject, final String to, final String body,
                           final String html, final File... attachments) {
     try {
-      com.simiacryptus.ref.wrappers.RefStream<MimeBodyPart> attachmentStream = com.simiacryptus.ref.wrappers.RefArrays
+      RefStream<MimeBodyPart> attachmentStream = RefArrays
           .stream(attachments).filter(x -> x.exists() && x.length() < 1024 * 1024 * 4).map(SESUtil::toAttachment);
       ses.sendRawEmail(
           new SendRawEmailRequest(toRaw(getMessage(Session.getDefaultInstance(new Properties()), subject, to,
-              mix(com.simiacryptus.ref.wrappers.RefStream
-                  .concat(com.simiacryptus.ref.wrappers.RefStream.of(wrap(getEmailBody(body, html))), attachmentStream)
+              mix(RefStream
+                  .concat(RefStream.of(wrap(getEmailBody(body, html))), attachmentStream)
                   .toArray(i -> new MimeBodyPart[i]))))));
     } catch (IOException | MessagingException e) {
       throw new RuntimeException(e);

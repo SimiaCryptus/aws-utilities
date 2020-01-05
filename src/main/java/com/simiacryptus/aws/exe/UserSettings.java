@@ -19,13 +19,14 @@
 
 package com.simiacryptus.aws.exe;
 
+import com.simiacryptus.ref.lang.RefAware;
 import com.simiacryptus.util.JsonUtil;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.Scanner;
 
-public @com.simiacryptus.ref.lang.RefAware
+public @RefAware
 class UserSettings {
   public String emailAddress;
 
