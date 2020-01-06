@@ -28,6 +28,7 @@ import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.simiacryptus.notebook.MarkdownNotebookOutput;
 import com.simiacryptus.notebook.NotebookOutput;
 import com.simiacryptus.ref.lang.RefAware;
+import com.simiacryptus.ref.wrappers.RefString;
 import com.simiacryptus.util.JsonUtil;
 import com.simiacryptus.util.Util;
 import com.simiacryptus.util.test.SysOutInterceptor;
@@ -76,8 +77,8 @@ class RemoteExecutionDemo {
         //node.shell();
         try (TendrilControl remoteJvm = node.startJvm(ec2, s3, settings, localControlPort)) {
           return remoteJvm.eval(() -> {
-            String msg = String.format("Hello World! The time is %s", new Date());
-            System.out.println("Returning Value: " + msg);
+            String msg = RefString.format("Hello World! The time is %s", new Date());
+            com.simiacryptus.ref.wrappers.RefSystem.out.println("Returning Value: " + msg);
             return msg;
           });
         } catch (Exception e) {

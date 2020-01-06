@@ -37,6 +37,7 @@ import com.simiacryptus.ref.lang.RefUtil;
 import com.simiacryptus.ref.wrappers.RefHashMap;
 import com.simiacryptus.ref.wrappers.RefMap;
 import com.simiacryptus.ref.wrappers.RefStream;
+import com.simiacryptus.ref.wrappers.RefString;
 import com.simiacryptus.util.JsonUtil;
 import com.simiacryptus.util.ReportingUtil;
 import com.simiacryptus.util.Util;
@@ -124,13 +125,13 @@ class EC2NotebookRunner {
         logFiles(child);
       }
     } else {
-      logger.info(String.format("File %s length %d", f.getAbsolutePath(), f.length()));
+      logger.info(RefString.format("File %s length %d", f.getAbsolutePath(), f.length()));
     }
   }
 
   public static void run(final SerializableConsumer<NotebookOutput> consumer, final String testName) {
     try {
-      final File file = new File(String.format("report/%s_%s", testName, UUID.randomUUID().toString()));
+      final File file = new File(RefString.format("report/%s_%s", testName, UUID.randomUUID().toString()));
       try (NotebookOutput log = new MarkdownNotebookOutput(file, 1080, true, file.getName(), UUID.randomUUID())) {
         consumer.accept(log);
         logger.info("Finished worker tiledTexturePaintingPhase");
@@ -175,7 +176,7 @@ class EC2NotebookRunner {
       throw new RuntimeException(e);
     }
     try {
-      ReportingUtil.browse(new URI(String.format("http://%s:1080/", node.getStatus().getPublicIpAddress())));
+      ReportingUtil.browse(new URI(RefString.format("http://%s:1080/", node.getStatus().getPublicIpAddress())));
     } catch (IOException | URISyntaxException e) {
       logger.info("Error opening browser", e);
     }
@@ -204,13 +205,13 @@ class EC2NotebookRunner {
       }
     } finally {
       logger.warn("Exiting node worker", new RuntimeException("Stack Trace"));
-      System.exit(0);
+      com.simiacryptus.ref.wrappers.RefSystem.exit(0);
     }
   }
 
   private SerializableConsumer<NotebookOutput> notificationWrapper(final String testName,
                                                                    final SerializableConsumer<NotebookOutput> fn) {
-    long startTime = System.currentTimeMillis();
+    long startTime = com.simiacryptus.ref.wrappers.RefSystem.currentTimeMillis();
     return log -> {
       log.setArchiveHome(URI.create("s3://" + s3bucket + "/reports/" + UUID.randomUUID() + "/"));
       log.onComplete(() -> {
@@ -248,22 +249,22 @@ class EC2NotebookRunner {
       File imageFile = new File(workingDir, group).getAbsoluteFile();
       URL url = uploads.get(imageFile);
       if (null == url) {
-        logger.info(String.format("No File Found for %s, reverting to %s", imageFile, group));
+        logger.info(RefString.format("No File Found for %s, reverting to %s", imageFile, group));
         replacedHtml += "\"" + group + "\"";
       } else {
-        logger.info(String.format("Rewriting %s to %s at %s", group, imageFile, url));
+        logger.info(RefString.format("Rewriting %s to %s at %s", group, imageFile, url));
         replacedHtml += "\"" + url + "\"";
       }
       start = matcher.end();
     }
-    double durationMin = (System.currentTimeMillis() - startTime) / (1000.0 * 60);
-    String subject = String.format("%s Completed in %.3fmin", testName, durationMin);
+    double durationMin = (com.simiacryptus.ref.wrappers.RefSystem.currentTimeMillis() - startTime) / (1000.0 * 60);
+    String subject = RefString.format("%s Completed in %.3fmin", testName, durationMin);
     File zip = new File(workingDir, testName + ".zip");
     File pdf = new File(workingDir, testName + ".pdf");
 
     String append = "<hr/>" + RefStream.of(zip, pdf, new File(workingDir, testName + ".html"))
         .map(RefUtil.wrapInterface(
-            (Function<? super File, ? extends String>) file -> String
+            (Function<File, String>) file -> String
                 .format("<p><a href=\"%s\">%s</a></p>", uploads.get(file.getAbsoluteFile()), file.getName()),
             uploads == null ? null : uploads.addRef()))
         .reduce((a, b) -> a + b).get();

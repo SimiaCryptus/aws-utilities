@@ -61,7 +61,7 @@ class ClasspathUtil {
       return localClasspath.updateAndGet(f -> {
         if (f != null)
           return f;
-        String localClasspath = System.getProperty("java.class.path");
+        String localClasspath = com.simiacryptus.ref.wrappers.RefSystem.getProperty("java.class.path");
         logger.info("Java Local Classpath: " + localClasspath);
         File lib = new File("lib");
         lib.mkdirs();
@@ -104,15 +104,15 @@ class ClasspathUtil {
     try {
       if (entryFile.isFile()) {
         String remote = libPrefix + hash(entryFile) + ".jar";
-        logger.info(String.format("Staging %s via %s", entryPath, remote));
+        logger.info(RefString.format("Staging %s via %s", entryPath, remote));
         try {
           stage(entryFile, remote);
         } catch (Throwable e) {
-          logger.warn(String.format("Error staging %s to %s", entryFile, remote), e);
+          logger.warn(RefString.format("Error staging %s to %s", entryFile, remote), e);
         }
         return RefArrays.asList(remote);
       } else {
-        logger.info(String.format("Processing %s", entryPath));
+        logger.info(RefString.format("Processing %s", entryPath));
         RefArrayList<String> list = new RefArrayList<>();
         File parentFile = entryFile.getParentFile().getParentFile();
         if (entryFile.getName().equals("classes") && entryFile.getParentFile().getName().equals("target")) {
@@ -145,11 +145,11 @@ class ClasspathUtil {
     File tempJar = toJar(entryFile);
     try {
       String remote = libPrefix + hash(tempJar) + ".jar";
-      logger.info(String.format("Uploading %s to %s", tempJar, remote));
+      logger.info(RefString.format("Uploading %s to %s", tempJar, remote));
       try {
         stage(tempJar, remote);
       } catch (Throwable e) {
-        throw new RuntimeException(String.format("Error staging %s to %s", entryFile, remote), e);
+        throw new RuntimeException(RefString.format("Error staging %s to %s", entryFile, remote), e);
       }
       return remote;
     } finally {
@@ -164,7 +164,7 @@ class ClasspathUtil {
   @Nonnull
   public static File toJar(@Nonnull final File entry) throws IOException {
     File tempJar = File.createTempFile(UUID.randomUUID().toString(), ".jar").getAbsoluteFile();
-    logger.info(String.format("Archiving %s to %s", entry, tempJar));
+    logger.info(RefString.format("Archiving %s to %s", entry, tempJar));
     try (ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(tempJar))) {
       for (final File file : RefArrays.stream(entry.listFiles()).sorted().collect(RefCollectors.toList())) {
         write(zip, "", file);
@@ -219,7 +219,7 @@ class ClasspathUtil {
       RefCollection<RefList<ClasspathUtil.ClasspathEntry>> temp_04_0005 = temp_04_0004
           .values();
       temp_04_0005.stream().map(RefUtil.wrapInterface(
-          (Function<? super RefList<ClasspathUtil.ClasspathEntry>, ? extends ClasspathUtil.ClasspathEntry>) x -> {
+          (Function<RefList<ClasspathUtil.ClasspathEntry>, ClasspathUtil.ClasspathEntry>) x -> {
             if (x.size() > 1 && !x.get(0).jarEntry.isDirectory()) {
               conflicts.add(new String[]{x.stream().map(y -> new File(y.file.getName()).getName()).sorted()
                   .reduce((a, b) -> a + ", " + b).get(), x.get(0).jarEntry.getName()});
@@ -244,14 +244,14 @@ class ClasspathUtil {
             byte[] bytes = IOUtils.toByteArray(inputStream);
             inputStream.close();
             if (jarEntry.getSize() != (long) bytes.length)
-              logger.warn(String.format("Size wrong for %s: %s != %s", new File(jarEntryName).getName(),
+              logger.warn(RefString.format("Size wrong for %s: %s != %s", new File(jarEntryName).getName(),
                   jarEntry.getSize(), bytes.length));
             jarOutputStream.putNextEntry(jarEntry);
             //logger.info(String.format("Wrote file %s from %s", jarEntryName, entry.getFile().getName()));
             IOUtils.write(bytes, jarOutputStream);
           }
         } catch (Throwable e) {
-          logger.info(String.format("Error putting class %s with length %s", jarEntryName, jarEntry.getSize()), e);
+          logger.info(RefString.format("Error putting class %s with length %s", jarEntryName, jarEntry.getSize()), e);
         }
       });
       if (null != temp_04_0005)

@@ -39,7 +39,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
+import java.util.List;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 public @RefAware
 class S3Util {
@@ -57,16 +59,16 @@ class S3Util {
       log.write();
       File root = log.getRoot();
       URI archiveHome = log.getArchiveHome();
-      logger.info(String.format("Files in %s to be archived in %s", root.getAbsolutePath(), archiveHome));
+      logger.info(RefString.format("Files in %s to be archived in %s", root.getAbsolutePath(), archiveHome));
       RefHashMap<File, URL> map = new RefHashMap<>();
       if (null != archiveHome) {
         logFiles(root);
         if (null == archiveHome || (archiveHome.getScheme().startsWith("s3") && (null == archiveHome.getHost()
             || archiveHome.getHost().isEmpty() || "null".equals(archiveHome.getHost())))) {
-          logger.info(String.format("No archive destination to publish to: %s", archiveHome));
+          logger.info(RefString.format("No archive destination to publish to: %s", archiveHome));
           return map;
         }
-        logger.info(String.format("Resolved %s / %s", archiveHome, log.getName()));
+        logger.info(RefString.format("Resolved %s / %s", archiveHome, log.getName()));
         for (File file : root.listFiles()) {
           map.putAll(S3Util.upload(s3, archiveHome, file));
         }
@@ -83,7 +85,7 @@ class S3Util {
         logFiles(child);
       }
     } else
-      logger.info(String.format("File %s length %s", f.getAbsolutePath(), f.length()));
+      logger.info(RefString.format("File %s length %s", f.getAbsolutePath(), f.length()));
   }
 
   public static RefMap<File, URL> upload(final AmazonS3 s3, final URI path, final File file) {
@@ -106,7 +108,7 @@ class S3Util {
       if (file.isFile()) {
         String reportPath = path.resolve(file.getName()).getPath().replaceAll("//", "/").replaceAll("^/", "");
         if (scheme.startsWith("s3")) {
-          logger.info(String.format("Uploading file %s to s3 %s/%s", file.getAbsolutePath(), bucket, reportPath));
+          logger.info(RefString.format("Uploading file %s to s3 %s/%s", file.getAbsolutePath(), bucket, reportPath));
           boolean upload;
           try {
             ObjectMetadata existingMetadata;
@@ -116,19 +118,19 @@ class S3Util {
               existingMetadata = null;
             if (null != existingMetadata) {
               if (existingMetadata.getContentLength() != file.length()) {
-                logger.info(String.format("Removing outdated file %s/%s", bucket, reportPath));
+                logger.info(RefString.format("Removing outdated file %s/%s", bucket, reportPath));
                 s3.deleteObject(bucket, reportPath);
                 upload = true;
               } else {
-                logger.info(String.format("Existing file %s/%s", bucket, reportPath));
+                logger.info(RefString.format("Existing file %s/%s", bucket, reportPath));
                 upload = false;
               }
             } else {
-              logger.info(String.format("Not found file %s/%s", bucket, reportPath));
+              logger.info(RefString.format("Not found file %s/%s", bucket, reportPath));
               upload = true;
             }
           } catch (AmazonS3Exception e) {
-            logger.info(String.format("Error listing %s/%s", bucket, reportPath), e);
+            logger.info(RefString.format("Error listing %s/%s", bucket, reportPath), e);
             upload = true;
           }
           if (upload) {
@@ -138,7 +140,7 @@ class S3Util {
           }
         } else {
           try {
-            logger.info(String.format("Copy file %s to %s", file.getAbsolutePath(), reportPath));
+            logger.info(RefString.format("Copy file %s to %s", file.getAbsolutePath(), reportPath));
             FileUtils.copyFile(file, new File(reportPath));
           } catch (IOException e) {
             throw new RuntimeException(e);
@@ -149,23 +151,17 @@ class S3Util {
         if (scheme.startsWith("s3")) {
           String reportPath = filePath.getPath().replaceAll("//", "/").replaceAll("^/", "");
           logger.info(
-              String.format("Scanning peer uploads to %s at s3 %s/%s", file.getAbsolutePath(), bucket, reportPath));
-          RefCollectors.RefCollector<S3ObjectSummary, ?, RefList<S3ObjectSummary>> temp_07_0001 = RefCollectors
-              .toList();
-          RefList<S3ObjectSummary> preexistingFiles = s3
+              RefString.format("Scanning peer uploads to %s at s3 %s/%s", file.getAbsolutePath(), bucket, reportPath));
+          List<S3ObjectSummary> preexistingFiles = s3
               .listObjects(new ListObjectsRequest().withBucketName(bucket).withPrefix(reportPath)).getObjectSummaries()
-              .stream().collect(temp_07_0001);
-          if (null != temp_07_0001)
-            temp_07_0001.freeRef();
+              .stream().collect(Collectors.toList());
           for (S3ObjectSummary preexistingFile : preexistingFiles) {
-            logger.info(String.format("Preexisting File: '%s' + '%s'", reportPath, preexistingFile.getKey()));
+            logger.info(RefString.format("Preexisting File: '%s' + '%s'", reportPath, preexistingFile.getKey()));
             map.put(new File(file, preexistingFile.getKey()).getAbsoluteFile(),
                 s3.getUrl(bucket, reportPath + preexistingFile.getKey()));
           }
-          if (null != preexistingFiles)
-            preexistingFiles.freeRef();
         }
-        logger.info(String.format("Uploading folder %s to %s", file.getAbsolutePath(), filePath.toString()));
+        logger.info(RefString.format("Uploading folder %s to %s", file.getAbsolutePath(), filePath.toString()));
         for (File subfile : file.listFiles()) {
           map.putAll(upload(s3, filePath, subfile));
         }

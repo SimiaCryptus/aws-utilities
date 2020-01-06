@@ -54,7 +54,7 @@ class LocalNotebookRunner {
         log.setFrontMatterProperty("status", "OK");
       } finally {
         logger.warn("Exiting notebook", new RuntimeException("Stack Trace"));
-        System.exit(0);
+        com.simiacryptus.ref.wrappers.RefSystem.exit(0);
       }
     }
   }

@@ -50,7 +50,7 @@ import java.io.Serializable;
 import java.lang.invoke.SerializedLambda;
 import java.net.InetSocketAddress;
 import java.security.NoSuchAlgorithmException;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.Predicate;
 
@@ -83,13 +83,13 @@ class Tendril {
 
   public static void main(String... args) {
     try {
-      if (Boolean.parseBoolean(System.getProperty("SHUTDOWN_ON_EXIT", "true")))
+      if (Boolean.parseBoolean(com.simiacryptus.ref.wrappers.RefSystem.getProperty("SHUTDOWN_ON_EXIT", "true")))
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
           String command = "sudo shutdown -h 0";
-          System.err.println("Terminating system via command: " + command);
+          com.simiacryptus.ref.wrappers.RefSystem.err.println("Terminating system via command: " + command);
           try {
             int i = Runtime.getRuntime().exec(command).waitFor();
-            System.err.printf("Result %s for %s%n", i, command);
+            com.simiacryptus.ref.wrappers.RefSystem.err.printf("Result %s for %s%n", i, command);
           } catch (IOException e) {
             e.printStackTrace();
           } catch (InterruptedException e) {
@@ -103,7 +103,7 @@ class Tendril {
       Executors.newScheduledThreadPool(1, new ThreadFactoryBuilder().setDaemon(true).build()).schedule(() -> {
         if (!tendrilLink.contacted) {
           logger.warn("Server has not been contacted yet. Exiting.", new RuntimeException("Stack Trace"));
-          System.exit(1);
+          com.simiacryptus.ref.wrappers.RefSystem.exit(1);
         }
       }, 5, TimeUnit.MINUTES);
       objectSpace.register(1318, tendrilLink);
@@ -121,7 +121,7 @@ class Tendril {
         }
       });
       server.start();
-      server.bind(new InetSocketAddress("127.0.0.1", Integer.parseInt(System.getProperty("controlPort", "1318"))),
+      server.bind(new InetSocketAddress("127.0.0.1", Integer.parseInt(com.simiacryptus.ref.wrappers.RefSystem.getProperty("controlPort", "1318"))),
           null);
     } catch (Throwable e) {
       e.printStackTrace();
@@ -133,14 +133,14 @@ class Tendril {
                                               final String programArguments, final String libPrefix, final String keyspace,
                                               final Predicate<String> classpathFilter, final AmazonS3 s3, final RefHashMap<String, String> env,
                                               final String[] bucket) {
-    String localClasspath = System.getProperty("java.class.path");
+    String localClasspath = com.simiacryptus.ref.wrappers.RefSystem.getProperty("java.class.path");
     RefArrays.stream(new File(".").listFiles()).filter(x -> x.getName().endsWith(".json")).forEach(file -> {
       logger.info("Deploy " + file.getAbsoluteFile());
       node.scp(file, file.getName());
     });
     String remoteClasspath = stageRemoteClasspath(node, localClasspath, classpathFilter, libPrefix, true, s3, bucket[0],
         keyspace);
-    String commandLine = String.format("nohup java %s -cp %s %s %s", javaOpts, remoteClasspath,
+    String commandLine = RefString.format("nohup java %s -cp %s %s %s", javaOpts, remoteClasspath,
         Tendril.class.getCanonicalName(), programArguments);
     logger.info("Java Local Classpath: " + localClasspath);
     logger.info("Java Remote Classpath: " + remoteClasspath);
@@ -155,7 +155,7 @@ class Tendril {
     if (null != temp_05_0006)
       temp_05_0006.freeRef();
     logger.info("Java Command Line: " + commandLine);
-    execAsync(node.getConnection(), commandLine, new CloseShieldOutputStream(System.out),
+    execAsync(node.getConnection(), commandLine, new CloseShieldOutputStream(com.simiacryptus.ref.wrappers.RefSystem.out),
         RefUtil.addRef(env));
     if (null != env)
       env.freeRef();
@@ -164,43 +164,36 @@ class Tendril {
 
   @Nonnull
   public static TendrilControl startLocalJvm(final int controlPort, final String javaOpts,
-                                             final RefHashMap<String, String> env, File workingDir) {
+                                             final Map<String, String> env, File workingDir) {
     final String programArguments = "";
-    File javaBin = new File(new File(System.getProperty("java.home")), "bin");
+    File javaBin = new File(new File(com.simiacryptus.ref.wrappers.RefSystem.getProperty("java.home")), "bin");
     String javaExePath = RefArrays.stream(javaBin.listFiles()).filter(x -> {
       String name = x.getName();
       String[] split = name.split("\\.");
       return split[0].equals("java") && (name.endsWith("exe") || name.equals("java"));
     }).findFirst().get().getAbsolutePath();
     try {
-      RefArrayList<String> cmd = new RefArrayList<>(RefArrays.asList(javaExePath));
+      List<String> cmd = new ArrayList<>(Arrays.asList(javaExePath));
       RefArrays.stream(javaOpts.split(" ")).forEach(cmd::add);
-      String classpath = RefArrays.stream(System.getProperty("java.class.path").split(File.pathSeparator))
+      String classpath = RefArrays.stream(com.simiacryptus.ref.wrappers.RefSystem.getProperty("java.class.path").split(File.pathSeparator))
           .map(path -> workingDir.toURI().relativize(new File(path).toURI()).getPath())
           .reduce((a, b) -> a + File.pathSeparator + b).get();
-      cmd.addAll(RefArrays.asList("-cp", classpath,
+      cmd.addAll(Arrays.asList("-cp", classpath,
           //ClasspathUtil.summarizeLocalClasspath().getAbsolutePath(),
           "-DcontrolPort=" + controlPort, Tendril.class.getCanonicalName()));
       RefArrays.stream(programArguments.split(" ")).forEach(cmd::add);
-      RefHashSet<Map.Entry<String, String>> temp_05_0007 = env
-          .entrySet();
-      logger.info("Java Environment: " + temp_05_0007.stream().map(e -> {
+      logger.info("Java Environment: " + env
+          .entrySet().stream().map(e -> {
         String temp_05_0002 = e.getKey() + " = " + e.getValue();
         if (null != e)
           RefUtil.freeRef(e);
         return temp_05_0002;
       }).reduce((a, b) -> a + "; " + b).orElse(""));
-      if (null != temp_05_0007)
-        temp_05_0007.freeRef();
-      logger.info(String.format("Java Command Line (from %s): %s", workingDir.getAbsolutePath(),
+      logger.info(RefString.format("Java Command Line (from %s): %s", workingDir.getAbsolutePath(),
           cmd.stream().reduce((a, b) -> a + " " + b).get()));
       ProcessBuilder processBuilder = new ProcessBuilder().command(cmd).directory(workingDir).inheritIO();
-      if (null != cmd)
-        cmd.freeRef();
       processBuilder.environment().putAll(env);
       processBuilder.start();
-      if (null != env)
-        env.freeRef();
       return new TendrilControl(getControl(controlPort));
     } catch (IOException e) {
       throw new RuntimeException("Error running child jvm", e);
@@ -249,7 +242,7 @@ class Tendril {
   public static String stageRemoteClasspath(final EC2Node node, final String localClasspath,
                                             final Predicate<String> classpathFilter, final String libPrefix, final boolean parallel, final AmazonS3 s3,
                                             final String bucket, final String keyspace) {
-    logger.info(String.format("Mkdir %s: %s", libPrefix, node.exec("mkdir -p " + libPrefix)));
+    logger.info(RefString.format("Mkdir %s: %s", libPrefix, node.exec("mkdir -p " + libPrefix)));
     ExecutorService executorService = Executors.newFixedThreadPool(4);
     PrintStream out = SysOutInterceptor.INSTANCE.currentHandler();
     try {
@@ -287,16 +280,16 @@ class Tendril {
     try {
       if (entryFile.isFile()) {
         String remote = libPrefix + ClasspathUtil.hash(entryFile) + ".jar";
-        logger.info(String.format("Staging %s via %s", entryPath, remote));
+        logger.info(RefString.format("Staging %s via %s", entryPath, remote));
         try {
           stage(node, entryFile, remote, s3, bucket, keyspace);
         } catch (Throwable e) {
-          throw new IOException(String.format("Error staging %s to %s/%s", entryFile, bucket, remote), e);
+          throw new IOException(RefString.format("Error staging %s to %s/%s", entryFile, bucket, remote), e);
           //logger.warn(String.format("Error staging %s to %s/%s", entryFile, bucket, remote), e);
         }
         return RefArrays.asList(remote);
       } else {
-        logger.info(String.format("Processing %s", entryPath));
+        logger.info(RefString.format("Processing %s", entryPath));
         RefArrayList<String> list = new RefArrayList<>();
         if (entryFile.getName().equals("classes") && entryFile.getParentFile().getName().equals("target")) {
           File javaSrc = new File(new File(new File(entryFile.getParentFile().getParentFile(), "src"), "main"), "java");
@@ -330,11 +323,11 @@ class Tendril {
     File tempJar = ClasspathUtil.toJar(entryFile);
     try {
       String remote = libPrefix + ClasspathUtil.hash(tempJar) + ".jar";
-      logger.info(String.format("Uploading %s to %s", tempJar, remote));
+      logger.info(RefString.format("Uploading %s to %s", tempJar, remote));
       try {
         stage(node, tempJar, remote, s3, bucket, keyspace);
       } catch (Throwable e) {
-        throw new RuntimeException(String.format("Error staging %s to %s", entryFile, remote), e);
+        throw new RuntimeException(RefString.format("Error staging %s to %s", entryFile, remote), e);
       }
       return remote;
     } finally {
@@ -400,12 +393,9 @@ class Tendril {
 
   @Nonnull
   public static TendrilControl startLocalJvm(final JvmConfig jvmConfig, final int localControlPort,
-                                             final RefHashMap<String, String> env) {
-    TendrilControl temp_05_0005 = startLocalJvm(localControlPort, jvmConfig.javaOpts,
-        RefUtil.addRef(env), new File("."));
-    if (null != env)
-      env.freeRef();
-    return temp_05_0005;
+                                             final Map<String, String> env) {
+    return startLocalJvm(localControlPort, jvmConfig.javaOpts,
+        env, new File("."));
   }
 
   public @RefAware
@@ -453,22 +443,22 @@ class Tendril {
 
     public void exit(final int status, final int wait) {
       contacted = true;
-      logger.warn(String.format("Exiting with eval %d in %d", status, wait), new RuntimeException("Stack Trace"));
+      logger.warn(RefString.format("Exiting with eval %d in %d", status, wait), new RuntimeException("Stack Trace"));
       new Thread(() -> {
         try {
           Thread.sleep(wait);
         } catch (InterruptedException e) {
           e.printStackTrace();
         }
-        logger.warn(String.format("Exiting with eval %d in %d", status, wait), new RuntimeException("Stack Trace"));
-        System.exit(status);
+        logger.warn(RefString.format("Exiting with eval %d in %d", status, wait), new RuntimeException("Stack Trace"));
+        com.simiacryptus.ref.wrappers.RefSystem.exit(status);
       }).start();
     }
 
     @Override
     public long time() {
       contacted = true;
-      return System.currentTimeMillis();
+      return com.simiacryptus.ref.wrappers.RefSystem.currentTimeMillis();
     }
 
     @Override

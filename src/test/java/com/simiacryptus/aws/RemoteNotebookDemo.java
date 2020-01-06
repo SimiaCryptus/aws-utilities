@@ -30,6 +30,7 @@ import com.simiacryptus.notebook.MarkdownNotebookOutput;
 import com.simiacryptus.notebook.NotebookOutput;
 import com.simiacryptus.ref.lang.RefAware;
 import com.simiacryptus.ref.lang.RefUtil;
+import com.simiacryptus.ref.wrappers.RefString;
 import com.simiacryptus.util.JsonUtil;
 import com.simiacryptus.util.Util;
 import com.simiacryptus.util.test.SysOutInterceptor;
@@ -97,7 +98,7 @@ class RemoteNotebookDemo {
       });
     });
     try {
-      Desktop.getDesktop().browse(new URI(String.format("http://%s:1080/", node.getStatus().getPublicIpAddress())));
+      Desktop.getDesktop().browse(new URI(RefString.format("http://%s:1080/", node.getStatus().getPublicIpAddress())));
     } catch (IOException | URISyntaxException e) {
       logger.info("Error opening browser", e);
     }
@@ -121,7 +122,7 @@ class RemoteNotebookDemo {
       logger.info("Running worker loop " + i);
       log.run(() -> {
         try {
-          System.out.println(String.format("The time is now %s", new Date()));
+          com.simiacryptus.ref.wrappers.RefSystem.out.println(RefString.format("The time is now %s", new Date()));
           Thread.sleep(10000);
         } catch (InterruptedException e) {
           throw new RuntimeException(e);
@@ -133,7 +134,7 @@ class RemoteNotebookDemo {
 
   private void nodeMain() {
     try {
-      final File file = new File(String.format("report/%s_%s", testName, UUID.randomUUID().toString()));
+      final File file = new File(RefString.format("report/%s_%s", testName, UUID.randomUUID().toString()));
       try (MarkdownNotebookOutput log = new MarkdownNotebookOutput(file, 1080, true, file.getName(),
           UUID.randomUUID())) {
         log.setArchiveHome(URI.create("s3://" + default_bucket + "/reports/" + UUID.randomUUID() + "/"));
@@ -159,7 +160,7 @@ class RemoteNotebookDemo {
       logger.warn("Error!", e);
     } finally {
       logger.warn("Exiting node worker", new RuntimeException("Stack Trace"));
-      System.exit(0);
+      com.simiacryptus.ref.wrappers.RefSystem.exit(0);
     }
   }
 

@@ -25,6 +25,7 @@ import com.simiacryptus.lang.SerializableCallable;
 import com.simiacryptus.lang.SerializableSupplier;
 import com.simiacryptus.ref.lang.RefAware;
 import com.simiacryptus.ref.wrappers.RefHashMap;
+import com.simiacryptus.ref.wrappers.RefString;
 import com.simiacryptus.util.JsonUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,7 +83,7 @@ class TendrilControl implements AutoCloseable {
             try {
               if (null == promise)
                 throw new AssertionError();
-              logger.warn(String.format("Task Start: %s = %s", key, JsonUtil.toJson(task)));
+              logger.warn(RefString.format("Task Start: %s = %s", key, JsonUtil.toJson(task)));
               promise.set(task.get());
             } catch (Exception e) {
               logger.warn("Task Error", e);
@@ -144,10 +145,10 @@ class TendrilControl implements AutoCloseable {
         });
       } catch (Throwable e) {
         if (failures < maxRetries) {
-          logger.info(String.format("Error polling task; %s failures", failures), e);
+          logger.info(RefString.format("Error polling task; %s failures", failures), e);
           result = null;
         } else {
-          logger.warn(String.format("Error polling task; %s failures", failures), e);
+          logger.warn(RefString.format("Error polling task; %s failures", failures), e);
           throw e instanceof RuntimeException ? (RuntimeException) e : new RuntimeException(e);
         }
       }

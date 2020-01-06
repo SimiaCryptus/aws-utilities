@@ -37,6 +37,7 @@ import com.simiacryptus.ref.wrappers.RefArrays;
 import com.simiacryptus.ref.wrappers.RefHashMap;
 import com.simiacryptus.ref.wrappers.RefList;
 import com.simiacryptus.ref.wrappers.RefStream;
+import com.simiacryptus.ref.wrappers.RefString;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.CloseShieldOutputStream;
@@ -52,6 +53,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
@@ -61,7 +64,7 @@ import java.util.function.Function;
 public @RefAware
 class EC2Util {
 
-  public static final Regions REGION = Regions.fromName(System.getProperty("AWS_REGION", getCurrentRegion()));
+  public static final Regions REGION = Regions.fromName(com.simiacryptus.ref.wrappers.RefSystem.getProperty("AWS_REGION", getCurrentRegion()));
   private static final Logger logger = LoggerFactory.getLogger(EC2Util.class);
   private static final Charset charset = Charset.forName("UTF-8");
   private static final Random random = new Random();
@@ -82,11 +85,11 @@ class EC2Util {
                            final String cacheNamespace, final AmazonS3 s3) {
     String key = cacheNamespace + remote;
     if (!s3.doesObjectExist(bucket, key)) {
-      logger.info(String.format("Pushing to s3: %s/%s <= %s", bucket, key, file));
+      logger.info(RefString.format("Pushing to s3: %s/%s <= %s", bucket, key, file));
       s3.putObject(new PutObjectRequest(bucket, key, file));
     }
-    logger.debug(String.format("Pulling from s3: %s/%s", bucket, key));
-    exec(session, String.format("aws s3api get-object --bucket %s --key %s %s", bucket, key, remote));
+    logger.debug(RefString.format("Pulling from s3: %s/%s", bucket, key));
+    exec(session, RefString.format("aws s3api get-object --bucket %s --key %s %s", bucket, key, remote));
   }
 
   public static String publicHostname() {
@@ -127,11 +130,11 @@ class EC2Util {
     try {
       assert file.exists();
       ChannelExec channel = (ChannelExec) session.openChannel("exec");
-      channel.setCommand(String.format("scp -t %s", remote));
+      channel.setCommand(RefString.format("scp -t %s", remote));
       ByteArrayOutputStream out = new ByteArrayOutputStream();
       channel.setOutputStream(out);
-      channel.setExtOutputStream(new CloseShieldOutputStream(System.err));
-      String header = String.format("C0644 %d %s\n", file.length(),
+      channel.setExtOutputStream(new CloseShieldOutputStream(com.simiacryptus.ref.wrappers.RefSystem.err));
+      String header = RefString.format("C0644 %d %s\n", file.length(),
           RefArrays.stream(remote.split("/")).reduce((a, b) -> b).get());
       RefList<InputStream> temp_06_0003 = RefArrays
           .asList(new StringInputStream(header), new FileInputStream(file), new ByteArrayInputStream(new byte[]{0}));
@@ -142,7 +145,7 @@ class EC2Util {
       join((Channel) channel);
       int exitStatus = channel.getExitStatus();
       if (0 != exitStatus) {
-        String msg = String.format("Error Exit Code %d while copying %s to %s; log: %s", exitStatus, file, remote,
+        String msg = RefString.format("Error Exit Code %d while copying %s to %s; log: %s", exitStatus, file, remote,
             new String(out.toByteArray(), charset));
         logger.warn(msg);
         if (retries > 0)
@@ -161,9 +164,9 @@ class EC2Util {
   public static int shell(final Session session) {
     try {
       Channel channel = session.openChannel("shell");
-      channel.setOutputStream(new CloseShieldOutputStream(System.out));
-      channel.setExtOutputStream(new CloseShieldOutputStream(System.err));
-      channel.setInputStream(System.in);
+      channel.setOutputStream(new CloseShieldOutputStream(com.simiacryptus.ref.wrappers.RefSystem.out));
+      channel.setExtOutputStream(new CloseShieldOutputStream(com.simiacryptus.ref.wrappers.RefSystem.err));
+      channel.setInputStream(com.simiacryptus.ref.wrappers.RefSystem.in);
       channel.connect();
       join(channel);
       int exitStatus = channel.getExitStatus();
@@ -327,17 +330,17 @@ class EC2Util {
   @Nonnull
   public static Session connect(final KeyPair keyPair, final String username, final Instance ec2instance,
                                 final int localControlPort) throws InterruptedException {
-    long timeout = System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(10);
+    long timeout = com.simiacryptus.ref.wrappers.RefSystem.currentTimeMillis() + TimeUnit.MINUTES.toMillis(10);
     while (true) {
       String state = ec2instance.getState().getName();
       if (!state.equals("running"))
         throw new RuntimeException("Illegal State: " + state);
-      if (System.currentTimeMillis() > timeout)
+      if (com.simiacryptus.ref.wrappers.RefSystem.currentTimeMillis() > timeout)
         throw new RuntimeException("Timeout");
       Session session = null;
       try {
         JSch jSch = new JSch();
-        logger.info(String.format("Connecting to %s with key %s", ec2instance.getPublicIpAddress(),
+        logger.info(RefString.format("Connecting to %s with key %s", ec2instance.getPublicIpAddress(),
             keyPair.getKeyFingerprint()));
         jSch.addIdentity(username, keyPair.getKeyMaterial().getBytes(charset),
             keyPair.getKeyFingerprint().getBytes(charset), null);
@@ -373,7 +376,7 @@ class EC2Util {
   @NotNull
   public static String bucketGrantStr(String... bucket) {
     return RefArrays
-        .stream(bucket).map(b -> String.format("{\n" + "      \"Action\": \"s3:*\",\n"
+        .stream(bucket).map(b -> RefString.format("{\n" + "      \"Action\": \"s3:*\",\n"
             + "      \"Effect\": \"Allow\",\n" + "      \"Resource\": \"arn:aws:s3:::%s*\"\n" + "    }", b))
         .reduce((a, b) -> a + ", " + b).get();
   }
@@ -416,7 +419,7 @@ class EC2Util {
       instance.set(getInstance(ec2, instance.get()));
     }
     Instance info = instance.get();
-    logger.info(String.format("Instance started: %s @ http://%s:1080/ - %s", info.getInstanceId(),
+    logger.info(RefString.format("Instance started: %s @ http://%s:1080/ - %s", info.getInstanceId(),
         info.getPublicDnsName(), info));
     return info;
   }
@@ -427,13 +430,8 @@ class EC2Util {
   }
 
   public static IpPermission getTcpPermission(final int port) {
-    RefList<IpRange> temp_06_0005 = RefArrays
-        .asList(new IpRange().withCidrIp("0.0.0.0/0"));
-    IpPermission temp_06_0004 = new IpPermission().withIpv4Ranges(temp_06_0005)
+    return new IpPermission().withIpv4Ranges(Arrays.asList(new IpRange().withCidrIp("0.0.0.0/0")))
         .withIpProtocol("tcp").withFromPort(port).withToPort(port);
-    if (null != temp_06_0005)
-      temp_06_0005.freeRef();
-    return temp_06_0004;
   }
 
   @Nonnull
@@ -445,7 +443,7 @@ class EC2Util {
       String output = new String(process.getOutBuffer().toByteArray(), charset);
       int exitStatus = process.getChannel().getExitStatus();
       if (0 != exitStatus) {
-        logger.info(String.format("Exit Status: %d; Output:\n%s", exitStatus, output));
+        logger.info(RefString.format("Exit Status: %d; Output:\n%s", exitStatus, output));
         throw new AssertionError("Exit Status: " + exitStatus);
       }
       return output;
@@ -594,7 +592,7 @@ class EC2Util {
       env.forEach((k, v) -> channel.setEnv(k, v));
       if (null != env)
         env.freeRef();
-      channel.setExtOutputStream(new CloseShieldOutputStream(System.err));
+      channel.setExtOutputStream(new CloseShieldOutputStream(com.simiacryptus.ref.wrappers.RefSystem.err));
       channel.connect();
     }
 

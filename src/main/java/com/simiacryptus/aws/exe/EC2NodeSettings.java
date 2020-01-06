@@ -25,9 +25,9 @@ import com.simiacryptus.ref.lang.RefAware;
 public @RefAware
 class EC2NodeSettings {
 
-  public static final String AMI_AMAZON_DEEP_LEARNING = System.getProperty("AMI_AMAZON_DEEP_LEARNING",
+  public static final String AMI_AMAZON_DEEP_LEARNING = com.simiacryptus.ref.wrappers.RefSystem.getProperty("AMI_AMAZON_DEEP_LEARNING",
       AMI_AMAZON_DEEP_LEARNING());
-  public static final String AMI_AMAZON_LINUX = System.getProperty("AMI_AMAZON_LINUX", AMI_AMAZON_LINUX());
+  public static final String AMI_AMAZON_LINUX = com.simiacryptus.ref.wrappers.RefSystem.getProperty("AMI_AMAZON_LINUX", AMI_AMAZON_LINUX());
   public static final EC2NodeSettings P3_2XL = new EC2NodeSettings("p3.2xlarge", AMI_AMAZON_DEEP_LEARNING, "ec2-user");
   public static final EC2NodeSettings P3_8XL = new EC2NodeSettings("p3.8xlarge", AMI_AMAZON_DEEP_LEARNING, "ec2-user");
   public static final EC2NodeSettings P2_XL = new EC2NodeSettings("p2.xlarge", AMI_AMAZON_DEEP_LEARNING, "ec2-user");
