@@ -39,8 +39,7 @@ import java.io.File;
 import java.util.Date;
 import java.util.Random;
 
-public @RefAware
-class RemoteExecutionDemo {
+public class RemoteExecutionDemo {
 
   static final Logger logger = LoggerFactory.getLogger(RemoteExecutionDemo.class);
   private static final String default_bucket = "simiacryptus";

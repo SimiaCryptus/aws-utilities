@@ -28,8 +28,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
-public @RefAware
-class Promise<T> implements Future<T> {
+public class Promise<T> implements Future<T> {
   public final Semaphore onReady = new Semaphore(0);
   public final AtomicReference<T> result = new AtomicReference<T>();
 

@@ -59,8 +59,7 @@ import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public @RefAware
-class EC2NotebookRunner {
+public class EC2NotebookRunner {
 
   private static final Logger logger = LoggerFactory.getLogger(EC2NotebookRunner.class);
   public static String JAVA_OPTS = " -Xmx50g";
@@ -210,7 +209,7 @@ class EC2NotebookRunner {
   }
 
   private SerializableConsumer<NotebookOutput> notificationWrapper(final String testName,
-                                                                   final SerializableConsumer<NotebookOutput> fn) {
+      final SerializableConsumer<NotebookOutput> fn) {
     long startTime = com.simiacryptus.ref.wrappers.RefSystem.currentTimeMillis();
     return log -> {
       log.setArchiveHome(URI.create("s3://" + s3bucket + "/reports/" + UUID.randomUUID() + "/"));
@@ -232,7 +231,7 @@ class EC2NotebookRunner {
   }
 
   private void sendCompleteEmail(final String testName, final File workingDir, final RefMap<File, URL> uploads,
-                                 final long startTime) {
+      final long startTime) {
     String html = null;
     try {
       html = FileUtils.readFileToString(new File(workingDir, testName + ".html"), "UTF-8");
@@ -262,12 +261,14 @@ class EC2NotebookRunner {
     File zip = new File(workingDir, testName + ".zip");
     File pdf = new File(workingDir, testName + ".pdf");
 
-    String append = "<hr/>" + RefStream.of(zip, pdf, new File(workingDir, testName + ".html"))
-        .map(RefUtil.wrapInterface(
-            (Function<File, String>) file -> String
-                .format("<p><a href=\"%s\">%s</a></p>", uploads.get(file.getAbsoluteFile()), file.getName()),
-            uploads == null ? null : uploads.addRef()))
-        .reduce((a, b) -> a + b).get();
+    String append = "<hr/>"
+        + RefUtil.get(RefStream.of(zip, pdf, new File(workingDir, testName + ".html"))
+        .map(
+            RefUtil.wrapInterface(
+                (Function<File, String>) file -> String.format("<p><a href=\"%s\">%s</a></p>",
+                    uploads.get(file.getAbsoluteFile()), file.getName()),
+                uploads == null ? null : uploads.addRef()))
+        .reduce((a, b) -> a + b));
     if (null != uploads)
       uploads.freeRef();
     String endTag = "</body>";
@@ -276,7 +277,7 @@ class EC2NotebookRunner {
     } else {
       replacedHtml += append;
     }
-    File[] attachments = isEmailFiles() ? new File[]{zip, pdf} : new File[]{};
+    File[] attachments = isEmailFiles() ? new File[] { zip, pdf } : new File[] {};
     SESUtil.send(AmazonSimpleEmailServiceClientBuilder.defaultClient(), subject, emailAddress, replacedHtml,
         replacedHtml, attachments);
   }

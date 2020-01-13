@@ -48,8 +48,7 @@ import java.util.Date;
 import java.util.Random;
 import java.util.UUID;
 
-public @RefAware
-class RemoteNotebookDemo {
+public class RemoteNotebookDemo {
 
   static final Logger logger = LoggerFactory.getLogger(RemoteNotebookDemo.class);
   private static final String to = "acharneski+mindseye@gmail.com";

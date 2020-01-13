@@ -24,7 +24,11 @@ import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.*;
 import com.simiacryptus.notebook.NotebookOutput;
 import com.simiacryptus.ref.lang.RefAware;
-import com.simiacryptus.ref.wrappers.*;
+import com.simiacryptus.ref.lang.RefUtil;
+import com.simiacryptus.ref.wrappers.RefArrays;
+import com.simiacryptus.ref.wrappers.RefHashMap;
+import com.simiacryptus.ref.wrappers.RefMap;
+import com.simiacryptus.ref.wrappers.RefString;
 import com.simiacryptus.util.Util;
 import com.simiacryptus.util.io.TeeInputStream;
 import org.apache.commons.io.FileUtils;
@@ -43,8 +47,7 @@ import java.util.List;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-public @RefAware
-class S3Util {
+public class S3Util {
 
   private final static Logger logger = LoggerFactory.getLogger(S3Util.class);
 
@@ -212,9 +215,9 @@ class S3Util {
 
   @Nonnull
   public static String defaultPolicy(final String... bucket) {
-    String bucketGrant = RefArrays.stream(bucket).map(b -> "{\n" + "      \"Action\": \"s3:*\",\n"
+    String bucketGrant = RefUtil.get(RefArrays.stream(bucket).map(b -> "{\n" + "      \"Action\": \"s3:*\",\n"
         + "      \"Effect\": \"Allow\",\n" + "      \"Resource\": \"arn:aws:s3:::" + b + "*\"\n" + "    }")
-        .reduce((a, b) -> a + "," + b).get();
+        .reduce((a, b) -> a + "," + b));
     return "{\n" + "  \"Version\": \"2012-10-17\",\n" + "  \"Statement\": [\n" + "    " + bucketGrant + ",\n"
         + "    {\n" + "      \"Action\": \"s3:ListBucket*\",\n" + "      \"Effect\": \"Allow\",\n"
         + "      \"Resource\": \"arn:aws:s3:::*\"\n" + "    },\n" + "    {\n"

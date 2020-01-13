@@ -24,8 +24,7 @@ import com.simiacryptus.ref.lang.RefAware;
 
 import javax.annotation.Nonnull;
 
-public final @RefAware
-class AwsTendrilNodeSettings extends AwsTendrilEnvSettings {
+public final class AwsTendrilNodeSettings extends AwsTendrilEnvSettings {
   public String imageId;
   public String instanceType;
   public String username;

@@ -32,12 +32,9 @@ import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.util.StringInputStream;
 import com.jcraft.jsch.*;
 import com.simiacryptus.ref.lang.RefAware;
+import com.simiacryptus.ref.lang.RefIgnore;
 import com.simiacryptus.ref.lang.RefUtil;
-import com.simiacryptus.ref.wrappers.RefArrays;
-import com.simiacryptus.ref.wrappers.RefHashMap;
-import com.simiacryptus.ref.wrappers.RefList;
-import com.simiacryptus.ref.wrappers.RefStream;
-import com.simiacryptus.ref.wrappers.RefString;
+import com.simiacryptus.ref.wrappers.*;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.CloseShieldOutputStream;
@@ -54,17 +51,16 @@ import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
-public @RefAware
-class EC2Util {
+public class EC2Util {
 
-  public static final Regions REGION = Regions.fromName(com.simiacryptus.ref.wrappers.RefSystem.getProperty("AWS_REGION", getCurrentRegion()));
+  public static final Regions REGION = Regions
+      .fromName(com.simiacryptus.ref.wrappers.RefSystem.getProperty("AWS_REGION", getCurrentRegion()));
   private static final Logger logger = LoggerFactory.getLogger(EC2Util.class);
   private static final Charset charset = Charset.forName("UTF-8");
   private static final Random random = new Random();
@@ -82,7 +78,7 @@ class EC2Util {
   }
 
   public static void stage(final Session session, final File file, final String remote, final String bucket,
-                           final String cacheNamespace, final AmazonS3 s3) {
+      final String cacheNamespace, final AmazonS3 s3) {
     String key = cacheNamespace + remote;
     if (!s3.doesObjectExist(bucket, key)) {
       logger.info(RefString.format("Pushing to s3: %s/%s <= %s", bucket, key, file));
@@ -135,10 +131,10 @@ class EC2Util {
       channel.setOutputStream(out);
       channel.setExtOutputStream(new CloseShieldOutputStream(com.simiacryptus.ref.wrappers.RefSystem.err));
       String header = RefString.format("C0644 %d %s\n", file.length(),
-          RefArrays.stream(remote.split("/")).reduce((a, b) -> b).get());
-      RefList<InputStream> temp_06_0003 = RefArrays
-          .asList(new StringInputStream(header), new FileInputStream(file), new ByteArrayInputStream(new byte[]{0}));
-      channel.setInputStream(temp_06_0003.stream().reduce((a, b) -> new SequenceInputStream(a, b)).get());
+          RefUtil.get(RefArrays.stream(remote.split("/")).reduce((a, b) -> b)));
+      RefList<InputStream> temp_06_0003 = RefArrays.asList(new StringInputStream(header), new FileInputStream(file),
+          new ByteArrayInputStream(new byte[] { 0 }));
+      channel.setInputStream(RefUtil.get(temp_06_0003.stream().reduce((a, b) -> new SequenceInputStream(a, b))));
       if (null != temp_06_0003)
         temp_06_0003.freeRef();
       channel.connect();
@@ -186,15 +182,15 @@ class EC2Util {
   }
 
   public static <T> T run(final AmazonEC2 ec2, final String imageId, final String instanceType, final String username,
-                          Function<Session, T> task, final String bucket, final int localControlPort, final int... ports) {
+      Function<Session, T> task, final String bucket, final int localControlPort, final int... ports) {
     return start(ec2, imageId, instanceType, username, AmazonIdentityManagementClientBuilder.defaultClient(), bucket,
         localControlPort, ports).runAndTerminate(task);
   }
 
   @Nonnull
   public static EC2Node start(final AmazonEC2 ec2, final String imageId, final String instanceType,
-                              final String username, final AmazonIdentityManagement iam, final String bucket, final int localControlPort,
-                              final int... ports) {
+      final String username, final AmazonIdentityManagement iam, final String bucket, final int localControlPort,
+      final int... ports) {
     return start(ec2, imageId, instanceType, username,
         newIamRole(iam, ("{\n" + "  \"Version\": \"2012-10-17\",\n" + "  \"Statement\": [\n" + "    "
             + bucketGrantStr(bucket) + "\n" + "  ]\n" + "}").replaceAll("BUCKET", bucket)),
@@ -203,15 +199,15 @@ class EC2Util {
 
   @Nonnull
   public static EC2Node start(final AmazonEC2 ec2, final String imageId, final String instanceType,
-                              final String username, final InstanceProfile iam, final int localControlPort, final int... ports) {
+      final String username, final InstanceProfile iam, final int localControlPort, final int... ports) {
     return start(ec2, imageId, instanceType, username, getKeyPair(ec2), newSecurityGroup(ec2, ports), iam,
         localControlPort);
   }
 
   @Nullable
   public static EC2Node start(final AmazonEC2 ec2, final String imageId, final String instanceType,
-                              final String username, final KeyPair keyPair, final String groupId, final InstanceProfile instanceProfile,
-                              final int localControlPort) {
+      final String username, final KeyPair keyPair, final String groupId, final InstanceProfile instanceProfile,
+      final int localControlPort) {
     Instance instance = start(ec2, imageId, instanceType, groupId, keyPair, instanceProfile);
     try {
       return new EC2Node(ec2, connect(keyPair, username, instance, localControlPort), instance.getInstanceId());
@@ -223,8 +219,8 @@ class EC2Util {
 
   @Nullable
   public static EC2Node start(final AmazonEC2 ec2, final String imageId, final String instanceType,
-                              final String username, final KeyPair keyPair, final String groupId, final AmazonIdentityManagement iam,
-                              final String bucket) {
+      final String username, final KeyPair keyPair, final String groupId, final AmazonIdentityManagement iam,
+      final String bucket) {
     return start(ec2, imageId, instanceType, username, keyPair, groupId,
         newIamRole(iam, ("{\n" + "  \"Version\": \"2012-10-17\",\n" + "  \"Statement\": [\n" + "    "
             + bucketGrantStr(bucket) + "\n" + "  ]\n" + "}").replaceAll("BUCKET", bucket)),
@@ -329,7 +325,7 @@ class EC2Util {
 
   @Nonnull
   public static Session connect(final KeyPair keyPair, final String username, final Instance ec2instance,
-                                final int localControlPort) throws InterruptedException {
+      final int localControlPort) throws InterruptedException {
     long timeout = com.simiacryptus.ref.wrappers.RefSystem.currentTimeMillis() + TimeUnit.MINUTES.toMillis(10);
     while (true) {
       String state = ec2instance.getState().getName();
@@ -368,17 +364,17 @@ class EC2Util {
   }
 
   public static Instance start(final AmazonEC2 ec2, final String ami, final String instanceType, final String groupId,
-                               final KeyPair keyPair, final AmazonIdentityManagement iam, final String... bucket) {
+      final KeyPair keyPair, final AmazonIdentityManagement iam, final String... bucket) {
     return start(ec2, ami, instanceType, groupId, keyPair, newIamRole(iam, ("{\n" + "  \"Version\": \"2012-10-17\",\n"
         + "  \"Statement\": [\n" + "    " + bucketGrantStr(bucket) + "\n" + "  ]\n" + "}")));
   }
 
   @NotNull
   public static String bucketGrantStr(String... bucket) {
-    return RefArrays
+    return RefUtil.get(RefArrays
         .stream(bucket).map(b -> RefString.format("{\n" + "      \"Action\": \"s3:*\",\n"
             + "      \"Effect\": \"Allow\",\n" + "      \"Resource\": \"arn:aws:s3:::%s*\"\n" + "    }", b))
-        .reduce((a, b) -> a + ", " + b).get();
+        .reduce((a, b) -> a + ", " + b));
   }
 
   public static void sleep(final int millis) {
@@ -405,12 +401,12 @@ class EC2Util {
   }
 
   public static Instance start(final AmazonEC2 ec2, final String ami, final String instanceType, final String groupId,
-                               final KeyPair keyPair, final InstanceProfile instanceProfile) {
+      final KeyPair keyPair, final InstanceProfile instanceProfile) {
     final AtomicReference<Instance> instance = new AtomicReference<>();
 
     instance.set(ec2.runInstances(new RunInstancesRequest().withImageId(ami).withInstanceType(instanceType)
         .withIamInstanceProfile(new IamInstanceProfileSpecification().withArn(instanceProfile.getArn())
-            //        .withName(role.getInstanceProfileName())
+        //        .withName(role.getInstanceProfileName())
         ).withInstanceInitiatedShutdownBehavior(ShutdownBehavior.Terminate).withMinCount(1).withMaxCount(1)
         .withKeyName(keyPair.getKeyName()).withSecurityGroupIds(groupId)).getReservation().getInstances().get(0));
     while (instance.get().getState().getName().equals("pending")) {
@@ -430,8 +426,8 @@ class EC2Util {
   }
 
   public static IpPermission getTcpPermission(final int port) {
-    return new IpPermission().withIpv4Ranges(Arrays.asList(new IpRange().withCidrIp("0.0.0.0/0")))
-        .withIpProtocol("tcp").withFromPort(port).withToPort(port);
+    return new IpPermission().withIpv4Ranges(Arrays.asList(new IpRange().withCidrIp("0.0.0.0/0"))).withIpProtocol("tcp")
+        .withFromPort(port).withToPort(port);
   }
 
   @Nonnull
@@ -454,8 +450,7 @@ class EC2Util {
 
   @Nonnull
   public static Process execAsync(final Session session, final String script, RefHashMap<String, String> env) {
-    EC2Util.Process temp_06_0001 = execAsync(session, script, new ByteArrayOutputStream(),
-        RefUtil.addRef(env));
+    EC2Util.Process temp_06_0001 = execAsync(session, script, new ByteArrayOutputStream(), RefUtil.addRef(env));
     if (null != env)
       env.freeRef();
     return temp_06_0001;
@@ -463,10 +458,9 @@ class EC2Util {
 
   @Nonnull
   public static Process execAsync(final Session session, final String script, final OutputStream outBuffer,
-                                  RefHashMap<String, String> env) {
+      RefHashMap<String, String> env) {
     try {
-      EC2Util.Process temp_06_0002 = new Process(session, script, outBuffer,
-          RefUtil.addRef(RefUtil.addRef(env)));
+      EC2Util.Process temp_06_0002 = new Process(session, script, outBuffer, RefUtil.addRef(RefUtil.addRef(env)));
       if (null != env)
         env.freeRef();
       return temp_06_0002;
@@ -482,18 +476,18 @@ class EC2Util {
   }
 
   public static EC2Node start(final AmazonEC2 ec2, final NodeConfig jvmConfig, final ServiceConfig serviceConfig,
-                              final int localControlPort) {
+      final int localControlPort) {
     return start(ec2, jvmConfig.imageId, jvmConfig.instanceType, jvmConfig.username, serviceConfig.keyPair,
         serviceConfig.groupId, serviceConfig.instanceProfile, localControlPort);
   }
 
   public static AwsTendrilNodeSettings setup(AmazonEC2 ec2, final AmazonIdentityManagement iam, final AmazonS3 s3,
-                                             final String instanceType, final String imageId, final String username) {
+      final String instanceType, final String imageId, final String username) {
     return setup(ec2, iam, s3.createBucket("data-" + randomHex()).getName(), instanceType, imageId, username);
   }
 
   public static AwsTendrilNodeSettings setup(AmazonEC2 ec2, final AmazonIdentityManagement iam, final String bucket,
-                                             final String instanceType, final String imageId, final String username) {
+      final String instanceType, final String imageId, final String username) {
     return AwsTendrilEnvSettings.setup(instanceType, imageId, username, newSecurityGroup(ec2, 22, 1080, 4040, 8080),
         newIamRole(iam, S3Util.defaultPolicy(bucket)).getArn(), bucket);
   }
@@ -507,8 +501,7 @@ class EC2Util {
         newIamRole(iam, S3Util.defaultPolicy(bucket)).getArn(), bucket);
   }
 
-  public static @RefAware
-  class EC2Node implements AutoCloseable {
+  public static class EC2Node implements AutoCloseable {
     private final AmazonEC2 ec2;
     private final Session connection;
     private final String instanceId;
@@ -533,7 +526,7 @@ class EC2Util {
     }
 
     public TendrilControl startJvm(final AmazonEC2 ec2, final AmazonS3 s3, final AwsTendrilNodeSettings settings,
-                                   final int localControlPort) {
+        final int localControlPort) {
       return Tendril.startRemoteJvm(this, settings.newJvmConfig(), localControlPort, Tendril::defaultClasspathFilter,
           s3, new RefHashMap<String, String>(), settings.getServiceConfig(ec2).bucket);
     }
@@ -573,18 +566,17 @@ class EC2Util {
     }
 
     public void stage(final File entryFile, final String remote, final String bucket, final String keyspace,
-                      final AmazonS3 s3) {
+        final AmazonS3 s3) {
       EC2Util.stage(getConnection(), entryFile, remote, bucket, keyspace, s3);
     }
   }
 
-  public static @RefAware
-  class Process {
+  public static class Process {
     private final ChannelExec channel;
     private final OutputStream outBuffer;
 
     public Process(final Session session, final String script, final OutputStream outBuffer,
-                   RefHashMap<String, String> env) throws JSchException {
+        RefHashMap<String, String> env) throws JSchException {
       channel = (ChannelExec) session.openChannel("exec");
       channel.setCommand(script);
       this.outBuffer = outBuffer;
@@ -619,8 +611,7 @@ class EC2Util {
     }
   }
 
-  public static @RefAware
-  class ServiceConfig {
+  public static class ServiceConfig {
     public String[] bucket;
     public InstanceProfile instanceProfile;
     public String groupId;
@@ -635,12 +626,12 @@ class EC2Util {
     }
 
     public ServiceConfig(final AmazonEC2 ec2, final String groupId, final InstanceProfile instanceProfile,
-                         final String... bucket) {
+        final String... bucket) {
       this(groupId, instanceProfile, EC2Util.getKeyPair(ec2), bucket);
     }
 
     public ServiceConfig(final String groupId, final InstanceProfile instanceProfile, final KeyPair keyPair,
-                         final String... bucket) {
+        final String... bucket) {
       this.bucket = bucket;
       this.groupId = groupId;
       this.instanceProfile = instanceProfile;
@@ -648,8 +639,7 @@ class EC2Util {
     }
   }
 
-  public static @RefAware
-  class NodeConfig {
+  public static class NodeConfig {
     public String imageId;
     public String instanceType;
     public String username;

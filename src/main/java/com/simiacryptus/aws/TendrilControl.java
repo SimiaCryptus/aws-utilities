@@ -36,8 +36,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-public @RefAware
-class TendrilControl implements AutoCloseable {
+public class TendrilControl implements AutoCloseable {
 
   private static final Logger logger = LoggerFactory.getLogger(TendrilControl.class);
   private final static RefHashMap<String, Promise> currentOperations = new RefHashMap<String, Promise>();
@@ -112,8 +111,7 @@ class TendrilControl implements AutoCloseable {
     inner.exit();
   }
 
-  private @RefAware
-  class PollerTask<T> implements Runnable {
+  private class PollerTask<T> implements Runnable {
     private final String taskKey;
     private final Promise<T> localPromise;
     private final int maxRetries = 4;

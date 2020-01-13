@@ -30,8 +30,7 @@ import java.io.Serializable;
 
 import static com.simiacryptus.aws.EC2Util.sleep;
 
-public @RefAware
-class AwsTendrilEnvSettings implements Serializable {
+public class AwsTendrilEnvSettings implements Serializable {
   public String securityGroup;
   public String instanceProfileArn;
   public String bucket;
@@ -49,7 +48,7 @@ class AwsTendrilEnvSettings implements Serializable {
   }
 
   public static AwsTendrilNodeSettings setup(final String instanceType, final String imageId, final String username,
-                                             final String securityGroup, final String instanceProfileArn, final String bucket) {
+      final String securityGroup, final String instanceProfileArn, final String bucket) {
     AwsTendrilNodeSettings self = new AwsTendrilNodeSettings();
     self.securityGroup = securityGroup;
     self.bucket = bucket;
@@ -62,7 +61,7 @@ class AwsTendrilEnvSettings implements Serializable {
   }
 
   public static AwsTendrilEnvSettings setup(final String securityGroup, final String instanceProfileArn,
-                                            final String bucket) {
+      final String bucket) {
     AwsTendrilEnvSettings self = new AwsTendrilEnvSettings();
     self.securityGroup = securityGroup;
     self.bucket = bucket;

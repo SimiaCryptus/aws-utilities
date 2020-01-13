@@ -31,8 +31,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 
-public @RefAware
-class LocalNotebookRunner {
+public class LocalNotebookRunner {
   private static final Logger logger = LoggerFactory.getLogger(LocalNotebookRunner.class);
 
   static {

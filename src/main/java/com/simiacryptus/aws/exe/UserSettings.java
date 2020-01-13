@@ -26,8 +26,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Scanner;
 
-public @RefAware
-class UserSettings {
+public class UserSettings {
   public String emailAddress;
 
   private UserSettings() {

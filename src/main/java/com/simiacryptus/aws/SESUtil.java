@@ -47,27 +47,24 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Properties;
 
-public @RefAware
-class SESUtil {
+public class SESUtil {
   private static final Logger logger = LoggerFactory.getLogger(SESUtil.class);
 
   public static void send(final AmazonSimpleEmailService ses, final String subject, final String to, final String body,
-                          final String html, final File... attachments) {
+      final String html, final File... attachments) {
     try {
-      RefStream<MimeBodyPart> attachmentStream = RefArrays
-          .stream(attachments).filter(x -> x.exists() && x.length() < 1024 * 1024 * 4).map(SESUtil::toAttachment);
-      ses.sendRawEmail(
-          new SendRawEmailRequest(toRaw(getMessage(Session.getDefaultInstance(new Properties()), subject, to,
-              mix(RefStream
-                  .concat(RefStream.of(wrap(getEmailBody(body, html))), attachmentStream)
-                  .toArray(i -> new MimeBodyPart[i]))))));
+      RefStream<MimeBodyPart> attachmentStream = RefArrays.stream(attachments)
+          .filter(x -> x.exists() && x.length() < 1024 * 1024 * 4).map(SESUtil::toAttachment);
+      ses.sendRawEmail(new SendRawEmailRequest(toRaw(getMessage(Session.getDefaultInstance(new Properties()), subject,
+          to, mix(RefStream.concat(RefStream.of(wrap(getEmailBody(body, html))), attachmentStream)
+              .toArray(i -> new MimeBodyPart[i]))))));
     } catch (IOException | MessagingException e) {
       throw new RuntimeException(e);
     }
   }
 
   public static MimeMessage getMessage(final Session session, final String subject, final String to,
-                                       final MimeMultipart content) throws MessagingException {
+      final MimeMultipart content) throws MessagingException {
     MimeMessage message = new MimeMessage(session);
     message.setSubject(subject, "UTF-8");
     message.setFrom(new InternetAddress("acharneski@gmail.com"));
@@ -124,8 +121,7 @@ class SESUtil {
 
   public static void setup(final AmazonSimpleEmailService ses, final String emailAddress) {
     try {
-      List<String> verifiedEmailAddresses = ses.listVerifiedEmailAddresses()
-          .getVerifiedEmailAddresses();
+      List<String> verifiedEmailAddresses = ses.listVerifiedEmailAddresses().getVerifiedEmailAddresses();
       if (verifiedEmailAddresses.contains(emailAddress))
         return;
       ses.verifyEmailAddress(new VerifyEmailAddressRequest().withEmailAddress(emailAddress));
