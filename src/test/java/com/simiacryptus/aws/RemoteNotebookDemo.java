@@ -28,9 +28,9 @@ import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.simpleemail.AmazonSimpleEmailServiceClientBuilder;
 import com.simiacryptus.notebook.MarkdownNotebookOutput;
 import com.simiacryptus.notebook.NotebookOutput;
-import com.simiacryptus.ref.lang.RefAware;
 import com.simiacryptus.ref.lang.RefUtil;
 import com.simiacryptus.ref.wrappers.RefString;
+import com.simiacryptus.ref.wrappers.RefSystem;
 import com.simiacryptus.util.JsonUtil;
 import com.simiacryptus.util.Util;
 import com.simiacryptus.util.test.SysOutInterceptor;
@@ -38,6 +38,7 @@ import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
@@ -82,7 +83,7 @@ public class RemoteNotebookDemo {
     }
   }
 
-  public void launcherNotebook(final NotebookOutput log) {
+  public void launcherNotebook(@Nonnull final NotebookOutput log) {
     AwsTendrilNodeSettings settings = log.eval(() -> {
       return JsonUtil.cache(new File("settings.json"), AwsTendrilNodeSettings.class, () -> EC2Util.setup(getEc2(),
           getIam(), default_bucket, default_instanceType, default_imageId, default_username));
@@ -90,6 +91,7 @@ public class RemoteNotebookDemo {
     int localControlPort = new Random().nextInt(1024) + 1024;
     EC2Util.EC2Node node = settings.startNode(getEc2(), localControlPort);
     log.run(() -> {
+      assert node != null;
       TendrilControl tendrilControl = node.startJvm(getEc2(), getS3(), settings, localControlPort);
       tendrilControl.start(() -> {
         nodeMain();
@@ -97,8 +99,9 @@ public class RemoteNotebookDemo {
       });
     });
     try {
+      assert node != null;
       Desktop.getDesktop().browse(new URI(RefString.format("http://%s:1080/", node.getStatus().getPublicIpAddress())));
-    } catch (IOException | URISyntaxException e) {
+    } catch (@Nonnull IOException | URISyntaxException e) {
       logger.info("Error opening browser", e);
     }
     for (int i = 0; i < 100; i++) {
@@ -115,13 +118,13 @@ public class RemoteNotebookDemo {
     }
   }
 
-  public void nodeTaskNotebook(final NotebookOutput log) {
+  public void nodeTaskNotebook(@Nonnull final NotebookOutput log) {
     logger.info("Running worker process");
     for (int i = 0; i < 10; i++) {
       logger.info("Running worker loop " + i);
       log.run(() -> {
         try {
-          com.simiacryptus.ref.wrappers.RefSystem.out.println(RefString.format("The time is now %s", new Date()));
+          RefSystem.out.println(RefString.format("The time is now %s", new Date()));
           Thread.sleep(10000);
         } catch (InterruptedException e) {
           throw new RuntimeException(e);
@@ -159,7 +162,7 @@ public class RemoteNotebookDemo {
       logger.warn("Error!", e);
     } finally {
       logger.warn("Exiting node worker", new RuntimeException("Stack Trace"));
-      com.simiacryptus.ref.wrappers.RefSystem.exit(0);
+      RefSystem.exit(0);
     }
   }
 

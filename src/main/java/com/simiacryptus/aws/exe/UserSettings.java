@@ -19,7 +19,7 @@
 
 package com.simiacryptus.aws.exe;
 
-import com.simiacryptus.ref.lang.RefAware;
+import com.simiacryptus.ref.wrappers.RefSystem;
 import com.simiacryptus.util.JsonUtil;
 
 import java.io.File;
@@ -37,8 +37,8 @@ public class UserSettings {
     try {
       return JsonUtil.cache(new File("user-settings.json"), UserSettings.class, () -> {
         UserSettings userSettings = new UserSettings();
-        Scanner scanner = new Scanner(com.simiacryptus.ref.wrappers.RefSystem.in);
-        com.simiacryptus.ref.wrappers.RefSystem.out.print("Enter user email address: ");
+        Scanner scanner = new Scanner(RefSystem.in);
+        RefSystem.out.print("Enter user email address: ");
         userSettings.emailAddress = scanner.nextLine();
         return userSettings;
       });

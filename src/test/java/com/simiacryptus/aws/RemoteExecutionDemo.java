@@ -27,14 +27,15 @@ import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.simiacryptus.notebook.MarkdownNotebookOutput;
 import com.simiacryptus.notebook.NotebookOutput;
-import com.simiacryptus.ref.lang.RefAware;
 import com.simiacryptus.ref.wrappers.RefString;
+import com.simiacryptus.ref.wrappers.RefSystem;
 import com.simiacryptus.util.JsonUtil;
 import com.simiacryptus.util.Util;
 import com.simiacryptus.util.test.SysOutInterceptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import java.io.File;
 import java.util.Date;
 import java.util.Random;
@@ -59,7 +60,7 @@ public class RemoteExecutionDemo {
     }
   }
 
-  public void demo(final NotebookOutput log) {
+  public void demo(@Nonnull final NotebookOutput log) {
     AmazonEC2 ec2 = AmazonEC2ClientBuilder.standard().withRegion(EC2Util.REGION).build();
     AmazonIdentityManagement iam = AmazonIdentityManagementClientBuilder.standard().withRegion(EC2Util.REGION).build();
     AmazonS3 s3 = AmazonS3ClientBuilder.standard().withRegion(EC2Util.REGION).build();
@@ -74,10 +75,11 @@ public class RemoteExecutionDemo {
       int localControlPort = new Random().nextInt(1024) + 1024;
       try (EC2Util.EC2Node node = settings.startNode(ec2, localControlPort)) {
         //node.shell();
+        assert node != null;
         try (TendrilControl remoteJvm = node.startJvm(ec2, s3, settings, localControlPort)) {
           return remoteJvm.eval(() -> {
             String msg = RefString.format("Hello World! The time is %s", new Date());
-            com.simiacryptus.ref.wrappers.RefSystem.out.println("Returning Value: " + msg);
+            RefSystem.out.println("Returning Value: " + msg);
             return msg;
           });
         } catch (Exception e) {

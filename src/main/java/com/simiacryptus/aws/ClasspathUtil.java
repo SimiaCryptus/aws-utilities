@@ -19,7 +19,6 @@
 
 package com.simiacryptus.aws;
 
-import com.simiacryptus.ref.lang.RefAware;
 import com.simiacryptus.ref.lang.RefUtil;
 import com.simiacryptus.ref.wrappers.*;
 import com.simiacryptus.util.CodeUtil;
@@ -27,7 +26,6 @@ import com.simiacryptus.util.JsonUtil;
 import com.simiacryptus.util.test.SysOutInterceptor;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.IOUtils;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,13 +52,13 @@ public class ClasspathUtil {
   private static final Logger logger = LoggerFactory.getLogger(Tendril.class);
   private static final AtomicReference<File> localClasspath = new AtomicReference<>();
 
-  @NotNull
+  @Nonnull
   public static File summarizeLocalClasspath() {
     synchronized (localClasspath) {
       return localClasspath.updateAndGet(f -> {
         if (f != null)
           return f;
-        String localClasspath = com.simiacryptus.ref.wrappers.RefSystem.getProperty("java.class.path");
+        String localClasspath = RefSystem.getProperty("java.class.path");
         logger.info("Java Local Classpath: " + localClasspath);
         File lib = new File("lib");
         lib.mkdirs();
@@ -75,8 +73,9 @@ public class ClasspathUtil {
     }
   }
 
-  public static String stageLocalClasspath(final String localClasspath, final Predicate<String> classpathFilter,
-      final String libPrefix, final boolean parallel) {
+  @Nonnull
+  public static String stageLocalClasspath(@Nonnull final String localClasspath, @Nonnull final Predicate<String> classpathFilter,
+                                           @Nonnull final String libPrefix, final boolean parallel) {
     new File(libPrefix).mkdirs();
     RefStream<String> stream = RefArrays.stream(localClasspath.split(File.pathSeparator)).filter(classpathFilter);
     PrintStream out = SysOutInterceptor.INSTANCE.currentHandler();
@@ -87,18 +86,16 @@ public class ClasspathUtil {
       RefList<String> temp_04_0003 = RefArrays.asList(entryPath);
       RefList<String> classpathEntry = (new File(entryPath).isDirectory()) ? stageClasspathEntry(libPrefix, entryPath)
           : temp_04_0003.addRef();
-      if (null != temp_04_0003)
-        temp_04_0003.freeRef();
+      temp_04_0003.freeRef();
       SysOutInterceptor.INSTANCE.setCurrentHandler(prev);
       RefStream<String> temp_04_0001 = classpathEntry.stream();
-      if (null != classpathEntry)
-        classpathEntry.freeRef();
+      classpathEntry.freeRef();
       return temp_04_0001;
     }).reduce((a, b) -> a + ":" + b));
   }
 
   @Nonnull
-  public static RefList<String> stageClasspathEntry(final String libPrefix, final String entryPath) {
+  public static RefList<String> stageClasspathEntry(final String libPrefix, @Nonnull final String entryPath) {
     final File entryFile = new File(entryPath);
     try {
       if (entryFile.isFile()) {
@@ -139,7 +136,7 @@ public class ClasspathUtil {
   }
 
   @Nonnull
-  public static String addDir(final String libPrefix, final File entryFile)
+  public static String addDir(final String libPrefix, @Nonnull final File entryFile)
       throws IOException, NoSuchAlgorithmException {
     File tempJar = toJar(entryFile);
     try {
@@ -156,7 +153,7 @@ public class ClasspathUtil {
     }
   }
 
-  public static void stage(final File entryFile, final String remote) {
+  public static void stage(@Nonnull final File entryFile, @Nonnull final String remote) {
     Tendril.stage(entryFile, remote, 10);
   }
 
@@ -165,9 +162,11 @@ public class ClasspathUtil {
     File tempJar = File.createTempFile(UUID.randomUUID().toString(), ".jar").getAbsoluteFile();
     logger.info(RefString.format("Archiving %s to %s", entry, tempJar));
     try (ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(tempJar))) {
-      for (final File file : RefArrays.stream(entry.listFiles()).sorted().collect(RefCollectors.toList())) {
+      RefList<File> files = RefArrays.stream(entry.listFiles()).sorted().collect(RefCollectors.toList());
+      for (final File file : files) {
         write(zip, "", file);
       }
+      files.freeRef();
       zip.putNextEntry(new ZipEntry("META-INF/CodeUtil/classSourceInfo.json"));
       try (InputStream input = new ByteArrayInputStream(
           JsonUtil.toJson(RefUtil.addRef(CodeUtil.classSourceInfo)).toString().getBytes("UTF-8"))) {
@@ -182,7 +181,8 @@ public class ClasspathUtil {
     return tempJar;
   }
 
-  public static String hash(final File classpath) throws NoSuchAlgorithmException, IOException {
+  @Nonnull
+  public static String hash(@Nonnull final File classpath) throws NoSuchAlgorithmException, IOException {
     MessageDigest digest = MessageDigest.getInstance("MD5");
     InputStream fis = new FileInputStream(classpath);
     int n = 0;
@@ -196,7 +196,7 @@ public class ClasspathUtil {
     return new String(Hex.encodeHex(digest.digest()));
   }
 
-  private static void summarize(String[] jarFiles, File summary) {
+  private static void summarize(@Nonnull String[] jarFiles, @Nonnull File summary) {
     try {
       JarOutputStream jarOutputStream = new JarOutputStream(new FileOutputStream(summary));
       RefList<JarFile> files = RefArrays.stream(jarFiles).map(x -> {
@@ -218,63 +218,55 @@ public class ClasspathUtil {
       temp_04_0005.stream().map(
           RefUtil.wrapInterface((Function<RefList<ClasspathUtil.ClasspathEntry>, ClasspathUtil.ClasspathEntry>) x -> {
             if (x.size() > 1 && !x.get(0).jarEntry.isDirectory()) {
-              conflicts.add(new String[] { RefUtil.get(
+              conflicts.add(new String[]{RefUtil.get(
                   x.stream().map(y -> new File(y.file.getName()).getName()).sorted()
                       .reduce((a, b) -> a + ", " + b)
-              ), x.get(0).jarEntry.getName() });
+              ), x.get(0).jarEntry.getName()});
             }
             ClasspathUtil.ClasspathEntry temp_04_0002 = x.get(0);
-            if (null != x)
-              x.freeRef();
+            x.freeRef();
             return temp_04_0002;
-          }, conflicts == null ? null : conflicts.addRef())).filter(x -> {
-            String name = x.jarEntry.getName();
-            return !name.startsWith("java/") && !name.startsWith("sun/") && !name.toUpperCase().endsWith(".DSA")
-                && !name.toUpperCase().endsWith(".RSA");
-          }).forEach(entry -> {
-            JarEntry jarEntry = entry.getJarEntry();
-            String jarEntryName = jarEntry.getName();
-            try {
-              if (jarEntry.isDirectory()) {
-                jarOutputStream.putNextEntry(jarEntry);
-                //logger.info(String.format("Wrote directory %s from %s", jarEntryName, entry.getFile().getName()));
-              } else {
-                InputStream inputStream = entry.getFile().getInputStream(jarEntry);
-                byte[] bytes = IOUtils.toByteArray(inputStream);
-                inputStream.close();
-                if (jarEntry.getSize() != (long) bytes.length)
-                  logger.warn(RefString.format("Size wrong for %s: %s != %s", new File(jarEntryName).getName(),
-                      jarEntry.getSize(), bytes.length));
-                jarOutputStream.putNextEntry(jarEntry);
-                //logger.info(String.format("Wrote file %s from %s", jarEntryName, entry.getFile().getName()));
-                IOUtils.write(bytes, jarOutputStream);
-              }
-            } catch (Throwable e) {
-              logger.info(RefString.format("Error putting class %s with length %s", jarEntryName, jarEntry.getSize()),
-                  e);
-            }
-          });
-      if (null != temp_04_0005)
-        temp_04_0005.freeRef();
-      if (null != temp_04_0004)
-        temp_04_0004.freeRef();
+          }, conflicts.addRef())).filter(x -> {
+        String name = x.jarEntry.getName();
+        return !name.startsWith("java/") && !name.startsWith("sun/") && !name.toUpperCase().endsWith(".DSA")
+            && !name.toUpperCase().endsWith(".RSA");
+      }).forEach(entry -> {
+        JarEntry jarEntry = entry.getJarEntry();
+        String jarEntryName = jarEntry.getName();
+        try {
+          if (jarEntry.isDirectory()) {
+            jarOutputStream.putNextEntry(jarEntry);
+            //logger.info(String.format("Wrote directory %s from %s", jarEntryName, entry.getFile().getName()));
+          } else {
+            InputStream inputStream = entry.getFile().getInputStream(jarEntry);
+            byte[] bytes = IOUtils.toByteArray(inputStream);
+            inputStream.close();
+            if (jarEntry.getSize() != (long) bytes.length)
+              logger.warn(RefString.format("Size wrong for %s: %s != %s", new File(jarEntryName).getName(),
+                  jarEntry.getSize(), bytes.length));
+            jarOutputStream.putNextEntry(jarEntry);
+            //logger.info(String.format("Wrote file %s from %s", jarEntryName, entry.getFile().getName()));
+            IOUtils.write(bytes, jarOutputStream);
+          }
+        } catch (Throwable e) {
+          logger.info(RefString.format("Error putting class %s with length %s", jarEntryName, jarEntry.getSize()),
+              e);
+        }
+      });
+      temp_04_0005.freeRef();
+      temp_04_0004.freeRef();
       RefMap<String, RefList<String[]>> temp_04_0006 = conflicts.stream().collect(RefCollectors.groupingBy(y -> y[0]));
       RefSet<Map.Entry<String, RefList<String[]>>> temp_04_0007 = temp_04_0006.entrySet();
       temp_04_0007.stream().forEach(e -> {
         RefList<String[]> temp_04_0008 = e.getValue();
         logger.info("Conflict between " + e.getKey() + " for "
             + RefUtil.get(temp_04_0008.stream().map(y -> y[1]).sorted().reduce((a, b) -> a + ", " + b)));
-        if (null != temp_04_0008)
-          temp_04_0008.freeRef();
-        if (null != e)
-          RefUtil.freeRef(e);
+        temp_04_0008.freeRef();
+        RefUtil.freeRef(e);
       });
-      if (null != temp_04_0007)
-        temp_04_0007.freeRef();
-      if (null != temp_04_0006)
-        temp_04_0006.freeRef();
-      if (null != conflicts)
-        conflicts.freeRef();
+      temp_04_0007.freeRef();
+      temp_04_0006.freeRef();
+      conflicts.freeRef();
       jarOutputStream.close();
       files.forEach(x -> {
         try {
@@ -283,14 +275,13 @@ public class ClasspathUtil {
           logger.info("Error closing " + x.getName(), e);
         }
       });
-      if (null != files)
-        files.freeRef();
+      files.freeRef();
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
   }
 
-  private static void write(final ZipOutputStream zip, final String base, final File entry) throws IOException {
+  private static void write(@Nonnull final ZipOutputStream zip, final String base, @Nonnull final File entry) throws IOException {
     if (entry.isFile()) {
       zip.putNextEntry(new ZipEntry(base + entry.getName()));
       try (FileInputStream input = new FileInputStream(entry)) {
@@ -298,9 +289,11 @@ public class ClasspathUtil {
       }
       zip.closeEntry();
     } else {
-      for (final File file : RefArrays.stream(entry.listFiles()).sorted().collect(RefCollectors.toList())) {
+      RefList<File> files = RefArrays.stream(entry.listFiles()).sorted().collect(RefCollectors.toList());
+      for (final File file : files) {
         write(zip, base + entry.getName() + "/", file);
       }
+      files.freeRef();
     }
 
   }

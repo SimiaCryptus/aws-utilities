@@ -32,12 +32,8 @@ import com.simiacryptus.aws.*;
 import com.simiacryptus.lang.SerializableConsumer;
 import com.simiacryptus.notebook.MarkdownNotebookOutput;
 import com.simiacryptus.notebook.NotebookOutput;
-import com.simiacryptus.ref.lang.RefAware;
 import com.simiacryptus.ref.lang.RefUtil;
-import com.simiacryptus.ref.wrappers.RefHashMap;
-import com.simiacryptus.ref.wrappers.RefMap;
-import com.simiacryptus.ref.wrappers.RefStream;
-import com.simiacryptus.ref.wrappers.RefString;
+import com.simiacryptus.ref.wrappers.*;
 import com.simiacryptus.util.JsonUtil;
 import com.simiacryptus.util.ReportingUtil;
 import com.simiacryptus.util.Util;
@@ -47,6 +43,7 @@ import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -62,6 +59,7 @@ import java.util.regex.Pattern;
 public class EC2NotebookRunner {
 
   private static final Logger logger = LoggerFactory.getLogger(EC2NotebookRunner.class);
+  @Nonnull
   public static String JAVA_OPTS = " -Xmx50g";
 
   static {
@@ -93,12 +91,13 @@ public class EC2NotebookRunner {
     return emailFiles;
   }
 
+  @Nonnull
   public EC2NotebookRunner setEmailFiles(boolean emailFiles) {
     this.emailFiles = emailFiles;
     return this;
   }
 
-  public static void run(final SerializableConsumer<NotebookOutput>... reportTasks) throws IOException {
+  public static void run(@Nonnull final SerializableConsumer<NotebookOutput>... reportTasks) throws IOException {
     for (final SerializableConsumer<NotebookOutput> reportTask : reportTasks) {
       Tendril.getKryo().copy(reportTask);
     }
@@ -109,16 +108,16 @@ public class EC2NotebookRunner {
     }
   }
 
-  public static String getTestName(final SerializableConsumer<NotebookOutput> fn) {
+  public static String getTestName(@Nonnull final SerializableConsumer<NotebookOutput> fn) {
     String name = fn.getClass().getCanonicalName();
     if (null == name || name.isEmpty())
       name = fn.getClass().getSimpleName();
-    if (null == name || name.isEmpty())
+    if (name.isEmpty())
       name = "index";
     return name;
   }
 
-  public static void logFiles(final File f) {
+  public static void logFiles(@Nonnull final File f) {
     if (f.isDirectory()) {
       for (final File child : f.listFiles()) {
         logFiles(child);
@@ -128,7 +127,7 @@ public class EC2NotebookRunner {
     }
   }
 
-  public static void run(final SerializableConsumer<NotebookOutput> consumer, final String testName) {
+  public static void run(@Nonnull final SerializableConsumer<NotebookOutput> consumer, final String testName) {
     try {
       final File file = new File(RefString.format("report/%s_%s", testName, UUID.randomUUID().toString()));
       try (NotebookOutput log = new MarkdownNotebookOutput(file, 1080, true, file.getName(), UUID.randomUUID())) {
@@ -142,7 +141,7 @@ public class EC2NotebookRunner {
     }
   }
 
-  public void launchNotebook(final NotebookOutput log) {
+  public void launchNotebook(@Nonnull final NotebookOutput log) {
     AwsTendrilNodeSettings settings = log.eval(() -> {
       EC2NodeSettings nodeSettings = EC2NodeSettings.P3_2XL;
 
@@ -162,6 +161,7 @@ public class EC2NotebookRunner {
     EC2Util.EC2Node node = settings.startNode(getEc2(), localControlPort);
     try {
       log.run(() -> {
+        assert node != null;
         TendrilControl tendrilControl = Tendril.startRemoteJvm(node, jvmConfig, localControlPort,
             Tendril::defaultClasspathFilter, getS3(), new RefHashMap<String, String>(),
             settings.getServiceConfig(getEc2()).bucket);
@@ -171,12 +171,14 @@ public class EC2NotebookRunner {
         });
       });
     } catch (Throwable e) {
+      assert node != null;
       node.close();
       throw new RuntimeException(e);
     }
     try {
+      assert node != null;
       ReportingUtil.browse(new URI(RefString.format("http://%s:1080/", node.getStatus().getPublicIpAddress())));
-    } catch (IOException | URISyntaxException e) {
+    } catch (@Nonnull IOException | URISyntaxException e) {
       logger.info("Error opening browser", e);
     }
     while ("running".equals(getStatus(log, node)))
@@ -187,7 +189,7 @@ public class EC2NotebookRunner {
       }
   }
 
-  public String getStatus(final NotebookOutput log, final EC2Util.EC2Node node) {
+  public String getStatus(@Nonnull final NotebookOutput log, @Nonnull final EC2Util.EC2Node node) {
     try {
       return log.eval(() -> {
         return node.getStatus().getState().getName();
@@ -204,25 +206,25 @@ public class EC2NotebookRunner {
       }
     } finally {
       logger.warn("Exiting node worker", new RuntimeException("Stack Trace"));
-      com.simiacryptus.ref.wrappers.RefSystem.exit(0);
+      RefSystem.exit(0);
     }
   }
 
+  @Nonnull
   private SerializableConsumer<NotebookOutput> notificationWrapper(final String testName,
-      final SerializableConsumer<NotebookOutput> fn) {
-    long startTime = com.simiacryptus.ref.wrappers.RefSystem.currentTimeMillis();
+                                                                   @Nonnull final SerializableConsumer<NotebookOutput> fn) {
+    long startTime = RefSystem.currentTimeMillis();
     return log -> {
       log.setArchiveHome(URI.create("s3://" + s3bucket + "/reports/" + UUID.randomUUID() + "/"));
       log.onComplete(() -> {
         logFiles(log.getRoot());
         RefMap<File, URL> uploads = S3Util.upload(getS3(), log.getArchiveHome(), log.getRoot());
-        sendCompleteEmail(testName, log.getRoot(), uploads == null ? null : uploads.addRef(), startTime);
-        if (null != uploads)
-          uploads.freeRef();
+        sendCompleteEmail(testName, log.getRoot(), uploads.addRef(), startTime);
+        uploads.freeRef();
       });
       try {
         sendStartEmail(testName, fn);
-      } catch (IOException | URISyntaxException e) {
+      } catch (@Nonnull IOException | URISyntaxException e) {
         throw new RuntimeException(e);
       }
       fn.accept(log);
@@ -230,8 +232,8 @@ public class EC2NotebookRunner {
     };
   }
 
-  private void sendCompleteEmail(final String testName, final File workingDir, final RefMap<File, URL> uploads,
-      final long startTime) {
+  private void sendCompleteEmail(final String testName, final File workingDir, @Nonnull final RefMap<File, URL> uploads,
+                                 final long startTime) {
     String html = null;
     try {
       html = FileUtils.readFileToString(new File(workingDir, testName + ".html"), "UTF-8");
@@ -256,7 +258,7 @@ public class EC2NotebookRunner {
       }
       start = matcher.end();
     }
-    double durationMin = (com.simiacryptus.ref.wrappers.RefSystem.currentTimeMillis() - startTime) / (1000.0 * 60);
+    double durationMin = (RefSystem.currentTimeMillis() - startTime) / (1000.0 * 60);
     String subject = RefString.format("%s Completed in %.3fmin", testName, durationMin);
     File zip = new File(workingDir, testName + ".zip");
     File pdf = new File(workingDir, testName + ".pdf");
@@ -267,17 +269,16 @@ public class EC2NotebookRunner {
             RefUtil.wrapInterface(
                 (Function<File, String>) file -> String.format("<p><a href=\"%s\">%s</a></p>",
                     uploads.get(file.getAbsoluteFile()), file.getName()),
-                uploads == null ? null : uploads.addRef()))
+                uploads.addRef()))
         .reduce((a, b) -> a + b));
-    if (null != uploads)
-      uploads.freeRef();
+    uploads.freeRef();
     String endTag = "</body>";
     if (replacedHtml.contains(endTag)) {
       replacedHtml.replace(endTag, append + endTag);
     } else {
       replacedHtml += append;
     }
-    File[] attachments = isEmailFiles() ? new File[] { zip, pdf } : new File[] {};
+    File[] attachments = isEmailFiles() ? new File[]{zip, pdf} : new File[]{};
     SESUtil.send(AmazonSimpleEmailServiceClientBuilder.defaultClient(), subject, emailAddress, replacedHtml,
         replacedHtml, attachments);
   }

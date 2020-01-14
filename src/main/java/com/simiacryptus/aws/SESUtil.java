@@ -23,7 +23,6 @@ import com.amazonaws.services.simpleemail.AmazonSimpleEmailService;
 import com.amazonaws.services.simpleemail.model.RawMessage;
 import com.amazonaws.services.simpleemail.model.SendRawEmailRequest;
 import com.amazonaws.services.simpleemail.model.VerifyEmailAddressRequest;
-import com.simiacryptus.ref.lang.RefAware;
 import com.simiacryptus.ref.wrappers.RefArrays;
 import com.simiacryptus.ref.wrappers.RefStream;
 import org.slf4j.Logger;
@@ -50,21 +49,22 @@ import java.util.Properties;
 public class SESUtil {
   private static final Logger logger = LoggerFactory.getLogger(SESUtil.class);
 
-  public static void send(final AmazonSimpleEmailService ses, final String subject, final String to, final String body,
-      final String html, final File... attachments) {
+  public static void send(@Nonnull final AmazonSimpleEmailService ses, final String subject, @Nonnull final String to, final String body,
+                          @Nonnull final String html, @Nonnull final File... attachments) {
     try {
       RefStream<MimeBodyPart> attachmentStream = RefArrays.stream(attachments)
           .filter(x -> x.exists() && x.length() < 1024 * 1024 * 4).map(SESUtil::toAttachment);
       ses.sendRawEmail(new SendRawEmailRequest(toRaw(getMessage(Session.getDefaultInstance(new Properties()), subject,
           to, mix(RefStream.concat(RefStream.of(wrap(getEmailBody(body, html))), attachmentStream)
               .toArray(i -> new MimeBodyPart[i]))))));
-    } catch (IOException | MessagingException e) {
+    } catch (@Nonnull IOException | MessagingException e) {
       throw new RuntimeException(e);
     }
   }
 
-  public static MimeMessage getMessage(final Session session, final String subject, final String to,
-      final MimeMultipart content) throws MessagingException {
+  @Nonnull
+  public static MimeMessage getMessage(final Session session, final String subject, @Nonnull final String to,
+                                       @Nonnull final MimeMultipart content) throws MessagingException {
     MimeMessage message = new MimeMessage(session);
     message.setSubject(subject, "UTF-8");
     message.setFrom(new InternetAddress("acharneski@gmail.com"));
@@ -73,7 +73,8 @@ public class SESUtil {
     return message;
   }
 
-  public static MimeMultipart getEmailBody(final String body, final String html) throws MessagingException {
+  @Nonnull
+  public static MimeMultipart getEmailBody(final String body, @Nonnull final String html) throws MessagingException {
     MimeMultipart multipart = new MimeMultipart("alternative");
     MimeBodyPart textPart = new MimeBodyPart();
     textPart.setContent(body, "text/plain; charset=UTF-8");
@@ -87,13 +88,14 @@ public class SESUtil {
   }
 
   @Nonnull
-  public static RawMessage toRaw(final MimeMessage message) throws IOException, MessagingException {
+  public static RawMessage toRaw(@Nonnull final MimeMessage message) throws IOException, MessagingException {
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
     message.writeTo(outputStream);
     return new RawMessage(ByteBuffer.wrap(outputStream.toByteArray()));
   }
 
-  public static MimeMultipart mix(final MimeBodyPart... parts) throws MessagingException {
+  @Nonnull
+  public static MimeMultipart mix(@Nonnull final MimeBodyPart... parts) throws MessagingException {
     MimeMultipart multipart = new MimeMultipart("mixed");
     for (final MimeBodyPart part : parts) {
       multipart.addBodyPart(part);
@@ -101,12 +103,14 @@ public class SESUtil {
     return multipart;
   }
 
-  public static MimeBodyPart wrap(final MimeMultipart content) throws MessagingException {
+  @Nonnull
+  public static MimeBodyPart wrap(@Nonnull final MimeMultipart content) throws MessagingException {
     MimeBodyPart mimeBodyPart = new MimeBodyPart();
     mimeBodyPart.setContent(content);
     return mimeBodyPart;
   }
 
+  @Nonnull
   public static MimeBodyPart toAttachment(final File attachment) {
     MimeBodyPart att = new MimeBodyPart();
     DataSource fds = new FileDataSource(attachment);
@@ -119,7 +123,7 @@ public class SESUtil {
     return att;
   }
 
-  public static void setup(final AmazonSimpleEmailService ses, final String emailAddress) {
+  public static void setup(@Nonnull final AmazonSimpleEmailService ses, final String emailAddress) {
     try {
       List<String> verifiedEmailAddresses = ses.listVerifiedEmailAddresses().getVerifiedEmailAddresses();
       if (verifiedEmailAddresses.contains(emailAddress))

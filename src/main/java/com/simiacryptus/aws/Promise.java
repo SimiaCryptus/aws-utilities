@@ -19,9 +19,7 @@
 
 package com.simiacryptus.aws;
 
-import com.simiacryptus.ref.lang.RefAware;
-import org.jetbrains.annotations.NotNull;
-
+import javax.annotation.Nonnull;
 import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -65,7 +63,7 @@ public class Promise<T> implements Future<T> {
   }
 
   @Override
-  public T get(long timeout, @NotNull TimeUnit unit) throws InterruptedException, TimeoutException {
+  public T get(long timeout, @Nonnull TimeUnit unit) throws InterruptedException, TimeoutException {
     if (onReady.tryAcquire(timeout, unit)) {
       onReady.release();
       return result.get();

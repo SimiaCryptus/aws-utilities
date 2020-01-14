@@ -23,7 +23,6 @@ import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.*;
 import com.simiacryptus.notebook.NotebookOutput;
-import com.simiacryptus.ref.lang.RefAware;
 import com.simiacryptus.ref.lang.RefUtil;
 import com.simiacryptus.ref.wrappers.RefArrays;
 import com.simiacryptus.ref.wrappers.RefHashMap;
@@ -32,11 +31,11 @@ import com.simiacryptus.ref.wrappers.RefString;
 import com.simiacryptus.util.Util;
 import com.simiacryptus.util.io.TeeInputStream;
 import org.apache.commons.io.FileUtils;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -51,13 +50,15 @@ public class S3Util {
 
   private final static Logger logger = LoggerFactory.getLogger(S3Util.class);
 
-  public static RefMap<File, URL> upload(NotebookOutput log) {
+  @Nonnull
+  public static RefMap<File, URL> upload(@Nonnull NotebookOutput log) {
     synchronized (log) {
       return upload(log, AmazonS3ClientBuilder.standard().withRegion(EC2Util.REGION).build());
     }
   }
 
-  public static RefMap<File, URL> upload(NotebookOutput log, AmazonS3 s3) {
+  @Nonnull
+  public static RefMap<File, URL> upload(@Nonnull NotebookOutput log, @Nonnull AmazonS3 s3) {
     try {
       log.write();
       File root = log.getRoot();
@@ -66,8 +67,7 @@ public class S3Util {
       RefHashMap<File, URL> map = new RefHashMap<>();
       if (null != archiveHome) {
         logFiles(root);
-        if (null == archiveHome || (archiveHome.getScheme().startsWith("s3") && (null == archiveHome.getHost()
-            || archiveHome.getHost().isEmpty() || "null".equals(archiveHome.getHost())))) {
+        if (archiveHome.getScheme().startsWith("s3") && (null == archiveHome.getHost() || archiveHome.getHost().isEmpty() || "null".equals(archiveHome.getHost()))) {
           logger.info(RefString.format("No archive destination to publish to: %s", archiveHome));
           return map;
         }
@@ -82,7 +82,7 @@ public class S3Util {
     }
   }
 
-  public static void logFiles(File f) {
+  public static void logFiles(@Nonnull File f) {
     if (f.isDirectory()) {
       for (File child : f.listFiles()) {
         logFiles(child);
@@ -91,16 +91,17 @@ public class S3Util {
       logger.info(RefString.format("File %s length %s", f.getAbsolutePath(), f.length()));
   }
 
-  public static RefMap<File, URL> upload(final AmazonS3 s3, final URI path, final File file) {
+  @Nonnull
+  public static RefMap<File, URL> upload(@Nonnull final AmazonS3 s3, final URI path, @Nonnull final File file) {
     return upload(s3, path, file, 3);
   }
 
-  public static RefMap<File, URL> upload(final AmazonS3 s3, final URI path, final File file, int retries) {
+  @Nonnull
+  public static RefMap<File, URL> upload(@Nonnull final AmazonS3 s3, @Nullable final URI path, @Nonnull final File file, int retries) {
     try {
       RefHashMap<File, URL> map = new RefHashMap<>();
       if (!file.exists()) {
-        if (null != map)
-          map.freeRef();
+        map.freeRef();
         throw new RuntimeException(file.toString());
       }
       if (null == path) {
@@ -178,11 +179,11 @@ public class S3Util {
     }
   }
 
-  public static InputStream cache(final AmazonS3 s3, final URI cacheLocation, URI resourceLocation) {
+  public static InputStream cache(@Nonnull final AmazonS3 s3, @Nonnull final URI cacheLocation, @Nonnull URI resourceLocation) {
     return cache(s3, cacheLocation, tempFile(cacheLocation), Util.getStreamSupplier(resourceLocation));
   }
 
-  public static InputStream cache(AmazonS3 s3, URI s3File, File localFile, Supplier<InputStream> streamSupplier) {
+  public static InputStream cache(@Nonnull AmazonS3 s3, @Nonnull URI s3File, @Nonnull File localFile, @Nonnull Supplier<InputStream> streamSupplier) {
     final String path = s3File.getPath().replaceAll("^/", "");
     if (s3.doesObjectExist(s3File.getHost(), path)) {
       return s3.getObject(s3File.getHost(), path).getObjectContent();
@@ -202,8 +203,8 @@ public class S3Util {
     }
   }
 
-  @NotNull
-  public static File tempFile(URI file) {
+  @Nonnull
+  public static File tempFile(@Nonnull URI file) {
     File localFile;
     try {
       localFile = File.createTempFile(file.getPath(), "data");
@@ -214,7 +215,7 @@ public class S3Util {
   }
 
   @Nonnull
-  public static String defaultPolicy(final String... bucket) {
+  public static String defaultPolicy(@Nonnull final String... bucket) {
     String bucketGrant = RefUtil.get(RefArrays.stream(bucket).map(b -> "{\n" + "      \"Action\": \"s3:*\",\n"
         + "      \"Effect\": \"Allow\",\n" + "      \"Resource\": \"arn:aws:s3:::" + b + "*\"\n" + "    }")
         .reduce((a, b) -> a + "," + b));

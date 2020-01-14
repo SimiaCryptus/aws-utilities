@@ -20,9 +20,9 @@
 package com.simiacryptus.aws;
 
 import com.amazonaws.services.ec2.AmazonEC2;
-import com.simiacryptus.ref.lang.RefAware;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 public final class AwsTendrilNodeSettings extends AwsTendrilEnvSettings {
   public String imageId;
@@ -37,7 +37,7 @@ public final class AwsTendrilNodeSettings extends AwsTendrilEnvSettings {
     super(securityGroup, instanceProfileArn, bucket);
   }
 
-  public AwsTendrilNodeSettings(AwsTendrilEnvSettings parent) {
+  public AwsTendrilNodeSettings(@Nonnull AwsTendrilEnvSettings parent) {
     super(parent.securityGroup, parent.instanceProfileArn, parent.bucket);
   }
 
@@ -46,7 +46,8 @@ public final class AwsTendrilNodeSettings extends AwsTendrilEnvSettings {
     return new Tendril.JvmConfig(this.imageId, this.instanceType, this.username);
   }
 
-  public EC2Util.EC2Node startNode(final AmazonEC2 ec2, final int localControlPort) {
+  @Nullable
+  public EC2Util.EC2Node startNode(@Nonnull final AmazonEC2 ec2, final int localControlPort) {
     return EC2Util.start(ec2, newJvmConfig(), getServiceConfig(ec2), localControlPort);
   }
 

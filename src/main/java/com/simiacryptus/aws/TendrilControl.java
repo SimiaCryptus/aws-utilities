@@ -23,13 +23,13 @@ import com.esotericsoftware.kryonet.rmi.TimeoutException;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.simiacryptus.lang.SerializableCallable;
 import com.simiacryptus.lang.SerializableSupplier;
-import com.simiacryptus.ref.lang.RefAware;
 import com.simiacryptus.ref.wrappers.RefHashMap;
 import com.simiacryptus.ref.wrappers.RefString;
 import com.simiacryptus.util.JsonUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -57,11 +57,13 @@ public class TendrilControl implements AutoCloseable {
     return inner.run(task);
   }
 
+  @Nullable
   public <T> Future<T> start(SerializableSupplier<T> task) {
     return start(task, 10, UUID.randomUUID().toString());
   }
 
-  public <T> Future<T> start(SerializableSupplier<T> task, int retries, String key) {
+  @Nullable
+  public <T> Future<T> start(@Nullable SerializableSupplier<T> task, int retries, String key) {
     if (null == task)
       return null;
     assert inner.isAlive();
@@ -80,8 +82,6 @@ public class TendrilControl implements AutoCloseable {
         if (run)
           new Thread(() -> {
             try {
-              if (null == promise)
-                throw new AssertionError();
               logger.warn(RefString.format("Task Start: %s = %s", key, JsonUtil.toJson(task)));
               promise.set(task.get());
             } catch (Exception e) {
@@ -129,6 +129,7 @@ public class TendrilControl implements AutoCloseable {
         result = inner.run(() -> {
           try {
             Promise promise = currentOperations.get(taskKey);
+            assert promise != null;
             if (promise.isDone()) {
               Object o = promise.get();
               failures = 0;

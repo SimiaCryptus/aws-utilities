@@ -22,7 +22,6 @@ package com.simiacryptus.aws;
 import com.amazonaws.services.ec2.AmazonEC2;
 import com.amazonaws.services.identitymanagement.model.InstanceProfile;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.simiacryptus.ref.lang.RefAware;
 import com.simiacryptus.util.JsonUtil;
 
 import javax.annotation.Nonnull;
@@ -47,8 +46,9 @@ public class AwsTendrilEnvSettings implements Serializable {
     this.bucket = "";
   }
 
+  @Nonnull
   public static AwsTendrilNodeSettings setup(final String instanceType, final String imageId, final String username,
-      final String securityGroup, final String instanceProfileArn, final String bucket) {
+                                             final String securityGroup, final String instanceProfileArn, final String bucket) {
     AwsTendrilNodeSettings self = new AwsTendrilNodeSettings();
     self.securityGroup = securityGroup;
     self.bucket = bucket;
@@ -60,8 +60,9 @@ public class AwsTendrilEnvSettings implements Serializable {
     return self;
   }
 
+  @Nonnull
   public static AwsTendrilEnvSettings setup(final String securityGroup, final String instanceProfileArn,
-      final String bucket) {
+                                            final String bucket) {
     AwsTendrilEnvSettings self = new AwsTendrilEnvSettings();
     self.securityGroup = securityGroup;
     self.bucket = bucket;
@@ -70,6 +71,7 @@ public class AwsTendrilEnvSettings implements Serializable {
     return self;
   }
 
+  @Nonnull
   @Override
   public String toString() {
     return JsonUtil.toJson(this).toString();
@@ -77,7 +79,7 @@ public class AwsTendrilEnvSettings implements Serializable {
 
   @Nonnull
   @JsonIgnore
-  public EC2Util.ServiceConfig getServiceConfig(final AmazonEC2 ec2) {
+  public EC2Util.ServiceConfig getServiceConfig(@Nonnull final AmazonEC2 ec2) {
     return new EC2Util.ServiceConfig(ec2, this.securityGroup, new InstanceProfile().withArn(this.instanceProfileArn),
         this.bucket);
   }

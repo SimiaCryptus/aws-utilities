@@ -22,13 +22,14 @@ package com.simiacryptus.aws.exe;
 import com.simiacryptus.lang.SerializableConsumer;
 import com.simiacryptus.notebook.MarkdownNotebookOutput;
 import com.simiacryptus.notebook.NotebookOutput;
-import com.simiacryptus.ref.lang.RefAware;
 import com.simiacryptus.ref.wrappers.RefConsumer;
+import com.simiacryptus.ref.wrappers.RefSystem;
 import com.simiacryptus.util.Util;
 import com.simiacryptus.util.test.SysOutInterceptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import java.io.File;
 
 public class LocalNotebookRunner {
@@ -38,14 +39,15 @@ public class LocalNotebookRunner {
     SysOutInterceptor.INSTANCE.init();
   }
 
+  @Nonnull
   public static <T extends SerializableConsumer> SerializableConsumer<NotebookOutput> getTask(
-      final Class<T> defaultClass, final String... args)
+      final Class<T> defaultClass, @Nonnull final String... args)
       throws InstantiationException, IllegalAccessException, ClassNotFoundException {
     return (SerializableConsumer<NotebookOutput>) (args.length == 0 ? defaultClass : Class.forName(args[0]))
         .newInstance();
   }
 
-  public static void run(RefConsumer<NotebookOutput>... fns) throws Exception {
+  public static void run(@Nonnull RefConsumer<NotebookOutput>... fns) throws Exception {
     for (final RefConsumer<NotebookOutput> fn : fns) {
       try (NotebookOutput log = new MarkdownNotebookOutput(
           new File("report/" + Util.dateStr("yyyyMMddHHmmss") + "/index"), true)) {
@@ -53,7 +55,7 @@ public class LocalNotebookRunner {
         log.setFrontMatterProperty("status", "OK");
       } finally {
         logger.warn("Exiting notebook", new RuntimeException("Stack Trace"));
-        com.simiacryptus.ref.wrappers.RefSystem.exit(0);
+        RefSystem.exit(0);
       }
     }
   }
