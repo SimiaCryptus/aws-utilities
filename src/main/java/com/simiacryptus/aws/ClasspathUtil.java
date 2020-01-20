@@ -163,9 +163,13 @@ public class ClasspathUtil {
     logger.info(RefString.format("Archiving %s to %s", entry, tempJar));
     try (ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(tempJar))) {
       RefList<File> files = RefArrays.stream(entry.listFiles()).sorted().collect(RefCollectors.toList());
-      for (final File file : files) {
-        write(zip, "", file);
-      }
+      files.forEach(file -> {
+        try {
+          write(zip, "", file);
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      });
       files.freeRef();
       zip.putNextEntry(new ZipEntry("META-INF/CodeUtil/classSourceInfo.json"));
       try (InputStream input = new ByteArrayInputStream(
@@ -290,12 +294,15 @@ public class ClasspathUtil {
       zip.closeEntry();
     } else {
       RefList<File> files = RefArrays.stream(entry.listFiles()).sorted().collect(RefCollectors.toList());
-      for (final File file : files) {
-        write(zip, base + entry.getName() + "/", file);
-      }
+      files.forEach(file -> {
+        try {
+          write(zip, base + entry.getName() + "/", file);
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      });
       files.freeRef();
     }
-
   }
 
   private static class ClasspathEntry {

@@ -30,7 +30,6 @@ public class UserSettings {
   public String emailAddress;
 
   private UserSettings() {
-
   }
 
   public static UserSettings load() {
