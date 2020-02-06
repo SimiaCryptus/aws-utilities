@@ -34,16 +34,14 @@ import java.io.*;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Map;
-import java.util.Random;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
+import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -84,7 +82,7 @@ public class ClasspathUtil {
     return RefUtil.get(stream.flatMap(entryPath -> {
       PrintStream prev = SysOutInterceptor.INSTANCE.setCurrentHandler(out);
       RefList<String> temp_04_0003 = RefArrays.asList(entryPath);
-      RefList<String> classpathEntry = (new File(entryPath).isDirectory()) ? stageClasspathEntry(libPrefix, entryPath)
+      RefList<String> classpathEntry = new File(entryPath).isDirectory() ? stageClasspathEntry(libPrefix, entryPath)
           : temp_04_0003.addRef();
       temp_04_0003.freeRef();
       SysOutInterceptor.INSTANCE.setCurrentHandler(prev);
@@ -203,34 +201,31 @@ public class ClasspathUtil {
   private static void summarize(@Nonnull String[] jarFiles, @Nonnull File summary) {
     try {
       JarOutputStream jarOutputStream = new JarOutputStream(new FileOutputStream(summary));
-      RefList<JarFile> files = RefArrays.stream(jarFiles).map(x -> {
+      List<JarFile> files = Arrays.stream(jarFiles).map(x -> {
         try {
           return new JarFile(new File(x));
         } catch (IOException e) {
           logger.warn("Error processing " + x, e);
           return null;
         }
-      }).filter(x -> x != null).collect(RefCollectors.toList());
-      RefArrayList<String[]> conflicts = new RefArrayList<>();
-      RefMap<String, RefList<ClasspathUtil.ClasspathEntry>> temp_04_0004 = files.stream().flatMap(file -> {
+      }).filter(x -> x != null).collect(Collectors.toList());
+      ArrayList<String[]> conflicts = new ArrayList<>();
+      files.stream().flatMap(file -> {
         return file.stream()
             //.filter(x -> !x.isDirectory())
-            .map(jarEntry -> new ClasspathEntry(file, jarEntry));
-      }).sorted(RefComparator.comparing(x -> x.jarEntry.getName() + ":" + x.file.getName()))
-          .collect(RefCollectors.groupingBy(x -> x.jarEntry.getName()));
-      RefCollection<RefList<ClasspathUtil.ClasspathEntry>> temp_04_0005 = temp_04_0004.values();
-      temp_04_0005.stream().map(
-          RefUtil.wrapInterface((Function<RefList<ClasspathUtil.ClasspathEntry>, ClasspathUtil.ClasspathEntry>) x -> {
-            if (x.size() > 1 && !x.get(0).jarEntry.isDirectory()) {
+            .map(jarEntry1 -> new ClasspathEntry(file, jarEntry1));
+      }).sorted(Comparator.comparing(x1 -> x1.jarEntry.getName() + ":" + x1.file.getName()))
+          .collect(Collectors.groupingBy(x1 -> x1.jarEntry.getName())).values().stream().map(
+          x -> {
+            ClasspathEntry classpathEntry = x.get(0);
+            if (x.size() > 1 && !classpathEntry.jarEntry.isDirectory()) {
               conflicts.add(new String[]{RefUtil.get(
                   x.stream().map(y -> new File(y.file.getName()).getName()).sorted()
                       .reduce((a, b) -> a + ", " + b)
-              ), x.get(0).jarEntry.getName()});
+              ), classpathEntry.jarEntry.getName()});
             }
-            ClasspathUtil.ClasspathEntry temp_04_0002 = x.get(0);
-            x.freeRef();
-            return temp_04_0002;
-          }, conflicts.addRef())).filter(x -> {
+            return classpathEntry;
+          }).filter(x -> {
         String name = x.jarEntry.getName();
         return !name.startsWith("java/") && !name.startsWith("sun/") && !name.toUpperCase().endsWith(".DSA")
             && !name.toUpperCase().endsWith(".RSA");
@@ -257,20 +252,12 @@ public class ClasspathUtil {
               e);
         }
       });
-      temp_04_0005.freeRef();
-      temp_04_0004.freeRef();
-      RefMap<String, RefList<String[]>> temp_04_0006 = conflicts.stream().collect(RefCollectors.groupingBy(y -> y[0]));
-      RefSet<Map.Entry<String, RefList<String[]>>> temp_04_0007 = temp_04_0006.entrySet();
-      temp_04_0007.stream().forEach(e -> {
-        RefList<String[]> temp_04_0008 = e.getValue();
+      conflicts.stream().collect(Collectors.groupingBy(y1 -> y1[0])).entrySet().stream().forEach(e -> {
+        List<String[]> temp_04_0008 = e.getValue();
         logger.info("Conflict between " + e.getKey() + " for "
             + RefUtil.get(temp_04_0008.stream().map(y -> y[1]).sorted().reduce((a, b) -> a + ", " + b)));
-        temp_04_0008.freeRef();
         RefUtil.freeRef(e);
       });
-      temp_04_0007.freeRef();
-      temp_04_0006.freeRef();
-      conflicts.freeRef();
       jarOutputStream.close();
       files.forEach(x -> {
         try {
@@ -279,7 +266,6 @@ public class ClasspathUtil {
           logger.info("Error closing " + x.getName(), e);
         }
       });
-      files.freeRef();
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

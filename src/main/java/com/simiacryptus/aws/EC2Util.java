@@ -363,8 +363,8 @@ public class EC2Util {
   @Nonnull
   public static Instance start(@Nonnull final AmazonEC2 ec2, final String ami, final String instanceType, final String groupId,
                                @Nonnull final KeyPair keyPair, @Nonnull final AmazonIdentityManagement iam, final String... bucket) {
-    return start(ec2, ami, instanceType, groupId, keyPair, newIamRole(iam, ("{\n" + "  \"Version\": \"2012-10-17\",\n"
-        + "  \"Statement\": [\n" + "    " + bucketGrantStr(bucket) + "\n" + "  ]\n" + "}")));
+    return start(ec2, ami, instanceType, groupId, keyPair, newIamRole(iam, "{\n" + "  \"Version\": \"2012-10-17\",\n"
+        + "  \"Statement\": [\n" + "    " + bucketGrantStr(bucket) + "\n" + "  ]\n" + "}"));
   }
 
   @Nonnull
@@ -458,10 +458,7 @@ public class EC2Util {
   public static Process execAsync(@Nonnull final Session session, final String script, final OutputStream outBuffer,
                                   @Nullable RefHashMap<String, String> env) {
     try {
-      EC2Util.Process temp_06_0002 = new Process(session, script, outBuffer, RefUtil.addRef(RefUtil.addRef(env)));
-      if (null != env)
-        env.freeRef();
-      return temp_06_0002;
+      return new Process(session, script, outBuffer, env);
     } catch (JSchException e) {
       throw new RuntimeException(e);
     }
@@ -531,7 +528,7 @@ public class EC2Util {
     @Nonnull
     public TendrilControl startJvm(@Nonnull final AmazonEC2 ec2, @Nonnull final AmazonS3 s3, @Nonnull final AwsTendrilNodeSettings settings,
                                    final int localControlPort) {
-      return Tendril.startRemoteJvm(this, settings.newJvmConfig(), localControlPort, Tendril::defaultClasspathFilter,
+      return Tendril.startRemoteJvm(this, settings.newJvmConfig(), localControlPort, file -> Tendril.defaultClasspathFilter(file),
           s3, new RefHashMap<String, String>(), settings.getServiceConfig(ec2).bucket);
     }
 

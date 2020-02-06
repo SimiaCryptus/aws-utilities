@@ -140,7 +140,7 @@ public class S3Util {
           if (upload) {
             s3.putObject(
                 new PutObjectRequest(bucket, reportPath, file).withCannedAcl(CannedAccessControlList.PublicRead));
-            map.put(file.getAbsoluteFile(), s3.getUrl(bucket, reportPath));
+            RefUtil.freeRef(map.put(file.getAbsoluteFile(), s3.getUrl(bucket, reportPath)));
           }
         } else {
           try {
@@ -161,8 +161,10 @@ public class S3Util {
               .stream().collect(Collectors.toList());
           for (S3ObjectSummary preexistingFile : preexistingFiles) {
             logger.info(RefString.format("Preexisting File: '%s' + '%s'", reportPath, preexistingFile.getKey()));
-            map.put(new File(file, preexistingFile.getKey()).getAbsoluteFile(),
-                s3.getUrl(bucket, reportPath + preexistingFile.getKey()));
+            RefUtil.freeRef(map.put(
+                new File(file, preexistingFile.getKey()).getAbsoluteFile(),
+                s3.getUrl(bucket, reportPath + preexistingFile.getKey())
+            ));
           }
         }
         logger.info(RefString.format("Uploading folder %s to %s", file.getAbsolutePath(), filePath.toString()));

@@ -172,7 +172,7 @@ public class Tendril {
     }).findFirst()).getAbsolutePath();
     try {
       List<String> cmd = new ArrayList<>(Arrays.asList(javaExePath));
-      RefArrays.stream(javaOpts.split(" ")).forEach(cmd::add);
+      RefArrays.stream(javaOpts.split(" ")).forEach(e2 -> cmd.add(e2));
       String classpath = RefUtil.get(RefArrays
           .stream(RefSystem.getProperty("java.class.path").split(File.pathSeparator))
           .map(path -> workingDir.toURI().relativize(new File(path).toURI()).getPath())
@@ -180,7 +180,7 @@ public class Tendril {
       cmd.addAll(Arrays.asList("-cp", classpath,
           //ClasspathUtil.summarizeLocalClasspath().getAbsolutePath(),
           "-DcontrolPort=" + controlPort, Tendril.class.getCanonicalName()));
-      RefArrays.stream(programArguments.split(" ")).forEach(cmd::add);
+      RefArrays.stream(programArguments.split(" ")).forEach(e1 -> cmd.add(e1));
       logger.info("Java Environment: " + env.entrySet().stream().map(e -> {
         String temp_05_0002 = e.getKey() + " = " + e.getValue();
         RefUtil.freeRef(e);

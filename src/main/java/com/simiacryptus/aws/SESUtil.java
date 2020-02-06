@@ -53,7 +53,7 @@ public class SESUtil {
                           @Nonnull final String html, @Nonnull final File... attachments) {
     try {
       RefStream<MimeBodyPart> attachmentStream = RefArrays.stream(attachments)
-          .filter(x -> x.exists() && x.length() < 1024 * 1024 * 4).map(SESUtil::toAttachment);
+          .filter(x -> x.exists() && x.length() < 1024 * 1024 * 4).map(attachment -> toAttachment(attachment));
       ses.sendRawEmail(new SendRawEmailRequest(toRaw(getMessage(Session.getDefaultInstance(new Properties()), subject,
           to, mix(RefStream.concat(RefStream.of(wrap(getEmailBody(body, html))), attachmentStream)
               .toArray(i -> new MimeBodyPart[i]))))));

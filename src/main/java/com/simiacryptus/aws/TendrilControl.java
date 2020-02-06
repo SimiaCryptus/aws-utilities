@@ -23,6 +23,7 @@ import com.esotericsoftware.kryonet.rmi.TimeoutException;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.simiacryptus.lang.SerializableCallable;
 import com.simiacryptus.lang.SerializableSupplier;
+import com.simiacryptus.ref.lang.RefUtil;
 import com.simiacryptus.ref.wrappers.RefHashMap;
 import com.simiacryptus.ref.wrappers.RefString;
 import com.simiacryptus.util.JsonUtil;
@@ -73,7 +74,7 @@ public class TendrilControl implements AutoCloseable {
         boolean run;
         synchronized (currentOperations) {
           if (!currentOperations.containsKey(key)) {
-            currentOperations.put(key, promise);
+            RefUtil.freeRef(currentOperations.put(key, promise));
             run = true;
           } else {
             run = false;

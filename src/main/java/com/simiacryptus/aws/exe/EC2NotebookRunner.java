@@ -163,7 +163,7 @@ public class EC2NotebookRunner {
       log.run(() -> {
         assert node != null;
         TendrilControl tendrilControl = Tendril.startRemoteJvm(node, jvmConfig, localControlPort,
-            Tendril::defaultClasspathFilter, getS3(), new RefHashMap<String, String>(),
+            file -> Tendril.defaultClasspathFilter(file), getS3(), new RefHashMap<String, String>(),
             settings.getServiceConfig(getEc2()).bucket);
         tendrilControl.start(() -> {
           this.nodeMain();
@@ -267,7 +267,7 @@ public class EC2NotebookRunner {
         + RefUtil.get(RefStream.of(zip, pdf, new File(workingDir, testName + ".html"))
         .map(
             RefUtil.wrapInterface(
-                (Function<File, String>) file -> String.format("<p><a href=\"%s\">%s</a></p>",
+                (Function<File, String>) file -> RefString.format("<p><a href=\"%s\">%s</a></p>",
                     uploads.get(file.getAbsoluteFile()), file.getName()),
                 uploads.addRef()))
         .reduce((a, b) -> a + b));
