@@ -42,7 +42,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -51,20 +53,20 @@ public class S3Util {
   private final static Logger logger = LoggerFactory.getLogger(S3Util.class);
 
   @Nonnull
-  public static RefMap<File, URL> upload(@Nonnull NotebookOutput log) {
+  public static Map<File, URL> upload(@Nonnull NotebookOutput log) {
     synchronized (log) {
       return upload(log, AmazonS3ClientBuilder.standard().withRegion(EC2Util.REGION).build());
     }
   }
 
   @Nonnull
-  public static RefMap<File, URL> upload(@Nonnull NotebookOutput log, @Nonnull AmazonS3 s3) {
+  public static Map<File, URL> upload(@Nonnull NotebookOutput log, @Nonnull AmazonS3 s3) {
     try {
       log.write();
       File root = log.getRoot();
       URI archiveHome = log.getArchiveHome();
       logger.info(RefString.format("Files in %s to be archived in %s", root.getAbsolutePath(), archiveHome));
-      RefHashMap<File, URL> map = new RefHashMap<>();
+      HashMap<File, URL> map = new HashMap<>();
       if (null != archiveHome) {
         logFiles(root);
         if (archiveHome.getScheme().startsWith("s3") && (null == archiveHome.getHost() || archiveHome.getHost().isEmpty() || "null".equals(archiveHome.getHost()))) {
