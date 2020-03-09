@@ -33,7 +33,10 @@ import com.simiacryptus.lang.SerializableConsumer;
 import com.simiacryptus.notebook.MarkdownNotebookOutput;
 import com.simiacryptus.notebook.NotebookOutput;
 import com.simiacryptus.ref.lang.RefUtil;
-import com.simiacryptus.ref.wrappers.*;
+import com.simiacryptus.ref.wrappers.RefHashMap;
+import com.simiacryptus.ref.wrappers.RefStream;
+import com.simiacryptus.ref.wrappers.RefString;
+import com.simiacryptus.ref.wrappers.RefSystem;
 import com.simiacryptus.util.JsonUtil;
 import com.simiacryptus.util.ReportingUtil;
 import com.simiacryptus.util.Util;
@@ -50,9 +53,9 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.Date;
+import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -218,9 +221,8 @@ public class EC2NotebookRunner {
       log.setArchiveHome(URI.create("s3://" + s3bucket + "/reports/" + UUID.randomUUID() + "/"));
       log.onComplete(() -> {
         logFiles(log.getRoot());
-        RefMap<File, URL> uploads = S3Util.upload(getS3(), log.getArchiveHome(), log.getRoot());
-        sendCompleteEmail(testName, log.getRoot(), uploads.addRef(), startTime);
-        uploads.freeRef();
+        Map<File, URL> uploads = S3Util.upload(getS3(), log.getArchiveHome(), log.getRoot());
+        sendCompleteEmail(testName, log.getRoot(), uploads, startTime);
       });
       try {
         sendStartEmail(testName, fn);
@@ -232,7 +234,7 @@ public class EC2NotebookRunner {
     };
   }
 
-  private void sendCompleteEmail(final String testName, final File workingDir, @Nonnull final RefMap<File, URL> uploads,
+  private void sendCompleteEmail(final String testName, final File workingDir, @Nonnull final Map<File, URL> uploads,
                                  final long startTime) {
     String html = null;
     try {
@@ -265,13 +267,9 @@ public class EC2NotebookRunner {
 
     String append = "<hr/>"
         + RefUtil.get(RefStream.of(zip, pdf, new File(workingDir, testName + ".html"))
-        .map(
-            RefUtil.wrapInterface(
-                (Function<File, String>) file -> RefString.format("<p><a href=\"%s\">%s</a></p>",
-                    uploads.get(file.getAbsoluteFile()), file.getName()),
-                uploads.addRef()))
+        .map(file -> RefString.format("<p><a href=\"%s\">%s</a></p>",
+            getUrl(file, uploads), file.getName()))
         .reduce((a, b) -> a + b));
-    uploads.freeRef();
     String endTag = "</body>";
     if (replacedHtml.contains(endTag)) {
       replacedHtml.replace(endTag, append + endTag);
@@ -281,6 +279,16 @@ public class EC2NotebookRunner {
     File[] attachments = isEmailFiles() ? new File[]{zip, pdf} : new File[]{};
     SESUtil.send(AmazonSimpleEmailServiceClientBuilder.defaultClient(), subject, emailAddress, replacedHtml,
         replacedHtml, attachments);
+  }
+
+  private URL getUrl(File file, @Nonnull Map<File, URL> uploads) {
+    File absoluteFile = file.getAbsoluteFile();
+    URL url = uploads.get(absoluteFile);
+    if (null == url) {
+      logger.warn("Not found: " + absoluteFile);
+      uploads.forEach((k, v) -> logger.info(k + " uploaded to " + v));
+    }
+    return url;
   }
 
   private void sendStartEmail(final String testName, final SerializableConsumer<NotebookOutput> fn)

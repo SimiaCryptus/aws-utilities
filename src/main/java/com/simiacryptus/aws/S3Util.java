@@ -25,8 +25,6 @@ import com.amazonaws.services.s3.model.*;
 import com.simiacryptus.notebook.NotebookOutput;
 import com.simiacryptus.ref.lang.RefUtil;
 import com.simiacryptus.ref.wrappers.RefArrays;
-import com.simiacryptus.ref.wrappers.RefHashMap;
-import com.simiacryptus.ref.wrappers.RefMap;
 import com.simiacryptus.ref.wrappers.RefString;
 import com.simiacryptus.util.Util;
 import com.simiacryptus.util.io.TeeInputStream;
@@ -94,16 +92,15 @@ public class S3Util {
   }
 
   @Nonnull
-  public static RefMap<File, URL> upload(@Nonnull final AmazonS3 s3, final URI path, @Nonnull final File file) {
+  public static Map<File, URL> upload(@Nonnull final AmazonS3 s3, final URI path, @Nonnull final File file) {
     return upload(s3, path, file, 3);
   }
 
   @Nonnull
-  public static RefMap<File, URL> upload(@Nonnull final AmazonS3 s3, @Nullable final URI path, @Nonnull final File file, int retries) {
+  public static Map<File, URL> upload(@Nonnull final AmazonS3 s3, @Nullable final URI path, @Nonnull final File file, int retries) {
     try {
-      RefHashMap<File, URL> map = new RefHashMap<>();
+      HashMap<File, URL> map = new HashMap<>();
       if (!file.exists()) {
-        map.freeRef();
         throw new RuntimeException(file.toString());
       }
       if (null == path) {
@@ -142,8 +139,8 @@ public class S3Util {
           if (upload) {
             s3.putObject(
                 new PutObjectRequest(bucket, reportPath, file).withCannedAcl(CannedAccessControlList.PublicRead));
-            RefUtil.freeRef(map.put(file.getAbsoluteFile(), s3.getUrl(bucket, reportPath)));
           }
+          RefUtil.freeRef(map.put(file.getAbsoluteFile(), s3.getUrl(bucket, reportPath)));
         } else {
           try {
             logger.info(RefString.format("Copy file %s to %s", file.getAbsolutePath(), reportPath));
