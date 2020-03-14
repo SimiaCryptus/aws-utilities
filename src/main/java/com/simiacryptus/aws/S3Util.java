@@ -40,6 +40,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -109,7 +110,8 @@ public class S3Util {
       String bucket = path.getHost();
       String scheme = path.getScheme();
       if (file.isFile()) {
-        String reportPath = path.resolve(file.getName()).getPath().replaceAll("//", "/").replaceAll("^/", "");
+        String reportPath = path.resolve(URLEncoder.encode(file.getName(), "UTF-8")).getPath()
+            .replaceAll("//", "/").replaceAll("^/", "");
         if (scheme.startsWith("s3")) {
           logger.info(RefString.format("Uploading file %s to s3 %s/%s", file.getAbsolutePath(), bucket, reportPath));
           boolean upload;

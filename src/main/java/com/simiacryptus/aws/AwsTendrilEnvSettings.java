@@ -77,7 +77,6 @@ public class AwsTendrilEnvSettings implements Serializable {
     return JsonUtil.toJson(this).toString();
   }
 
-  @Nonnull
   @JsonIgnore
   public EC2Util.ServiceConfig getServiceConfig(@Nonnull final AmazonEC2 ec2) {
     return new EC2Util.ServiceConfig(ec2, this.securityGroup, new InstanceProfile().withArn(this.instanceProfileArn),

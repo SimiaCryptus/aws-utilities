@@ -41,12 +41,10 @@ public final class AwsTendrilNodeSettings extends AwsTendrilEnvSettings {
     super(parent.securityGroup, parent.instanceProfileArn, parent.bucket);
   }
 
-  @Nonnull
   public Tendril.JvmConfig newJvmConfig() {
     return new Tendril.JvmConfig(this.imageId, this.instanceType, this.username);
   }
 
-  @Nullable
   public EC2Util.EC2Node startNode(@Nonnull final AmazonEC2 ec2, final int localControlPort) {
     return EC2Util.start(ec2, newJvmConfig(), getServiceConfig(ec2), localControlPort);
   }

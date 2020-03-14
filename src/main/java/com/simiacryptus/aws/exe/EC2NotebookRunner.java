@@ -192,7 +192,7 @@ public class EC2NotebookRunner {
       }
   }
 
-  public String getStatus(@Nonnull final NotebookOutput log, @Nonnull final EC2Util.EC2Node node) {
+  public String getStatus(final NotebookOutput log, final EC2Util.EC2Node node) {
     try {
       return log.eval(() -> {
         return node.getStatus().getState().getName();
