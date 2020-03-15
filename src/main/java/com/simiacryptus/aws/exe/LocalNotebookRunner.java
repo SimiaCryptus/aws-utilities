@@ -52,7 +52,7 @@ public class LocalNotebookRunner {
       try (NotebookOutput log = new MarkdownNotebookOutput(
           new File("report/" + Util.dateStr("yyyyMMddHHmmss") + "/index"), true)) {
         fn.accept(log);
-        log.setFrontMatterProperty("status", "OK");
+        log.setMetadata("status", "OK");
       } finally {
         logger.warn("Exiting notebook", new RuntimeException("Stack Trace"));
         RefSystem.exit(0);

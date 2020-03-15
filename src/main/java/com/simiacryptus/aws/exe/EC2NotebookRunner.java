@@ -230,7 +230,7 @@ public class EC2NotebookRunner {
         throw new RuntimeException(e);
       }
       fn.accept(log);
-      log.setFrontMatterProperty("status", "OK");
+      log.setMetadata("status", "OK");
     };
   }
 

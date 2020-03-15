@@ -22,7 +22,6 @@ package com.simiacryptus.aws;
 import com.amazonaws.services.ec2.AmazonEC2;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 public final class AwsTendrilNodeSettings extends AwsTendrilEnvSettings {
   public String imageId;
