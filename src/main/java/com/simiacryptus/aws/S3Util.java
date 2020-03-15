@@ -22,6 +22,7 @@ package com.simiacryptus.aws;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.*;
+import com.simiacryptus.notebook.MarkdownNotebookOutput;
 import com.simiacryptus.notebook.NotebookOutput;
 import com.simiacryptus.ref.lang.RefUtil;
 import com.simiacryptus.ref.wrappers.RefArrays;
@@ -72,7 +73,7 @@ public class S3Util {
           logger.info(RefString.format("No archive destination to publish to: %s", archiveHome));
           return map;
         }
-        logger.info(RefString.format("Resolved %s / %s", archiveHome, log.getName()));
+        logger.info(RefString.format("Uploading %s to %s", log.getFileName(), archiveHome));
         for (File file : root.listFiles()) {
           map.putAll(S3Util.upload(s3, archiveHome, file));
         }
@@ -227,5 +228,12 @@ public class S3Util {
         + "      \"Resource\": \"arn:aws:s3:::*\"\n" + "    },\n" + "    {\n"
         + "      \"Action\": [\"ses:SendEmail\",\"ses:SendRawEmail\"],\n" + "      \"Effect\": \"Allow\",\n"
         + "      \"Resource\": \"*\"\n" + "    }\n" + "  ]\n" + "}";
+  }
+
+  public static void uploadOnComplete(MarkdownNotebookOutput log, AmazonS3 amazonS3) {
+    log.onComplete(() -> {
+      URI archiveHome = log.getArchiveHome();
+      if(null != archiveHome) upload(amazonS3, archiveHome, log.getRoot());
+    });
   }
 }

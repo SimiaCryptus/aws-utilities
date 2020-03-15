@@ -136,12 +136,10 @@ public class RemoteNotebookDemo {
   private void nodeMain() {
     try {
       final File file = new File(RefString.format("report/%s_%s", testName, UUID.randomUUID().toString()));
-      try (MarkdownNotebookOutput log = new MarkdownNotebookOutput(file, 1080, true, file.getName(),
-          UUID.randomUUID())) {
+      try (MarkdownNotebookOutput log = new MarkdownNotebookOutput(file, true, file.getName(), UUID.randomUUID(), 1080
+      )) {
         log.setArchiveHome(URI.create("s3://" + default_bucket + "/reports/" + UUID.randomUUID() + "/"));
-        log.onComplete(() -> {
-          S3Util.upload(getS3(), log.getArchiveHome(), log.getRoot());
-        });
+        S3Util.uploadOnComplete(log, getS3());
         log.onComplete(() -> {
           String html = "";
           try {

@@ -133,7 +133,7 @@ public class EC2NotebookRunner {
   public static void run(@Nonnull final SerializableConsumer<NotebookOutput> consumer, final String testName) {
     try {
       final File file = new File(RefString.format("report/%s_%s", testName, UUID.randomUUID().toString()));
-      try (NotebookOutput log = new MarkdownNotebookOutput(file, 1080, true, file.getName(), UUID.randomUUID())) {
+      try (NotebookOutput log = new MarkdownNotebookOutput(file, true, file.getName(), UUID.randomUUID(), 1080)) {
         consumer.accept(log);
         logger.info("Finished worker tiledTexturePaintingPhase");
       } catch (Throwable e) {
