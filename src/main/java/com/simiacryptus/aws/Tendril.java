@@ -141,7 +141,7 @@ public class Tendril {
       logger.info("Deploy " + file.getAbsoluteFile());
       node.scp(file, file.getName());
     });
-    String remoteClasspath = stageRemoteClasspath(node, localClasspath, classpathFilter, libPrefix, true, s3, bucket[0],
+    String remoteClasspath = stageRemoteClasspath(node, localClasspath, classpathFilter, libPrefix, s3, bucket[0],
         keyspace);
     String commandLine = RefString.format("nohup java %s -cp %s %s %s", javaOpts, remoteClasspath,
         Tendril.class.getCanonicalName(), programArguments);
@@ -238,7 +238,7 @@ public class Tendril {
 
   @Nonnull
   public static String stageRemoteClasspath(@Nonnull final EC2Node node, @Nonnull final String localClasspath,
-                                            @Nonnull final Predicate<String> classpathFilter, final String libPrefix, final boolean parallel, @Nonnull final AmazonS3 s3,
+                                            @Nonnull final Predicate<String> classpathFilter, final String libPrefix, @Nonnull final AmazonS3 s3,
                                             @Nullable final String bucket, final String keyspace) {
     logger.info(RefString.format("Mkdir %s: %s", libPrefix, node.exec("mkdir -p " + libPrefix)));
     ExecutorService executorService = Executors.newFixedThreadPool(4);

@@ -152,8 +152,6 @@ public class RemoteNotebookDemo {
         });
         nodeTaskNotebook(log);
         logger.info("Finished worker process");
-      } catch (IOException e) {
-        logger.warn("Error!", e);
       }
     } catch (Throwable e) {
       logger.warn("Error!", e);
