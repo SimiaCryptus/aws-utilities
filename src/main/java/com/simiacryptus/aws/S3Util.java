@@ -21,32 +21,26 @@ package com.simiacryptus.aws;
 
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
-import com.amazonaws.services.s3.model.*;
-import com.simiacryptus.notebook.MarkdownNotebookOutput;
 import com.simiacryptus.notebook.NotebookOutput;
 import com.simiacryptus.ref.lang.RefUtil;
 import com.simiacryptus.ref.wrappers.RefArrays;
 import com.simiacryptus.ref.wrappers.RefString;
 import com.simiacryptus.util.Util;
 import com.simiacryptus.util.io.TeeInputStream;
-import org.apache.commons.io.FileUtils;
+import com.simiacryptus.util.S3Uploader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
-import java.net.URLEncoder;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 public class S3Util {
 
@@ -75,7 +69,7 @@ public class S3Util {
         }
         logger.info(RefString.format("Uploading %s to %s", log.getFileName(), archiveHome));
         for (File file : root.listFiles()) {
-          map.putAll(S3Util.upload(s3, archiveHome, file));
+          map.putAll(S3Uploader.upload(s3, archiveHome, file));
         }
       }
       return map;
@@ -91,96 +85,6 @@ public class S3Util {
       }
     } else
       logger.info(RefString.format("File %s length %s", f.getAbsolutePath(), f.length()));
-  }
-
-  @Nonnull
-  public static Map<File, URL> upload(@Nonnull final AmazonS3 s3, final URI path, @Nonnull final File file) {
-    return upload(s3, path, file, 3);
-  }
-
-  @Nonnull
-  public static Map<File, URL> upload(@Nonnull final AmazonS3 s3, @Nullable final URI path, @Nonnull final File file, int retries) {
-    try {
-      HashMap<File, URL> map = new HashMap<>();
-      if (!file.exists()) {
-        throw new RuntimeException(file.toString());
-      }
-      if (null == path) {
-        return map;
-      }
-      String bucket = path.getHost();
-      String scheme = path.getScheme();
-      if (file.isFile()) {
-        String reportPath = path.resolve(URLEncoder.encode(file.getName(), "UTF-8")).getPath()
-            .replaceAll("//", "/").replaceAll("^/", "");
-        if (scheme.startsWith("s3")) {
-          logger.info(RefString.format("Uploading file %s to s3 %s/%s", file.getAbsolutePath(), bucket, reportPath));
-          boolean upload;
-          try {
-            ObjectMetadata existingMetadata;
-            if (s3.doesObjectExist(bucket, reportPath))
-              existingMetadata = s3.getObjectMetadata(bucket, reportPath);
-            else
-              existingMetadata = null;
-            if (null != existingMetadata) {
-              if (existingMetadata.getContentLength() != file.length()) {
-                logger.info(RefString.format("Removing outdated file %s/%s", bucket, reportPath));
-                s3.deleteObject(bucket, reportPath);
-                upload = true;
-              } else {
-                logger.info(RefString.format("Existing file %s/%s", bucket, reportPath));
-                upload = false;
-              }
-            } else {
-              logger.info(RefString.format("Not found file %s/%s", bucket, reportPath));
-              upload = true;
-            }
-          } catch (AmazonS3Exception e) {
-            logger.info(RefString.format("Error listing %s/%s", bucket, reportPath), e);
-            upload = true;
-          }
-          if (upload) {
-            s3.putObject(
-                new PutObjectRequest(bucket, reportPath, file).withCannedAcl(CannedAccessControlList.PublicRead));
-          }
-          RefUtil.freeRef(map.put(file.getAbsoluteFile(), s3.getUrl(bucket, reportPath)));
-        } else {
-          try {
-            logger.info(RefString.format("Copy file %s to %s", file.getAbsolutePath(), reportPath));
-            FileUtils.copyFile(file, new File(reportPath));
-          } catch (IOException e) {
-            throw Util.throwException(e);
-          }
-        }
-      } else {
-        URI filePath = path.resolve(file.getName() + "/");
-        if (scheme.startsWith("s3")) {
-          String reportPath = filePath.getPath().replaceAll("//", "/").replaceAll("^/", "");
-          logger.info(
-              RefString.format("Scanning peer uploads to %s at s3 %s/%s", file.getAbsolutePath(), bucket, reportPath));
-          List<S3ObjectSummary> preexistingFiles = s3
-              .listObjects(new ListObjectsRequest().withBucketName(bucket).withPrefix(reportPath)).getObjectSummaries()
-              .stream().collect(Collectors.toList());
-          for (S3ObjectSummary preexistingFile : preexistingFiles) {
-            logger.info(RefString.format("Preexisting File: '%s' + '%s'", reportPath, preexistingFile.getKey()));
-            RefUtil.freeRef(map.put(
-                new File(file, preexistingFile.getKey()).getAbsoluteFile(),
-                s3.getUrl(bucket, reportPath + preexistingFile.getKey())
-            ));
-          }
-        }
-        logger.info(RefString.format("Uploading folder %s to %s", file.getAbsolutePath(), filePath.toString()));
-        for (File subfile : file.listFiles()) {
-          map.putAll(upload(s3, filePath, subfile));
-        }
-      }
-      return map;
-    } catch (Throwable e) {
-      if (retries > 0) {
-        return upload(s3, path, file, retries - 1);
-      }
-      throw new RuntimeException("Error uploading " + file + " to " + path, e);
-    }
   }
 
   public static InputStream cache(@Nonnull final AmazonS3 s3, @Nonnull final URI cacheLocation, @Nonnull URI resourceLocation) {
@@ -230,10 +134,4 @@ public class S3Util {
         + "      \"Resource\": \"*\"\n" + "    }\n" + "  ]\n" + "}";
   }
 
-  public static void uploadOnComplete(MarkdownNotebookOutput log, AmazonS3 amazonS3) {
-    log.onComplete(() -> {
-      URI archiveHome = log.getArchiveHome();
-      if (null != archiveHome) upload(amazonS3, archiveHome, log.getRoot());
-    });
-  }
 }

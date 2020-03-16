@@ -40,6 +40,7 @@ import com.simiacryptus.ref.wrappers.RefSystem;
 import com.simiacryptus.util.JsonUtil;
 import com.simiacryptus.util.ReportingUtil;
 import com.simiacryptus.util.Util;
+import com.simiacryptus.util.S3Uploader;
 import com.simiacryptus.util.test.SysOutInterceptor;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -221,7 +222,7 @@ public class EC2NotebookRunner {
       log.setArchiveHome(URI.create("s3://" + s3bucket + "/reports/" + UUID.randomUUID() + "/"));
       log.onComplete(() -> {
         logFiles(log.getRoot());
-        Map<File, URL> uploads = S3Util.upload(getS3(), log.getArchiveHome(), log.getRoot());
+        Map<File, URL> uploads = S3Uploader.upload(getS3(), log.getArchiveHome(), log.getRoot());
         sendCompleteEmail(testName, log.getRoot(), uploads, startTime);
       });
       try {

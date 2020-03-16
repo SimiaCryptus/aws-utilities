@@ -32,6 +32,7 @@ import com.simiacryptus.ref.wrappers.RefString;
 import com.simiacryptus.ref.wrappers.RefSystem;
 import com.simiacryptus.util.JsonUtil;
 import com.simiacryptus.util.Util;
+import com.simiacryptus.util.S3Uploader;
 import com.simiacryptus.util.test.SysOutInterceptor;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
@@ -139,7 +140,7 @@ public class RemoteNotebookDemo {
       try (MarkdownNotebookOutput log = new MarkdownNotebookOutput(file, true, file.getName(), UUID.randomUUID(), 1080
       )) {
         log.setArchiveHome(URI.create("s3://" + default_bucket + "/reports/" + UUID.randomUUID() + "/"));
-        S3Util.uploadOnComplete(log, getS3());
+        S3Uploader.uploadOnComplete(log, getS3());
         log.onComplete(() -> {
           String html = "";
           try {
