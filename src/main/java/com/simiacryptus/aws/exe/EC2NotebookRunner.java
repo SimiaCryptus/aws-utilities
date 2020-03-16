@@ -176,7 +176,7 @@ public class EC2NotebookRunner {
     } catch (Throwable e) {
       assert node != null;
       node.close();
-      throw new RuntimeException(e);
+      throw Util.throwException(e);
     }
     try {
       assert node != null;
@@ -227,7 +227,7 @@ public class EC2NotebookRunner {
       try {
         sendStartEmail(testName, fn);
       } catch (@Nonnull IOException | URISyntaxException e) {
-        throw new RuntimeException(e);
+        throw Util.throwException(e);
       }
       fn.accept(log);
       log.setMetadata("status", "OK");

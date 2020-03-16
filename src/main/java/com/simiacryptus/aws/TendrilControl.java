@@ -27,6 +27,7 @@ import com.simiacryptus.ref.lang.RefUtil;
 import com.simiacryptus.ref.wrappers.RefHashMap;
 import com.simiacryptus.ref.wrappers.RefString;
 import com.simiacryptus.util.JsonUtil;
+import com.simiacryptus.util.Util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -101,7 +102,7 @@ public class TendrilControl implements AutoCloseable {
         logger.warn("Error starting " + task, e);
         return start(task, retries - 1, key);
       } else {
-        throw new RuntimeException(e);
+        throw Util.throwException(e);
       }
     }
   }

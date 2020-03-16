@@ -126,7 +126,7 @@ public class RemoteNotebookDemo {
           RefSystem.out.println(RefString.format("The time is now %s", new Date()));
           Thread.sleep(10000);
         } catch (InterruptedException e) {
-          throw new RuntimeException(e);
+          throw Util.throwException(e);
         }
       });
       logger.info("Finished worker loop " + i);

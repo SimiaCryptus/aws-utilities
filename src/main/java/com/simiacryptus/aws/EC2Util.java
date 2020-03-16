@@ -33,6 +33,7 @@ import com.amazonaws.util.StringInputStream;
 import com.jcraft.jsch.*;
 import com.simiacryptus.ref.lang.RefUtil;
 import com.simiacryptus.ref.wrappers.*;
+import com.simiacryptus.util.Util;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.CloseShieldOutputStream;
@@ -93,7 +94,7 @@ public class EC2Util {
       try {
         return InetAddress.getLocalHost().getHostName();
       } catch (UnknownHostException e1) {
-        throw new RuntimeException(e1);
+        throw Util.throwException(e1);
       }
     }
   }
@@ -110,7 +111,7 @@ public class EC2Util {
     try {
       return IOUtils.toString(new URI("http://169.254.169.254/latest/meta-data/" + key), "UTF-8");
     } catch (URISyntaxException e) {
-      throw new RuntimeException(e);
+      throw Util.throwException(e);
     }
   }
 
@@ -149,7 +150,7 @@ public class EC2Util {
     } catch (Throwable e) {
       if (retries > 0)
         return scp(session, file, remote, retries - 1);
-      throw new RuntimeException(e);
+      throw Util.throwException(e);
     }
   }
 
@@ -168,7 +169,7 @@ public class EC2Util {
       }
       return exitStatus;
     } catch (@Nonnull InterruptedException | JSchException e) {
-      throw new RuntimeException(e);
+      throw Util.throwException(e);
     }
   }
 
@@ -244,7 +245,7 @@ public class EC2Util {
             try {
               FileUtils.write(new File(keyPair.getKeyName() + ".pem"), keyPair.getKeyMaterial(), "UTF-8");
             } catch (IOException e) {
-              throw new RuntimeException(e);
+              throw Util.throwException(e);
             }
           }
         }
@@ -442,7 +443,7 @@ public class EC2Util {
       }
       return output;
     } catch (InterruptedException e) {
-      throw new RuntimeException(e);
+      throw Util.throwException(e);
     }
   }
 
@@ -460,7 +461,7 @@ public class EC2Util {
     try {
       return new Process(session, script, outBuffer, env);
     } catch (JSchException e) {
-      throw new RuntimeException(e);
+      throw Util.throwException(e);
     }
   }
 
@@ -613,7 +614,7 @@ public class EC2Util {
         EC2Util.join(channel);
         return getOutput();
       } catch (InterruptedException e) {
-        throw new RuntimeException(e);
+        throw Util.throwException(e);
       }
     }
   }

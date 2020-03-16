@@ -21,6 +21,7 @@ package com.simiacryptus.aws.exe;
 
 import com.simiacryptus.ref.wrappers.RefSystem;
 import com.simiacryptus.util.JsonUtil;
+import com.simiacryptus.util.Util;
 
 import java.io.File;
 import java.io.IOException;
@@ -42,7 +43,7 @@ public class UserSettings {
         return userSettings;
       });
     } catch (IOException e) {
-      throw new RuntimeException(e);
+      throw Util.throwException(e);
     }
   }
 }

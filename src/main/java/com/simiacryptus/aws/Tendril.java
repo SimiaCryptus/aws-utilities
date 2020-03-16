@@ -31,6 +31,7 @@ import com.simiacryptus.lang.SerializableCallable;
 import com.simiacryptus.lang.SerializableConsumer;
 import com.simiacryptus.ref.lang.RefUtil;
 import com.simiacryptus.ref.wrappers.*;
+import com.simiacryptus.util.Util;
 import com.simiacryptus.util.test.SysOutInterceptor;
 import com.twitter.chill.KryoInstantiator;
 import com.twitter.chill.java.Java8ClosureRegistrar;
@@ -231,7 +232,7 @@ public class Tendril {
         sleep(5000);
         return getControl(localControlPort, retries - 1, timeoutSeconds);
       }
-      throw new RuntimeException(e);
+      throw Util.throwException(e);
     }
   }
 
@@ -259,9 +260,9 @@ public class Tendril {
         try {
           return (String) ((Future) x).get();
         } catch (InterruptedException e) {
-          throw new RuntimeException(e);
+          throw Util.throwException(e);
         } catch (ExecutionException e) {
-          throw new RuntimeException(e);
+          throw Util.throwException(e);
         }
       }).reduce((a, b) -> a + ":" + b));
     } finally {
@@ -356,7 +357,7 @@ public class Tendril {
         sleep((int) (Math.random() * 15000));
         stage(node, entryFile, remote, retries - 1, s3, bucket, keyspace);
       } else {
-        throw new RuntimeException(e);
+        throw Util.throwException(e);
       }
     }
   }
@@ -370,7 +371,7 @@ public class Tendril {
         sleep(5000);
         stage(entryFile, remote, retries - 1);
       } else {
-        throw new RuntimeException(e);
+        throw Util.throwException(e);
       }
     }
   }

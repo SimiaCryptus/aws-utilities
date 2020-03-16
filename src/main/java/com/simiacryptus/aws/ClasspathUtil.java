@@ -23,6 +23,7 @@ import com.simiacryptus.ref.lang.RefUtil;
 import com.simiacryptus.ref.wrappers.*;
 import com.simiacryptus.util.CodeUtil;
 import com.simiacryptus.util.JsonUtil;
+import com.simiacryptus.util.Util;
 import com.simiacryptus.util.test.SysOutInterceptor;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.IOUtils;
@@ -128,7 +129,7 @@ public class ClasspathUtil {
         return list;
       }
     } catch (Throwable e) {
-      throw new RuntimeException(e);
+      throw Util.throwException(e);
     }
   }
 
@@ -164,7 +165,7 @@ public class ClasspathUtil {
         try {
           write(zip, "", file);
         } catch (IOException e) {
-          throw new RuntimeException(e);
+          throw Util.throwException(e);
         }
       });
       files.freeRef();
@@ -177,7 +178,7 @@ public class ClasspathUtil {
     } catch (Throwable e) {
       if (tempJar.exists())
         tempJar.delete();
-      throw new RuntimeException(e);
+      throw Util.throwException(e);
     }
     return tempJar;
   }
@@ -266,7 +267,7 @@ public class ClasspathUtil {
         }
       });
     } catch (IOException e) {
-      throw new RuntimeException(e);
+      throw Util.throwException(e);
     }
   }
 
@@ -283,7 +284,7 @@ public class ClasspathUtil {
         try {
           write(zip, base + entry.getName() + "/", file);
         } catch (IOException e) {
-          throw new RuntimeException(e);
+          throw Util.throwException(e);
         }
       });
       files.freeRef();

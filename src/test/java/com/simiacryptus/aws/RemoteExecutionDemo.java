@@ -83,7 +83,7 @@ public class RemoteExecutionDemo {
             return msg;
           });
         } catch (Exception e) {
-          throw new RuntimeException(e);
+          throw Util.throwException(e);
         } finally {
           logger.info("Pausing to demonstrate automatic shutdown...");
           for (int i = 0; i < 10; i++) {

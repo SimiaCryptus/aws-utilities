@@ -80,7 +80,7 @@ public class S3Util {
       }
       return map;
     } catch (IOException e) {
-      throw new RuntimeException(e);
+      throw Util.throwException(e);
     }
   }
 
@@ -149,7 +149,7 @@ public class S3Util {
             logger.info(RefString.format("Copy file %s to %s", file.getAbsolutePath(), reportPath));
             FileUtils.copyFile(file, new File(reportPath));
           } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw Util.throwException(e);
           }
         }
       } else {
@@ -202,7 +202,7 @@ public class S3Util {
           }
         };
       } catch (IOException e) {
-        throw new RuntimeException(e);
+        throw Util.throwException(e);
       }
     }
   }
@@ -213,7 +213,7 @@ public class S3Util {
     try {
       localFile = File.createTempFile(file.getPath(), "data");
     } catch (IOException e) {
-      throw new RuntimeException(e);
+      throw Util.throwException(e);
     }
     return localFile;
   }
@@ -233,7 +233,7 @@ public class S3Util {
   public static void uploadOnComplete(MarkdownNotebookOutput log, AmazonS3 amazonS3) {
     log.onComplete(() -> {
       URI archiveHome = log.getArchiveHome();
-      if(null != archiveHome) upload(amazonS3, archiveHome, log.getRoot());
+      if (null != archiveHome) upload(amazonS3, archiveHome, log.getRoot());
     });
   }
 }

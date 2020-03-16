@@ -25,6 +25,7 @@ import com.amazonaws.services.simpleemail.model.SendRawEmailRequest;
 import com.amazonaws.services.simpleemail.model.VerifyEmailAddressRequest;
 import com.simiacryptus.ref.wrappers.RefArrays;
 import com.simiacryptus.ref.wrappers.RefStream;
+import com.simiacryptus.util.Util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,7 +59,7 @@ public class SESUtil {
           to, mix(RefStream.concat(RefStream.of(wrap(getEmailBody(body, html))), attachmentStream)
               .toArray(i -> new MimeBodyPart[i]))))));
     } catch (@Nonnull IOException | MessagingException e) {
-      throw new RuntimeException(e);
+      throw Util.throwException(e);
     }
   }
 
@@ -118,7 +119,7 @@ public class SESUtil {
       att.setDataHandler(new DataHandler(fds));
       att.setFileName(fds.getName());
     } catch (MessagingException e) {
-      throw new RuntimeException(e);
+      throw Util.throwException(e);
     }
     return att;
   }
