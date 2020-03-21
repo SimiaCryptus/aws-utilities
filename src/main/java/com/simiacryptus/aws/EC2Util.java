@@ -58,7 +58,7 @@ import java.util.function.Function;
 public class EC2Util {
 
   public static final Regions REGION = Regions
-      .fromName(RefSystem.getProperty("AWS_REGION", getCurrentRegion()));
+      .fromName(System.getProperty("AWS_REGION", getCurrentRegion()));
   private static final Logger logger = LoggerFactory.getLogger(EC2Util.class);
   private static final Charset charset = Charset.forName("UTF-8");
   private static final Random random = new Random();
@@ -74,6 +74,15 @@ public class EC2Util {
     } catch (Throwable e) {
       return Regions.US_EAST_1.getName();
     }
+  }
+
+  public static String getInstanceId() throws IOException, URISyntaxException {
+    return IOUtils.toString(new URI("http://169.254.169.254/latest/meta-data/instance-id"), "UTF-8");
+  }
+
+  public static String getPublicHostname() throws IOException, URISyntaxException {
+    return IOUtils.toString(new URI("http://169.254.169.254/latest/meta-data/public-hostname"),
+        "UTF-8");
   }
 
   public static void stage(@Nonnull final Session session, final File file, final String remote, final String bucket,
@@ -128,7 +137,7 @@ public class EC2Util {
       channel.setCommand(RefString.format("scp -t %s", remote));
       ByteArrayOutputStream out = new ByteArrayOutputStream();
       channel.setOutputStream(out);
-      channel.setExtOutputStream(new CloseShieldOutputStream(RefSystem.err));
+      channel.setExtOutputStream(new CloseShieldOutputStream(System.err));
       String header = RefString.format("C0644 %d %s\n", file.length(),
           RefUtil.get(RefArrays.stream(remote.split("/")).reduce((a, b) -> b)));
       RefList<InputStream> temp_06_0003 = RefArrays.asList(new StringInputStream(header), new FileInputStream(file),
@@ -158,9 +167,9 @@ public class EC2Util {
   public static int shell(@Nonnull final Session session) {
     try {
       Channel channel = session.openChannel("shell");
-      channel.setOutputStream(new CloseShieldOutputStream(RefSystem.out));
-      channel.setExtOutputStream(new CloseShieldOutputStream(RefSystem.err));
-      channel.setInputStream(RefSystem.in);
+      channel.setOutputStream(new CloseShieldOutputStream(System.out));
+      channel.setExtOutputStream(new CloseShieldOutputStream(System.err));
+      channel.setInputStream(System.in);
       channel.connect();
       join(channel);
       int exitStatus = channel.getExitStatus();
@@ -589,7 +598,7 @@ public class EC2Util {
       channel.setOutputStream(this.outBuffer);
       env.forEach((k, v) -> channel.setEnv(k, v));
       env.freeRef();
-      channel.setExtOutputStream(new CloseShieldOutputStream(RefSystem.err));
+      channel.setExtOutputStream(new CloseShieldOutputStream(System.err));
       channel.connect();
     }
 
@@ -617,29 +626,33 @@ public class EC2Util {
         throw Util.throwException(e);
       }
     }
+
+    public boolean isAlive() {
+      return channel.isConnected() && !channel.isClosed() && !channel.isEOF();
+    }
   }
 
   public static class ServiceConfig {
-    public String[] bucket;
+    public String bucket;
     public InstanceProfile instanceProfile;
     public String groupId;
     public KeyPair keyPair;
 
-    public ServiceConfig(@Nonnull final AmazonEC2 ec2, final String roleArn, final String... bucket) {
+    public ServiceConfig(@Nonnull final AmazonEC2 ec2, final String roleArn, final String bucket) {
       this(ec2, roleArn, EC2Util.newSecurityGroup(ec2, 22, 1080, 4040, 8080), bucket);
     }
 
-    public ServiceConfig(@Nonnull final AmazonEC2 ec2, final String roleArn, final String groupId, final String... bucket) {
+    public ServiceConfig(@Nonnull final AmazonEC2 ec2, final String roleArn, final String groupId, final String bucket) {
       this(ec2, groupId, new InstanceProfile().withArn(roleArn), bucket);
     }
 
     public ServiceConfig(@Nonnull final AmazonEC2 ec2, final String groupId, final InstanceProfile instanceProfile,
-                         final String... bucket) {
+                         final String bucket) {
       this(groupId, instanceProfile, EC2Util.getKeyPair(ec2), bucket);
     }
 
     public ServiceConfig(final String groupId, final InstanceProfile instanceProfile, final KeyPair keyPair,
-                         final String... bucket) {
+                         final String bucket) {
       this.bucket = bucket;
       this.groupId = groupId;
       this.instanceProfile = instanceProfile;

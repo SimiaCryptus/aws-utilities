@@ -19,6 +19,7 @@
 
 package com.simiacryptus.aws.exe;
 
+import com.amazonaws.regions.Regions;
 import com.amazonaws.services.ec2.AmazonEC2;
 import com.amazonaws.services.ec2.AmazonEC2ClientBuilder;
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagement;
@@ -32,18 +33,13 @@ import com.simiacryptus.aws.*;
 import com.simiacryptus.lang.SerializableConsumer;
 import com.simiacryptus.notebook.MarkdownNotebookOutput;
 import com.simiacryptus.notebook.NotebookOutput;
-import com.simiacryptus.ref.lang.RefUtil;
 import com.simiacryptus.ref.wrappers.RefHashMap;
-import com.simiacryptus.ref.wrappers.RefStream;
-import com.simiacryptus.ref.wrappers.RefString;
 import com.simiacryptus.ref.wrappers.RefSystem;
 import com.simiacryptus.util.JsonUtil;
 import com.simiacryptus.util.ReportingUtil;
-import com.simiacryptus.util.Util;
 import com.simiacryptus.util.S3Uploader;
+import com.simiacryptus.util.Util;
 import com.simiacryptus.util.test.SysOutInterceptor;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,12 +49,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.Date;
-import java.util.Map;
-import java.util.Random;
-import java.util.UUID;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.*;
 
 public class EC2NotebookRunner {
 
@@ -87,8 +78,8 @@ public class EC2NotebookRunner {
     return AmazonIdentityManagementClientBuilder.standard().withRegion(EC2Util.REGION).build();
   }
 
-  public static AmazonS3 getS3() {
-    return AmazonS3ClientBuilder.standard().withRegion(EC2Util.REGION).build();
+  public static AmazonS3 getS3(Regions region) {
+    return AmazonS3ClientBuilder.standard().withRegion(region).build();
   }
 
   public boolean isEmailFiles() {
@@ -101,14 +92,9 @@ public class EC2NotebookRunner {
     return this;
   }
 
-  public static void run(@Nonnull final SerializableConsumer<NotebookOutput>... reportTasks) throws IOException {
+  public static void test(@Nonnull SerializableConsumer<NotebookOutput>... reportTasks) {
     for (final SerializableConsumer<NotebookOutput> reportTask : reportTasks) {
       Tendril.getKryo().copy(reportTask);
-    }
-    String runnerName = EC2NotebookRunner.class.getSimpleName();
-    File reportFile = new File("target/report/" + Util.dateStr("yyyyMMddHHmmss") + "/" + runnerName);
-    try (NotebookOutput log = new MarkdownNotebookOutput(reportFile, true)) {
-      new EC2NotebookRunner(reportTasks).launchNotebook(log);
     }
   }
 
@@ -127,16 +113,16 @@ public class EC2NotebookRunner {
         logFiles(child);
       }
     } else {
-      logger.info(RefString.format("File %s length %d", f.getAbsolutePath(), f.length()));
+      logger.info(String.format("File %s length %d", f.getAbsolutePath(), f.length()));
     }
   }
 
   public static void run(@Nonnull final SerializableConsumer<NotebookOutput> consumer, final String testName) {
     try {
-      final File file = new File(RefString.format("report/%s_%s", testName, UUID.randomUUID().toString()));
+      final File file = new File(String.format("report/%s_%s", testName, UUID.randomUUID().toString()));
       try (NotebookOutput log = new MarkdownNotebookOutput(file, true, file.getName(), UUID.randomUUID(), 1080)) {
         consumer.accept(log);
-        logger.info("Finished worker tiledTexturePaintingPhase");
+        logger.info("Finished " + testName);
       } catch (Throwable e) {
         logger.warn("Error!", e);
       }
@@ -145,47 +131,71 @@ public class EC2NotebookRunner {
     }
   }
 
-  public void launchNotebook(@Nonnull final NotebookOutput log) {
-    AwsTendrilNodeSettings settings = log.eval(() -> {
-      EC2NodeSettings nodeSettings = EC2NodeSettings.P3_2XL;
+  public static void launch(EC2NodeSettings machineType, String ami, String javaOpts, SerializableConsumer<NotebookOutput> task) {
+    JAVA_OPTS = javaOpts;
+    test(task);
+    EC2NotebookRunner runner = new EC2NotebookRunner(task);
+    final AwsTendrilNodeSettings nodeSettings = runner.initNodeSettings(machineType, ami);
+    Tendril.JvmConfig jvmSettings = runner.initJvmSettings(nodeSettings);
+    runner.launch(nodeSettings, jvmSettings);
+  }
 
-      return JsonUtil.cache(new File("ec2-settings." + EC2Util.REGION.toString() + ".json"),
-          AwsTendrilNodeSettings.class, () -> EC2Util.setup(getEc2(), getIam(), getS3(), nodeSettings.machineType,
-              nodeSettings.imageId, nodeSettings.username));
-    });
-    s3bucket = settings.bucket;
-    settings.imageId = EC2NodeSettings.AMI_AMAZON_DEEP_LEARNING;
-    settings.instanceType = EC2NodeSettings.P2_XL.machineType;
-    settings.username = EC2NodeSettings.P2_XL.username;
+  public void launch(EC2NodeSettings nodeSettings) {
+    final AwsTendrilNodeSettings settings = initNodeSettings(nodeSettings, EC2NodeSettings.AMI_AMAZON_DEEP_LEARNING);
+    launch(settings, initJvmSettings(settings));
+  }
 
+  public void launch(AwsTendrilNodeSettings nodeSettings, Tendril.JvmConfig jvmConfig) {
+    s3bucket = nodeSettings.bucket;
+    EC2Util.EC2Node node = start(nodeSettings, jvmConfig);
+    open(node);
+    join(node);
+  }
+
+  public Tendril.JvmConfig initJvmSettings(AwsTendrilNodeSettings settings) {
     Tendril.JvmConfig jvmConfig = settings.newJvmConfig();
     jvmConfig.javaOpts += JAVA_OPTS;
+    return jvmConfig;
+  }
+
+  public void open(EC2Util.EC2Node node) {
+    try {
+      assert node != null;
+      ReportingUtil.browse(new URI(String.format("http://%s:1080/", node.getStatus().getPublicIpAddress())));
+    } catch (@Nonnull IOException | URISyntaxException e) {
+      logger.info("Error opening browser", e);
+    }
+  }
+
+  public EC2Util.EC2Node start(AwsTendrilNodeSettings settings, Tendril.JvmConfig jvmConfig) {
     int localControlPort = new Random().nextInt(1024) + 1024;
     SESUtil.setup(AmazonSimpleEmailServiceClientBuilder.defaultClient(), emailAddress);
     EC2Util.EC2Node node = settings.startNode(getEc2(), localControlPort);
     try {
-      log.run(() -> {
-        assert node != null;
-        TendrilControl tendrilControl = Tendril.startRemoteJvm(node, jvmConfig, localControlPort,
-            file -> Tendril.defaultClasspathFilter(file), getS3(), new RefHashMap<String, String>(),
-            settings.getServiceConfig(getEc2()).bucket);
-        tendrilControl.start(() -> {
-          this.nodeMain();
-          return null;
-        });
+      assert node != null;
+      String bucket = settings.getServiceConfig(getEc2()).bucket;
+      TendrilControl tendrilControl = Tendril.startRemoteJvm(
+          node,
+          jvmConfig,
+          localControlPort,
+          file -> Tendril.defaultClasspathFilter(file),
+          S3Uploader.buildClientForBucket(bucket),
+          new RefHashMap<String, String>(),
+          bucket);
+      tendrilControl.start(() -> {
+        this.nodeMain();
+        return null;
       });
     } catch (Throwable e) {
       assert node != null;
       node.close();
       throw Util.throwException(e);
     }
-    try {
-      assert node != null;
-      ReportingUtil.browse(new URI(RefString.format("http://%s:1080/", node.getStatus().getPublicIpAddress())));
-    } catch (@Nonnull IOException | URISyntaxException e) {
-      logger.info("Error opening browser", e);
-    }
-    while ("running".equals(getStatus(log, node)))
+    return node;
+  }
+
+  public void join(EC2Util.EC2Node node) {
+    while ("running".equals(node.getStatus().getState().getName()))
       try {
         Thread.sleep(30 * 1000);
       } catch (InterruptedException e) {
@@ -193,14 +203,20 @@ public class EC2NotebookRunner {
       }
   }
 
-  public String getStatus(final NotebookOutput log, final EC2Util.EC2Node node) {
+  public AwsTendrilNodeSettings initNodeSettings(EC2NodeSettings node, String ami) {
+    final AwsTendrilNodeSettings settings;
     try {
-      return log.eval(() -> {
-        return node.getStatus().getState().getName();
-      });
-    } catch (Throwable e) {
-      return e.getMessage();
+      Regions region = EC2Util.REGION;
+      settings = JsonUtil.cache(new File("ec2-settings." + region.toString() + ".json"),
+          AwsTendrilNodeSettings.class,
+          () -> EC2Util.setup(getEc2(), getIam(), getS3(region), node.machineType, node.imageId, node.username));
+      settings.imageId = ami;
+      settings.instanceType = node.machineType;
+      settings.username = node.username;
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
+    return settings;
   }
 
   void nodeMain() {
@@ -222,8 +238,14 @@ public class EC2NotebookRunner {
       log.setArchiveHome(URI.create("s3://" + s3bucket + "/reports/" + UUID.randomUUID() + "/"));
       log.onComplete(() -> {
         logFiles(log.getRoot());
-        Map<File, URL> uploads = S3Uploader.upload(getS3(), log.getArchiveHome(), log.getRoot());
-        sendCompleteEmail(testName, log.getRoot(), uploads, startTime);
+        URI archiveHome = log.getArchiveHome();
+        Map<File, URL> uploads;
+        if (null != archiveHome) {
+          uploads = S3Uploader.upload(S3Uploader.buildClientForBucket(archiveHome.getHost()), archiveHome, log.getRoot());
+        } else {
+          uploads = new HashMap<>();
+        }
+        EmailUtil.sendCompleteEmail(log, startTime, emailAddress, uploads, emailFiles);
       });
       try {
         sendStartEmail(testName, fn);
@@ -235,73 +257,14 @@ public class EC2NotebookRunner {
     };
   }
 
-  private void sendCompleteEmail(final String testName, final File workingDir, @Nonnull final Map<File, URL> uploads,
-                                 final long startTime) {
-    String html = null;
-    try {
-      html = FileUtils.readFileToString(new File(workingDir, testName + ".html"), "UTF-8");
-    } catch (IOException e) {
-      html = e.getMessage();
-    }
-    Pattern compile = Pattern.compile("\"([^\"]+?)\"");
-    Matcher matcher = compile.matcher(html);
-    int start = 0;
-    String replacedHtml = "";
-    while (matcher.find(start)) {
-      replacedHtml += html.substring(start, matcher.start());
-      String group = matcher.group(1);
-      File imageFile = new File(workingDir, group).getAbsoluteFile();
-      URL url = uploads.get(imageFile);
-      if (null == url) {
-        logger.info(RefString.format("No File Found for %s, reverting to %s", imageFile, group));
-        replacedHtml += "\"" + group + "\"";
-      } else {
-        logger.info(RefString.format("Rewriting %s to %s at %s", group, imageFile, url));
-        replacedHtml += "\"" + url + "\"";
-      }
-      start = matcher.end();
-    }
-    double durationMin = (RefSystem.currentTimeMillis() - startTime) / (1000.0 * 60);
-    String subject = RefString.format("%s Completed in %.3fmin", testName, durationMin);
-    File zip = new File(workingDir, testName + ".zip");
-    File pdf = new File(workingDir, testName + ".pdf");
-
-    String append = "<hr/>"
-        + RefUtil.get(RefStream.of(zip, pdf, new File(workingDir, testName + ".html"))
-        .map(file -> RefString.format("<p><a href=\"%s\">%s</a></p>",
-            getUrl(file, uploads), file.getName()))
-        .reduce((a, b) -> a + b));
-    String endTag = "</body>";
-    if (replacedHtml.contains(endTag)) {
-      replacedHtml.replace(endTag, append + endTag);
-    } else {
-      replacedHtml += append;
-    }
-    File[] attachments = isEmailFiles() ? new File[]{zip, pdf} : new File[]{};
-    SESUtil.send(AmazonSimpleEmailServiceClientBuilder.defaultClient(), subject, emailAddress, replacedHtml,
-        replacedHtml, attachments);
-  }
-
-  private URL getUrl(File file, @Nonnull Map<File, URL> uploads) {
-    File absoluteFile = file.getAbsoluteFile();
-    URL url = uploads.get(absoluteFile);
-    if (null == url) {
-      logger.warn("Not found: " + absoluteFile);
-      uploads.forEach((k, v) -> logger.info(k + " uploaded to " + v));
-    }
-    return url;
-  }
-
   private void sendStartEmail(final String testName, final SerializableConsumer<NotebookOutput> fn)
       throws IOException, URISyntaxException {
-    String publicHostname = IOUtils.toString(new URI("http://169.254.169.254/latest/meta-data/public-hostname"),
-        "UTF-8");
-    String instanceId = IOUtils.toString(new URI("http://169.254.169.254/latest/meta-data/instance-id"), "UTF-8");
+    String publicHostname = EC2Util.getPublicHostname();
+    String instanceId = EC2Util.getInstanceId();
     String functionJson = new ObjectMapper().enableDefaultTyping(ObjectMapper.DefaultTyping.NON_FINAL)
         .enable(SerializationFeature.INDENT_OUTPUT).writer().writeValueAsString(fn);
-    //https://console.aws.amazon.com/ec2/v2/home?region=us-east-1#Instances:search=i-00651bdfd6121e199
     String html = "<html><body>" + "<p><a href=\"http://" + publicHostname
-        + ":1080/\">The tiledTexturePaintingPhase can be monitored at " + publicHostname + "</a></p><hr/>"
+        + ":1080/\">The " + testName + " report can be monitored at " + publicHostname + "</a></p><hr/>"
         + "<p><a href=\"https://console.aws.amazon.com/ec2/v2/home?region=us-east-1#Instances:search=" + instanceId
         + "\">View instance " + instanceId + " on AWS Console</a></p><hr/>" + "<p>Script Definition:" + "<pre>"
         + functionJson + "</pre></p>" + "</body></html>";
@@ -309,4 +272,5 @@ public class EC2NotebookRunner {
     String subject = testName + " Starting";
     SESUtil.send(AmazonSimpleEmailServiceClientBuilder.defaultClient(), subject, emailAddress, txtBody, html);
   }
+
 }

@@ -79,7 +79,7 @@ public class RemoteExecutionDemo {
         try (TendrilControl remoteJvm = node.startJvm(ec2, s3, settings, localControlPort)) {
           return remoteJvm.eval(() -> {
             String msg = RefString.format("Hello World! The time is %s", new Date());
-            RefSystem.out.println("Returning Value: " + msg);
+            System.out.println("Returning Value: " + msg);
             return msg;
           });
         } catch (Exception e) {

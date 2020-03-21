@@ -37,8 +37,8 @@ public class UserSettings {
     try {
       return JsonUtil.cache(new File("user-settings.json"), UserSettings.class, () -> {
         UserSettings userSettings = new UserSettings();
-        Scanner scanner = new Scanner(RefSystem.in);
-        RefSystem.out.print("Enter user email address: ");
+        Scanner scanner = new Scanner(System.in);
+        System.out.print("Enter user email address: ");
         userSettings.emailAddress = scanner.nextLine();
         return userSettings;
       });

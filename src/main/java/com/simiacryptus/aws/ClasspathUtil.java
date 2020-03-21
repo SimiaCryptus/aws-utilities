@@ -20,7 +20,6 @@
 package com.simiacryptus.aws;
 
 import com.simiacryptus.ref.lang.RefUtil;
-import com.simiacryptus.ref.wrappers.*;
 import com.simiacryptus.util.CodeUtil;
 import com.simiacryptus.util.JsonUtil;
 import com.simiacryptus.util.Util;
@@ -42,6 +41,7 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -56,7 +56,7 @@ public class ClasspathUtil {
       return localClasspath.updateAndGet(f -> {
         if (f != null)
           return f;
-        String localClasspath = RefSystem.getProperty("java.class.path");
+        String localClasspath = System.getProperty("java.class.path");
         logger.info("Java Local Classpath: " + localClasspath);
         File lib = new File("lib");
         lib.mkdirs();
@@ -75,39 +75,34 @@ public class ClasspathUtil {
   public static String stageLocalClasspath(@Nonnull final String localClasspath, @Nonnull final Predicate<String> classpathFilter,
                                            @Nonnull final String libPrefix, final boolean parallel) {
     new File(libPrefix).mkdirs();
-    RefStream<String> stream = RefArrays.stream(localClasspath.split(File.pathSeparator)).filter(classpathFilter);
+    Stream<String> stream = Arrays.stream(localClasspath.split(File.pathSeparator)).filter(classpathFilter);
     PrintStream out = SysOutInterceptor.INSTANCE.currentHandler();
     if (parallel)
       stream = stream.parallel();
     return RefUtil.get(stream.flatMap(entryPath -> {
       PrintStream prev = SysOutInterceptor.INSTANCE.setCurrentHandler(out);
-      RefList<String> temp_04_0003 = RefArrays.asList(entryPath);
-      RefList<String> classpathEntry = new File(entryPath).isDirectory() ? stageClasspathEntry(libPrefix, entryPath)
-          : temp_04_0003.addRef();
-      temp_04_0003.freeRef();
+      List<String> classpathEntry = new File(entryPath).isDirectory() ? stageClasspathEntry(libPrefix, entryPath) : Arrays.asList(entryPath);
       SysOutInterceptor.INSTANCE.setCurrentHandler(prev);
-      RefStream<String> temp_04_0001 = classpathEntry.stream();
-      classpathEntry.freeRef();
-      return temp_04_0001;
+      return classpathEntry.stream();
     }).reduce((a, b) -> a + ":" + b));
   }
 
   @Nonnull
-  public static RefList<String> stageClasspathEntry(final String libPrefix, @Nonnull final String entryPath) {
+  public static List<String> stageClasspathEntry(final String libPrefix, @Nonnull final String entryPath) {
     final File entryFile = new File(entryPath);
     try {
       if (entryFile.isFile()) {
         String remote = libPrefix + hash(entryFile) + ".jar";
-        logger.info(RefString.format("Staging %s via %s", entryPath, remote));
+        logger.info(String.format("Staging %s via %s", entryPath, remote));
         try {
           stage(entryFile, remote);
         } catch (Throwable e) {
-          logger.warn(RefString.format("Error staging %s to %s", entryFile, remote), e);
+          logger.warn(String.format("Error staging %s to %s", entryFile, remote), e);
         }
-        return RefArrays.asList(remote);
+        return Arrays.asList(remote);
       } else {
-        logger.info(RefString.format("Processing %s", entryPath));
-        RefArrayList<String> list = new RefArrayList<>();
+        logger.info(String.format("Processing %s", entryPath));
+        ArrayList<String> list = new ArrayList<>();
         File parentFile = entryFile.getParentFile().getParentFile();
         if (entryFile.getName().equals("classes") && entryFile.getParentFile().getName().equals("target")) {
           File javaSrc = new File(new File(new File(parentFile, "src"), "main"), "java");
@@ -139,11 +134,11 @@ public class ClasspathUtil {
     File tempJar = toJar(entryFile);
     try {
       String remote = libPrefix + hash(tempJar) + ".jar";
-      logger.info(RefString.format("Uploading %s to %s", tempJar, remote));
+      logger.info(String.format("Uploading %s to %s", tempJar, remote));
       try {
         stage(tempJar, remote);
       } catch (Throwable e) {
-        throw new RuntimeException(RefString.format("Error staging %s to %s", entryFile, remote), e);
+        throw new RuntimeException(String.format("Error staging %s to %s", entryFile, remote), e);
       }
       return remote;
     } finally {
@@ -158,9 +153,9 @@ public class ClasspathUtil {
   @Nonnull
   public static File toJar(@Nonnull final File entry) throws IOException {
     File tempJar = File.createTempFile(UUID.randomUUID().toString(), ".jar").getAbsoluteFile();
-    logger.info(RefString.format("Archiving %s to %s", entry, tempJar));
+    logger.info(String.format("Archiving %s to %s", entry, tempJar));
     try (ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(tempJar))) {
-      RefList<File> files = RefArrays.stream(entry.listFiles()).sorted().collect(RefCollectors.toList());
+      List<File> files = Arrays.stream(entry.listFiles()).sorted().collect(Collectors.toList());
       files.forEach(file -> {
         try {
           write(zip, "", file);
@@ -168,12 +163,7 @@ public class ClasspathUtil {
           throw Util.throwException(e);
         }
       });
-      files.freeRef();
-      zip.putNextEntry(new ZipEntry("META-INF/CodeUtil/classSourceInfo.json"));
-      try (InputStream input = new ByteArrayInputStream(
-          JsonUtil.toJson(RefUtil.addRef(CodeUtil.classSourceInfo)).toString().getBytes("UTF-8"))) {
-        IOUtils.copy(input, zip);
-      }
+      addJson(zip, CodeUtil.CLASS_SOURCE_INFO_RS, CodeUtil.classSourceInfo);
       zip.closeEntry();
     } catch (Throwable e) {
       if (tempJar.exists())
@@ -181,6 +171,14 @@ public class ClasspathUtil {
       throw Util.throwException(e);
     }
     return tempJar;
+  }
+
+  public static void addJson(ZipOutputStream zip, String name, Object obj) throws IOException {
+    zip.putNextEntry(new ZipEntry(name));
+    try (InputStream input = new ByteArrayInputStream(
+        JsonUtil.toJson(obj).toString().getBytes("UTF-8"))) {
+      IOUtils.copy(input, zip);
+    }
   }
 
   @Nonnull
@@ -241,14 +239,14 @@ public class ClasspathUtil {
             byte[] bytes = IOUtils.toByteArray(inputStream);
             inputStream.close();
             if (jarEntry.getSize() != (long) bytes.length)
-              logger.warn(RefString.format("Size wrong for %s: %s != %s", new File(jarEntryName).getName(),
+              logger.warn(String.format("Size wrong for %s: %s != %s", new File(jarEntryName).getName(),
                   jarEntry.getSize(), bytes.length));
             jarOutputStream.putNextEntry(jarEntry);
             //logger.info(String.format("Wrote file %s from %s", jarEntryName, entry.getFile().getName()));
             IOUtils.write(bytes, jarOutputStream);
           }
         } catch (Throwable e) {
-          logger.info(RefString.format("Error putting class %s with length %s", jarEntryName, jarEntry.getSize()),
+          logger.info(String.format("Error putting class %s with length %s", jarEntryName, jarEntry.getSize()),
               e);
         }
       });
@@ -279,7 +277,7 @@ public class ClasspathUtil {
       }
       zip.closeEntry();
     } else {
-      RefList<File> files = RefArrays.stream(entry.listFiles()).sorted().collect(RefCollectors.toList());
+      List<File> files = Arrays.stream(entry.listFiles()).sorted().collect(Collectors.toList());
       files.forEach(file -> {
         try {
           write(zip, base + entry.getName() + "/", file);
@@ -287,7 +285,6 @@ public class ClasspathUtil {
           throw Util.throwException(e);
         }
       });
-      files.freeRef();
     }
   }
 

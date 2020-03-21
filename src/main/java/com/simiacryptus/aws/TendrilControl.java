@@ -23,6 +23,7 @@ import com.esotericsoftware.kryonet.rmi.TimeoutException;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.simiacryptus.lang.SerializableCallable;
 import com.simiacryptus.lang.SerializableSupplier;
+import com.simiacryptus.lang.UncheckedSupplier;
 import com.simiacryptus.ref.lang.RefUtil;
 import com.simiacryptus.ref.wrappers.RefHashMap;
 import com.simiacryptus.ref.wrappers.RefString;
@@ -32,6 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -41,7 +43,7 @@ import java.util.concurrent.TimeUnit;
 public class TendrilControl implements AutoCloseable {
 
   private static final Logger logger = LoggerFactory.getLogger(TendrilControl.class);
-  private final static RefHashMap<String, Promise> currentOperations = new RefHashMap<String, Promise>();
+  private final static HashMap<String, Promise> currentOperations = new HashMap<String, Promise>();
   private final static ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(1,
       new ThreadFactoryBuilder().setDaemon(true).build());
   private final Tendril.TendrilLink inner;
@@ -60,12 +62,12 @@ public class TendrilControl implements AutoCloseable {
   }
 
   @Nullable
-  public <T> Future<T> start(SerializableSupplier<T> task) {
+  public <T> Future<T> start(UncheckedSupplier<T> task) {
     return start(task, 10, UUID.randomUUID().toString());
   }
 
   @Nullable
-  public <T> Future<T> start(@Nullable SerializableSupplier<T> task, int retries, String key) {
+  public <T> Future<T> start(@Nullable UncheckedSupplier<T> task, int retries, String key) {
     if (null == task)
       return null;
     assert inner.isAlive();
@@ -75,7 +77,7 @@ public class TendrilControl implements AutoCloseable {
         boolean run;
         synchronized (currentOperations) {
           if (!currentOperations.containsKey(key)) {
-            RefUtil.freeRef(currentOperations.put(key, promise));
+            currentOperations.put(key, promise);
             run = true;
           } else {
             run = false;
@@ -84,16 +86,18 @@ public class TendrilControl implements AutoCloseable {
         if (run)
           new Thread(() -> {
             try {
-              logger.warn(RefString.format("Task Start: %s = %s", key, JsonUtil.toJson(task)));
+              logger.warn(RefString.format("Task Start: %s", key));
               promise.set(task.get());
-            } catch (Exception e) {
+            } catch (Throwable e) {
               logger.warn("Task Error", e);
+              promise.set(e);
             } finally {
               logger.warn("Task Exit: " + key);
             }
           }).start();
         return key;
       });
+      logger.info("Started task: " + taskKey, new RuntimeException());
       Promise<T> localPromise = new Promise<>();
       scheduledExecutorService.schedule(new PollerTask<>(taskKey, localPromise), 10, TimeUnit.SECONDS);
       return localPromise;
@@ -126,38 +130,47 @@ public class TendrilControl implements AutoCloseable {
 
     @Override
     public void run() {
-      Object result;
       try {
-        result = inner.run(() -> {
+        Object result = inner.run(() -> {
           try {
             Promise promise = currentOperations.get(taskKey);
             assert promise != null;
             if (promise.isDone()) {
-              Object o = promise.get();
-              failures = 0;
-              return o;
+              logger.info(RefString.format("Task complete: %s", taskKey));
+              return promise.get();
             } else {
-              failures = 0;
+              logger.info(RefString.format("Task running: %s", taskKey));
               return null;
             }
-          } catch (TimeoutException e) {
-            return null;
+          } catch (Throwable e) {
+            logger.info(RefString.format("Task error: %s", taskKey));
+            return e;
           }
         });
-      } catch (Throwable e) {
+        failures = 0;
+        if (null != result) {
+          if (result instanceof Throwable) {
+            localPromise.set((Throwable) result);
+          } else {
+            localPromise.set((T) result);
+          }
+        } else {
+          scheduledExecutorService.schedule(PollerTask.this, 5, TimeUnit.SECONDS);
+        }
+      } catch (TimeoutException e) {
         if (failures < maxRetries) {
-          logger.info(RefString.format("Error polling task; %s failures", failures), e);
-          result = null;
+          int newTimeout = (int) (15 * Math.pow(2, ++failures));
+          logger.info(RefString.format("Error polling task; %s failures - Retry in %s seconds", failures, newTimeout), e);
+          scheduledExecutorService.schedule(PollerTask.this, newTimeout, TimeUnit.SECONDS);
         } else {
           logger.warn(RefString.format("Error polling task; %s failures", failures), e);
-          throw e instanceof RuntimeException ? (RuntimeException) e : new RuntimeException(e);
+          localPromise.set(e);
+          throw Util.throwException(e);
         }
-      }
-      if (null != result) {
-        failures = 0;
-        localPromise.set((T) result);
-      } else {
-        scheduledExecutorService.schedule(PollerTask.this, (int) (15 * Math.pow(2, ++failures)), TimeUnit.SECONDS);
+      } catch (Exception e) {
+        logger.warn(RefString.format("Fatal error polling task after %s failures", failures), e);
+        localPromise.set(e);
+        throw Util.throwException(e);
       }
     }
   }

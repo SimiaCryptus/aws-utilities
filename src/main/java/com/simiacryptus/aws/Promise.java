@@ -19,6 +19,8 @@
 
 package com.simiacryptus.aws;
 
+import com.simiacryptus.util.Util;
+
 import javax.annotation.Nonnull;
 import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
@@ -29,6 +31,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public class Promise<T> implements Future<T> {
   public final Semaphore onReady = new Semaphore(0);
   public final AtomicReference<T> result = new AtomicReference<T>();
+  public final AtomicReference<Throwable> failure = new AtomicReference<Throwable>();
 
   @Override
   public boolean isCancelled() {
@@ -46,7 +49,14 @@ public class Promise<T> implements Future<T> {
   }
 
   public void set(T obj) {
+    assert !isDone();
     result.set(obj);
+    onReady.release();
+  }
+
+  public void set(Throwable obj) {
+    assert !isDone();
+    failure.set(obj);
     onReady.release();
   }
 
@@ -59,6 +69,8 @@ public class Promise<T> implements Future<T> {
   public T get() throws InterruptedException {
     onReady.acquire();
     onReady.release();
+    Throwable e = failure.get();
+    if(e != null) throw Util.throwException(e);
     return result.get();
   }
 
@@ -66,6 +78,8 @@ public class Promise<T> implements Future<T> {
   public T get(long timeout, @Nonnull TimeUnit unit) throws InterruptedException, TimeoutException {
     if (onReady.tryAcquire(timeout, unit)) {
       onReady.release();
+      Throwable e = failure.get();
+      if(e != null) throw Util.throwException(e);
       return result.get();
     } else {
       throw new TimeoutException();
