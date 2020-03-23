@@ -26,6 +26,7 @@ import com.esotericsoftware.kryo.serializers.JavaSerializer;
 import com.esotericsoftware.kryo.serializers.OptionalSerializers;
 import com.esotericsoftware.kryonet.*;
 import com.esotericsoftware.kryonet.rmi.ObjectSpace;
+import com.esotericsoftware.minlog.Log;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.simiacryptus.lang.SerializableCallable;
 import com.simiacryptus.lang.SerializableConsumer;
@@ -62,6 +63,10 @@ import java.util.function.Predicate;
 import static com.simiacryptus.aws.EC2Util.*;
 
 public class Tendril {
+
+  static {
+    Log.WARN();
+  }
 
   private static final Logger logger = LoggerFactory.getLogger(Tendril.class);
   private static final int BUFFER_SIZE = 8 * 1024 * 1024;

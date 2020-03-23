@@ -31,6 +31,7 @@ import com.simiacryptus.notebook.NotebookOutput;
 import com.simiacryptus.ref.wrappers.RefString;
 import com.simiacryptus.ref.wrappers.RefSystem;
 import com.simiacryptus.util.JsonUtil;
+import com.simiacryptus.util.ReportingUtil;
 import com.simiacryptus.util.Util;
 import com.simiacryptus.util.S3Uploader;
 import com.simiacryptus.util.test.SysOutInterceptor;
@@ -100,7 +101,7 @@ public class RemoteNotebookDemo {
     });
     try {
       assert node != null;
-      Desktop.getDesktop().browse(new URI(RefString.format("http://%s:1080/", node.getStatus().getPublicIpAddress())));
+      ReportingUtil.browse(new URI(RefString.format("http://%s:1080/", node.getStatus().getPublicIpAddress())));
     } catch (@Nonnull IOException | URISyntaxException e) {
       logger.info("Error opening browser", e);
     }

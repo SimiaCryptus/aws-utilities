@@ -21,13 +21,16 @@ package com.simiacryptus.aws;
 
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import com.amazonaws.services.s3.model.ListObjectsRequest;
+import com.amazonaws.services.s3.model.ObjectListing;
+import com.amazonaws.services.s3.model.S3ObjectSummary;
 import com.simiacryptus.notebook.NotebookOutput;
 import com.simiacryptus.ref.lang.RefUtil;
 import com.simiacryptus.ref.wrappers.RefArrays;
 import com.simiacryptus.ref.wrappers.RefString;
+import com.simiacryptus.util.S3Uploader;
 import com.simiacryptus.util.Util;
 import com.simiacryptus.util.io.TeeInputStream;
-import com.simiacryptus.util.S3Uploader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,12 +42,47 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class S3Util {
 
   private final static Logger logger = LoggerFactory.getLogger(S3Util.class);
+
+  public static List<String> listFiles(URI location, Predicate<S3ObjectSummary> filter) {
+    assert location.getScheme().equals("s3");
+    String bucket = location.getHost();
+    String path = location.getPath();
+    while (path.startsWith("/")) path = path.substring(1);
+    return listFiles(bucket, path, filter);
+  }
+
+  public static List<String> listFiles(String bucket, String path, Predicate<S3ObjectSummary> filter) {
+    AmazonS3 s3 = S3Uploader.buildClientForRegion(S3Uploader.getRegion(bucket));
+    ListObjectsRequest listObjectsRequest = new ListObjectsRequest()
+        .withBucketName(bucket)
+        .withPrefix(path)
+        .withMaxKeys(Integer.MAX_VALUE);
+    return getAllObjectSummaries(s3, s3.listObjects(listObjectsRequest))
+        .filter(filter)
+        .map(x -> x.getKey())
+        .collect(Collectors.toList());
+  }
+
+  private static Stream<S3ObjectSummary> getAllObjectSummaries(AmazonS3 s3, ObjectListing listing) {
+    if(listing.isTruncated()) {
+      return Stream.concat(
+          listing.getObjectSummaries().stream(),
+          getAllObjectSummaries(s3, s3.listNextBatchOfObjects(listing))
+      );
+    } else {
+      return listing.getObjectSummaries().stream();
+    }
+  }
 
   @Nonnull
   public static Map<File, URL> upload(@Nonnull NotebookOutput log) {
