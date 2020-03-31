@@ -86,8 +86,13 @@ public class S3Util {
 
   @Nonnull
   public static Map<File, URL> upload(@Nonnull NotebookOutput log) {
-    synchronized (log) {
-      return upload(log, AmazonS3ClientBuilder.standard().withRegion(EC2Util.REGION).build());
+    URI archiveHome = log.getArchiveHome();
+    if(archiveHome != null && !archiveHome.getHost().isEmpty()) {
+      synchronized (log) {
+        return upload(log, AmazonS3ClientBuilder.standard().withRegion(EC2Util.REGION).build());
+      }
+    } else {
+      return new HashMap<>();
     }
   }
 
