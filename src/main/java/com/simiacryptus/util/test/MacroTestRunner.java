@@ -49,18 +49,17 @@ public class MacroTestRunner {
 
   private static int MAX_TEST_CLASSES = Integer.MAX_VALUE;
   private static int MAX_TEST_METHODS = Integer.MAX_VALUE;
+  private final Random RANDOM = new Random();
   private long maxChildAge = TimeUnit.MINUTES.toMillis(15);
+  private String childJvmOptions = "-Xmx16g -ea";
+  private Isolation isolation = Isolation.Class;
+
+  public Map<String, String> getChildEnvironment() {
+    return System.getenv();
+  }
 
   public String getChildJvmOptions() {
     return childJvmOptions;
-  }
-
-  public Isolation getIsolation() {
-    return isolation;
-  }
-
-  public long getMaxChildAge() {
-    return maxChildAge;
   }
 
   public MacroTestRunner setChildJvmOptions(String childJvmOptions) {
@@ -68,124 +67,23 @@ public class MacroTestRunner {
     return this;
   }
 
+  public Isolation getIsolation() {
+    return isolation;
+  }
+
   public MacroTestRunner setIsolation(Isolation isolation) {
     this.isolation = isolation;
     return this;
   }
 
-  public MacroTestRunner setMaxChildAge(long value, TimeUnit unit) {
-    this.maxChildAge = unit.toMillis(value);
-    return this;
+  public long getMaxChildAge() {
+    return maxChildAge;
   }
 
-  public enum Isolation {
-    None,
-    Class,
-    Method
-  }
-
-  private String childJvmOptions = "-Xmx16g -ea";
-  private Isolation isolation = Isolation.Class;
-
-  private final Random RANDOM = new Random();
-
-  public void runAll(NotebookOutput log, String packageName) {
-    URI testArchive = TestSettings.INSTANCE.testArchive;
-    String startDateId = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date());
-    if (null != testArchive) {
-      log.setArchiveHome(testArchive.resolve("runner/"+ startDateId +"/"));
-    }
-    String logRoot = log.getRoot().getAbsolutePath()
-        .replaceAll(" ", "\\ ");
-    String extraJvmOpts = String.format("-DSHUTDOWN_ON_EXIT=false -DTEST_REPO=%s -DMAX_AGE_MS=%s",
-        logRoot, getMaxChildAge());
-    getTestClasses(log, packageName)
-        .forEach((declaringClass, testClasses) -> {
-          log.h1(declaringClass.getSimpleName());
-          testClasses.forEach(testClass -> {
-            if (testClass != declaringClass) log.h2(testClass.getSimpleName());
-            String testClassName = testClass.getName();
-            switch (getIsolation()) {
-              case None:
-                getTestMethods(getClass(testClassName)).forEach(method -> {
-                  String methodName = method.getName();
-                  log.h3("Test Method: " + methodName);
-                  try {
-                    Map<File, String> files = log.eval(() -> {
-                      return runTest(System.out, testClassName, methodName);
-                    });
-                    files.forEach((file,name)->{
-                      log.p(log.link(file, "Report " + name));
-                    });
-                  } catch (Throwable e) {
-                    // Ignore. It was logged by the eval
-                  }
-                });
-                break;
-              case Class:
-                try {
-                  Map<File, String> files = log.eval(() -> {
-                    System.out.println("Test: " + testClassName);
-                    System.out.println("Working Directory: " + logRoot);
-                    try (TendrilControl localJvm = startLocalJvm(extraJvmOpts)) {
-                      return localJvm.start(() -> {
-                        ReportingUtil.AUTO_BROWSE = false;
-                        return MacroTestRunner.runTest(System.out, testClassName);
-                      }).get(30, TimeUnit.MINUTES);
-                    }
-                  });
-                  files.forEach((file,name)->{
-                    log.p(log.link(file, "Report " + name));
-                  });
-                } catch (Throwable e) {
-                  // Ignore. It was logged by the eval
-                }
-                break;
-              case Method:
-                getTestMethods(getClass(testClassName)).forEach(method -> {
-                  String methodName = method.getName();
-                  log.h3("Test Method: " + methodName);
-                  try {
-                    Map<File, String> files = log.eval(() -> {
-                      System.out.println("Test: " + testClassName);
-                      System.out.println("Working Directory: " + logRoot);
-                      try (TendrilControl localJvm = startLocalJvm(extraJvmOpts)) {
-                        return localJvm.start(() -> {
-                          ReportingUtil.AUTO_BROWSE = false;
-                          return runTest(System.out, testClassName, methodName);
-                        }).get(30, TimeUnit.MINUTES);
-                      }
-                    });
-                    files.forEach((file,name)->{
-                      log.p(log.link(file, "Report " + name));
-                    });
-                  } catch (Throwable e) {
-                    // Ignore. It was logged by the eval
-                  }
-                });
-                break;
-            }
-          });
-        });
-  }
-
-  public @Nonnull TendrilControl startLocalJvm(String extraJvmOpts) {
-    return Tendril.startLocalJvm(
-        16000 + RANDOM.nextInt(4 * 1024),
-        getChildJvmOptions() + " " + extraJvmOpts,
-        getChildEnvironment(),
-        workingDirectory(),
-        true
-    );
-  }
-
-  public Map<String, String> getChildEnvironment() {
-    return System.getenv();
-  }
-
-  @NotNull
-  public File workingDirectory() {
-    return new File("").getAbsoluteFile();
+  public static Map<File, String> getReports() {
+    Map<File, String> reports = new HashMap<>(NotebookReportBase.reports);
+    NotebookReportBase.reports.clear();
+    return reports;
   }
 
   public static Map<File, String> runTest(PrintStream out, String testName) throws ClassNotFoundException {
@@ -194,21 +92,6 @@ public class MacroTestRunner {
       RunNotifier notifier = new RunNotifier();
       notifier.addListener(new LoggingRunListener(printWriter, out));
       new JUnitPlatform(Class.forName(testName)).run(notifier);
-    }
-    return getReports();
-  }
-
-  public static Map<File, String> getReports() {
-    Map<File,String> reports = new HashMap<>(NotebookReportBase.reports);
-    NotebookReportBase.reports.clear();
-    return reports;
-  }
-
-  protected Map<File, String> runEachTest(PrintStream out, String testName) throws NoTestsRemainException, ClassNotFoundException {
-    for (Method method : getTestMethods(getClass(testName))) {
-      String methodName = method.getName();
-      out.println("Test Method: " + methodName);
-      runTest(out, testName, methodName);
     }
     return getReports();
   }
@@ -234,15 +117,6 @@ public class MacroTestRunner {
     return getReports();
   }
 
-  @NotNull
-  public List<Method> getTestMethods(Class<?> testClass) {
-    return Arrays.stream(testClass.getMethods())
-        .filter(method -> method.getAnnotation(org.junit.jupiter.api.Test.class) != null)
-        .sorted(Comparator.comparing(Method::getName))
-        .limit(MAX_TEST_METHODS)
-        .collect(Collectors.toList());
-  }
-
   public static String toString(TestExecutionSummary summary) {
     StringWriter stringWriter = new StringWriter();
     summary.printTo(new PrintWriter(stringWriter));
@@ -252,6 +126,115 @@ public class MacroTestRunner {
       return e.getMessage();
     }
     return stringWriter.toString();
+  }
+
+  public MacroTestRunner setMaxChildAge(long value, TimeUnit unit) {
+    this.maxChildAge = unit.toMillis(value);
+    return this;
+  }
+
+  public void runAll(NotebookOutput log, String packageName) {
+    URI testArchive = TestSettings.INSTANCE.testArchive;
+    String startDateId = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date());
+    if (null != testArchive) {
+      log.setArchiveHome(testArchive.resolve("runner/" + startDateId + "/"));
+    }
+    String logRoot = log.getRoot().getAbsolutePath()
+        .replaceAll(" ", "\\ ");
+    String extraJvmOpts = String.format("-DSHUTDOWN_ON_EXIT=false -DTEST_REPO=%s -DMAX_AGE_MS=%s",
+        logRoot, getMaxChildAge());
+    getTestClasses(log, packageName)
+        .forEach((declaringClass, testClasses) -> {
+          log.h1(declaringClass.getSimpleName());
+          testClasses.forEach(testClass -> {
+            if (testClass != declaringClass) log.h2(testClass.getSimpleName());
+            String testClassName = testClass.getName();
+            switch (getIsolation()) {
+              case None:
+                getTestMethods(getClass(testClassName)).forEach(method -> {
+                  String methodName = method.getName();
+                  log.h3("Test Method: " + methodName);
+                  try {
+                    Map<File, String> files = log.eval(() -> {
+                      return runTest(System.out, testClassName, methodName);
+                    });
+                    files.forEach((file, name) -> {
+                      log.p(log.link(file, "Report " + name));
+                    });
+                  } catch (Throwable e) {
+                    // Ignore. It was logged by the eval
+                  }
+                });
+                break;
+              case Class:
+                try {
+                  Map<File, String> files = log.eval(() -> {
+                    System.out.println("Test: " + testClassName);
+                    System.out.println("Working Directory: " + logRoot);
+                    try (TendrilControl localJvm = startLocalJvm(extraJvmOpts)) {
+                      return localJvm.start(() -> {
+                        ReportingUtil.AUTO_BROWSE = false;
+                        return MacroTestRunner.runTest(System.out, testClassName);
+                      }).get(30, TimeUnit.MINUTES);
+                    }
+                  });
+                  files.forEach((file, name) -> {
+                    log.p(log.link(file, "Report " + name));
+                  });
+                } catch (Throwable e) {
+                  // Ignore. It was logged by the eval
+                }
+                break;
+              case Method:
+                getTestMethods(getClass(testClassName)).forEach(method -> {
+                  String methodName = method.getName();
+                  log.h3("Test Method: " + methodName);
+                  try {
+                    Map<File, String> files = log.eval(() -> {
+                      System.out.println("Test: " + testClassName);
+                      System.out.println("Working Directory: " + logRoot);
+                      try (TendrilControl localJvm = startLocalJvm(extraJvmOpts)) {
+                        return localJvm.start(() -> {
+                          ReportingUtil.AUTO_BROWSE = false;
+                          return runTest(System.out, testClassName, methodName);
+                        }).get(30, TimeUnit.MINUTES);
+                      }
+                    });
+                    files.forEach((file, name) -> {
+                      log.p(log.link(file, "Report " + name));
+                    });
+                  } catch (Throwable e) {
+                    // Ignore. It was logged by the eval
+                  }
+                });
+                break;
+            }
+          });
+        });
+  }
+
+  public @Nonnull TendrilControl startLocalJvm(String extraJvmOpts) {
+    return Tendril.startLocalJvm(
+        16000 + RANDOM.nextInt(4 * 1024),
+        getChildJvmOptions() + " " + extraJvmOpts,
+        getChildEnvironment(),
+        workingDirectory(),
+        true
+    );
+  }
+
+  @NotNull
+  public File workingDirectory() {
+    return new File("").getAbsoluteFile();
+  }
+
+  @NotNull
+  public List<Method> getTestMethods(Class<?> testClass) {
+    return Arrays.stream(testClass.getMethods())
+        .filter(method -> method.getAnnotation(org.junit.jupiter.api.Test.class) != null)
+        .sorted(Comparator.comparing(Method::getName))
+        .limit(MAX_TEST_METHODS)
+        .collect(Collectors.toList());
   }
 
   public Map<Class<?>, List<Class<?>>> getTestClasses(NotebookOutput log, String packageName) {
@@ -280,6 +263,21 @@ public class MacroTestRunner {
             return declaringClass == null ? x : declaringClass;
           }));
     });
+  }
+
+  protected Map<File, String> runEachTest(PrintStream out, String testName) throws NoTestsRemainException, ClassNotFoundException {
+    for (Method method : getTestMethods(getClass(testName))) {
+      String methodName = method.getName();
+      out.println("Test Method: " + methodName);
+      runTest(out, testName, methodName);
+    }
+    return getReports();
+  }
+
+  public enum Isolation {
+    None,
+    Class,
+    Method
   }
 
   private static class LoggingRunListener extends RunListener {

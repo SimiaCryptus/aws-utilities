@@ -73,21 +73,10 @@ public class S3Util {
         .collect(Collectors.toList());
   }
 
-  private static Stream<S3ObjectSummary> getAllObjectSummaries(AmazonS3 s3, ObjectListing listing) {
-    if(listing.isTruncated()) {
-      return Stream.concat(
-          listing.getObjectSummaries().stream(),
-          getAllObjectSummaries(s3, s3.listNextBatchOfObjects(listing))
-      );
-    } else {
-      return listing.getObjectSummaries().stream();
-    }
-  }
-
   @Nonnull
   public static Map<File, URL> upload(@Nonnull NotebookOutput log) {
     URI archiveHome = log.getArchiveHome();
-    if(archiveHome != null && !archiveHome.getHost().isEmpty()) {
+    if (archiveHome != null && !archiveHome.getHost().isEmpty()) {
       synchronized (log) {
         return upload(log, AmazonS3ClientBuilder.standard().withRegion(EC2Util.REGION).build());
       }
@@ -175,6 +164,17 @@ public class S3Util {
         + "      \"Resource\": \"arn:aws:s3:::*\"\n" + "    },\n" + "    {\n"
         + "      \"Action\": [\"ses:SendEmail\",\"ses:SendRawEmail\"],\n" + "      \"Effect\": \"Allow\",\n"
         + "      \"Resource\": \"*\"\n" + "    }\n" + "  ]\n" + "}";
+  }
+
+  private static Stream<S3ObjectSummary> getAllObjectSummaries(AmazonS3 s3, ObjectListing listing) {
+    if (listing.isTruncated()) {
+      return Stream.concat(
+          listing.getObjectSummaries().stream(),
+          getAllObjectSummaries(s3, s3.listNextBatchOfObjects(listing))
+      );
+    } else {
+      return listing.getObjectSummaries().stream();
+    }
   }
 
 }

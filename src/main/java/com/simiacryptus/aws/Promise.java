@@ -70,7 +70,7 @@ public class Promise<T> implements Future<T> {
     onReady.acquire();
     onReady.release();
     Throwable e = failure.get();
-    if(e != null) throw Util.throwException(e);
+    if (e != null) throw Util.throwException(e);
     return result.get();
   }
 
@@ -79,7 +79,7 @@ public class Promise<T> implements Future<T> {
     if (onReady.tryAcquire(timeout, unit)) {
       onReady.release();
       Throwable e = failure.get();
-      if(e != null) throw Util.throwException(e);
+      if (e != null) throw Util.throwException(e);
       return result.get();
     } else {
       throw new TimeoutException();

@@ -78,10 +78,6 @@ public class EC2NotebookRunner {
     return AmazonIdentityManagementClientBuilder.standard().withRegion(EC2Util.REGION).build();
   }
 
-  public static AmazonS3 getS3(Regions region) {
-    return AmazonS3ClientBuilder.standard().withRegion(region).build();
-  }
-
   public boolean isEmailFiles() {
     return emailFiles;
   }
@@ -90,6 +86,10 @@ public class EC2NotebookRunner {
   public EC2NotebookRunner setEmailFiles(boolean emailFiles) {
     this.emailFiles = emailFiles;
     return this;
+  }
+
+  public static AmazonS3 getS3(Regions region) {
+    return AmazonS3ClientBuilder.standard().withRegion(region).build();
   }
 
   public static void test(@Nonnull SerializableConsumer<NotebookOutput>... reportTasks) {

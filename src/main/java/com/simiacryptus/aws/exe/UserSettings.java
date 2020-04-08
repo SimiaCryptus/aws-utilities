@@ -19,7 +19,6 @@
 
 package com.simiacryptus.aws.exe;
 
-import com.simiacryptus.ref.wrappers.RefSystem;
 import com.simiacryptus.util.JsonUtil;
 import com.simiacryptus.util.Util;
 

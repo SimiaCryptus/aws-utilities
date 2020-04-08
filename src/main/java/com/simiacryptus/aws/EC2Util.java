@@ -617,6 +617,10 @@ public class EC2Util {
       return new String(getOutBuffer().toByteArray(), charset);
     }
 
+    public boolean isAlive() {
+      return channel.isConnected() && !channel.isClosed() && !channel.isEOF();
+    }
+
     @Nonnull
     public String join() {
       try {
@@ -625,10 +629,6 @@ public class EC2Util {
       } catch (InterruptedException e) {
         throw Util.throwException(e);
       }
-    }
-
-    public boolean isAlive() {
-      return channel.isConnected() && !channel.isClosed() && !channel.isEOF();
     }
   }
 

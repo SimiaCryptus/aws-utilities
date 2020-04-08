@@ -64,12 +64,12 @@ import static com.simiacryptus.aws.EC2Util.*;
 
 public class Tendril {
 
+  private static final Logger logger = LoggerFactory.getLogger(Tendril.class);
+  private static final int BUFFER_SIZE = 8 * 1024 * 1024;
+
   static {
     Log.WARN();
   }
-
-  private static final Logger logger = LoggerFactory.getLogger(Tendril.class);
-  private static final int BUFFER_SIZE = 8 * 1024 * 1024;
 
   public static Kryo getKryo() {
     final Kryo kryo = new KryoInstantiator().setRegistrationRequired(false).setReferences(true).newKryo();
