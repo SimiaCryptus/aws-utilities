@@ -218,8 +218,7 @@ public class MacroTestRunner {
         16000 + RANDOM.nextInt(4 * 1024),
         getChildJvmOptions() + " " + extraJvmOpts,
         getChildEnvironment(),
-        workingDirectory(),
-        true
+        workingDirectory()
     );
   }
 

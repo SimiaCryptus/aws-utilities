@@ -40,6 +40,7 @@ import com.twitter.chill.java.Java8ClosureRegistrar;
 import com.twitter.chill.java.UnmodifiableCollectionSerializer;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.output.CloseShieldOutputStream;
+import org.jetbrains.annotations.NotNull;
 import org.objenesis.strategy.StdInstantiatorStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -194,8 +195,7 @@ public class Tendril {
   public static TendrilControl startLocalJvm(final int controlPort,
                                              @Nonnull final String javaOpts,
                                              @Nonnull final Map<String, String> env,
-                                             @Nonnull File workingDir,
-                                             boolean redirectOut) {
+                                             @Nonnull File workingDir) {
     final String programArguments = "";
     File javaBin = new File(new File(System.getProperty("java.home")), "bin");
     String javaExePath = RefUtil.get(RefArrays.stream(javaBin.listFiles()).filter(x -> {
@@ -229,27 +229,13 @@ public class Tendril {
       logEnv(workingDir, cmd, env);
       ProcessBuilder processBuilder = new ProcessBuilder().command(cmd)
           .directory(workingDir);
-      if (redirectOut) {
-        processBuilder = processBuilder
-            .redirectErrorStream(true)
-            .redirectError(ProcessBuilder.Redirect.PIPE)
-            .redirectOutput(ProcessBuilder.Redirect.PIPE);
-      } else {
-        processBuilder = processBuilder.inheritIO();
-      }
+      processBuilder = processBuilder
+          .redirectErrorStream(true)
+          .redirectError(ProcessBuilder.Redirect.PIPE)
+          .redirectOutput(ProcessBuilder.Redirect.PIPE);
       processBuilder.environment().putAll(env);
       Process process = processBuilder.start();
-      final Thread ioPump;
-      if (redirectOut) {
-        PrintStream target = SysOutInterceptor.INSTANCE.currentHandler();
-        ioPump = new Thread(() -> {
-          pumpIO(process, target);
-        });
-        ioPump.start();
-      } else {
-        ioPump = null;
-      }
-
+      final Thread ioPump = pump(process);
       TendrilLink tendrilLink = getControl(controlPort, process::isAlive);
       return new TendrilControl(new TendrilLink() {
         @Override
@@ -291,6 +277,20 @@ public class Tendril {
     } catch (IOException e) {
       throw new RuntimeException("Error running child jvm", e);
     }
+  }
+
+  @NotNull
+  public static Thread pump(Process process) {
+    return pump(process, SysOutInterceptor.INSTANCE.currentHandler());
+  }
+
+  @NotNull
+  public static Thread pump(Process process, PrintStream target) {
+    final Thread ioPump = new Thread(() -> {
+      pumpIO(process, target);
+    });
+    ioPump.start();
+    return ioPump;
   }
 
   @RefIgnore
@@ -600,7 +600,7 @@ public class Tendril {
       @Nonnull final JvmConfig jvmConfig,
       final int localControlPort,
       @Nonnull final Map<String, String> env) {
-    return startLocalJvm(localControlPort, jvmConfig.javaOpts, env, new File("."), true);
+    return startLocalJvm(localControlPort, jvmConfig.javaOpts, env, new File("."));
   }
 
   public interface TendrilLink {
