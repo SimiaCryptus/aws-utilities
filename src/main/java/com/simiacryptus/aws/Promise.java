@@ -19,6 +19,10 @@
 
 package com.simiacryptus.aws;
 
+import com.simiacryptus.ref.lang.RefAware;
+import com.simiacryptus.ref.lang.ReferenceCounting;
+import com.simiacryptus.ref.lang.ReferenceCountingBase;
+import com.simiacryptus.ref.wrappers.RefAtomicReference;
 import com.simiacryptus.util.Util;
 
 import javax.annotation.Nonnull;
@@ -28,10 +32,21 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
-public class Promise<T> implements Future<T> {
+public class Promise<T> extends ReferenceCountingBase implements Future<T> {
   public final Semaphore onReady = new Semaphore(0);
-  public final AtomicReference<T> result = new AtomicReference<T>();
+  public final RefAtomicReference<T> result = new RefAtomicReference<T>();
   public final AtomicReference<Throwable> failure = new AtomicReference<Throwable>();
+
+  @Override
+  public Promise<T> addRef() {
+    return (Promise<T>) super.addRef();
+  }
+
+  @Override
+  protected void _free() {
+    result.freeRef();
+    super._free();
+  }
 
   @Override
   public boolean isCancelled() {
@@ -48,7 +63,7 @@ public class Promise<T> implements Future<T> {
     }
   }
 
-  public void set(T obj) {
+  public void set(@RefAware T obj) {
     assert !isDone();
     result.set(obj);
     onReady.release();

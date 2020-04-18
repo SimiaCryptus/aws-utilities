@@ -23,8 +23,13 @@ import com.esotericsoftware.kryonet.rmi.TimeoutException;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.simiacryptus.lang.SerializableCallable;
 import com.simiacryptus.lang.UncheckedSupplier;
+import com.simiacryptus.ref.lang.RefAware;
+import com.simiacryptus.ref.lang.RefIgnore;
+import com.simiacryptus.ref.lang.RefUtil;
+import com.simiacryptus.ref.wrappers.RefHashMap;
 import com.simiacryptus.ref.wrappers.RefString;
 import com.simiacryptus.util.Util;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,7 +44,7 @@ import java.util.concurrent.TimeUnit;
 public class TendrilControl implements AutoCloseable {
 
   private static final Logger logger = LoggerFactory.getLogger(TendrilControl.class);
-  private final static HashMap<String, Promise> currentOperations = new HashMap<String, Promise>();
+  private final static RefHashMap<String, Promise> currentOperations = new RefHashMap<String, Promise>();
   private final static ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(1,
       new ThreadFactoryBuilder().setDaemon(true).build());
   private final Tendril.TendrilLink inner;
@@ -62,7 +67,7 @@ public class TendrilControl implements AutoCloseable {
     return start(task, 10, UUID.randomUUID().toString());
   }
 
-  @Nullable
+  @Nullable @RefAware
   public <T> Future<T> start(@Nullable UncheckedSupplier<T> task, int retries, String key) {
     if (null == task)
       return null;
@@ -73,29 +78,22 @@ public class TendrilControl implements AutoCloseable {
         boolean run;
         synchronized (currentOperations) {
           if (!currentOperations.containsKey(key)) {
-            currentOperations.put(key, promise);
+            RefUtil.freeRef(currentOperations.put(key, promise.addRef()));
             run = true;
           } else {
             run = false;
           }
         }
-        if (run)
-          new Thread(() -> {
-            try {
-              logger.warn(RefString.format("Task Start: %s", key));
-              promise.set(task.get());
-            } catch (Throwable e) {
-              logger.warn("Task Error", e);
-              promise.set(e);
-            } finally {
-              logger.warn("Task Exit: " + key);
-            }
-          }).start();
+        if (run) {
+          start(task, key, promise);
+        } else {
+          promise.freeRef();
+        }
         return key;
       });
       logger.info("Started task: " + taskKey, new RuntimeException());
       Promise<T> localPromise = new Promise<>();
-      scheduledExecutorService.schedule(new PollerTask<>(taskKey, localPromise), 10, TimeUnit.SECONDS);
+      scheduledExecutorService.schedule(new PollerTask<>(taskKey, localPromise.addRef()), 10, TimeUnit.SECONDS);
       return localPromise;
     } catch (Throwable e) {
       if (retries > 0) {
@@ -107,6 +105,22 @@ public class TendrilControl implements AutoCloseable {
     }
   }
 
+  @RefIgnore
+  public <T> void start(@NotNull UncheckedSupplier<T> task, String key, Promise<T> promise) {
+    new Thread(() -> {
+      try {
+        logger.warn(RefString.format("Task Start: %s", key));
+        promise.set(task.get());
+      } catch (Throwable e) {
+        logger.warn("Task Error", e);
+        promise.set(e);
+      } finally {
+        promise.freeRef();
+        logger.warn("Task Exit: " + key);
+      }
+    }).start();
+  }
+
   @Override
   public void close() {
     logger.info("Closing " + this);
@@ -115,7 +129,7 @@ public class TendrilControl implements AutoCloseable {
 
   private class PollerTask<T> implements Runnable {
     private final String taskKey;
-    private final Promise<T> localPromise;
+    private final @RefIgnore Promise<T> localPromise;
     private final int maxRetries = 4;
     int failures = 0;
 
@@ -128,9 +142,9 @@ public class TendrilControl implements AutoCloseable {
     public void run() {
       try {
         Object result = inner.run(() -> {
+          Promise promise = currentOperations.get(taskKey);
+          assert promise != null;
           try {
-            Promise promise = currentOperations.get(taskKey);
-            assert promise != null;
             if (promise.isDone()) {
               logger.info(RefString.format("Task complete: %s", taskKey));
               return promise.get();
@@ -141,6 +155,8 @@ public class TendrilControl implements AutoCloseable {
           } catch (Throwable e) {
             logger.info(RefString.format("Task error: %s", taskKey));
             return e;
+          } finally {
+            promise.freeRef();
           }
         });
         failures = 0;
