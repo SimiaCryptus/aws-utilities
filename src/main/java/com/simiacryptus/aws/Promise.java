@@ -20,7 +20,6 @@
 package com.simiacryptus.aws;
 
 import com.simiacryptus.ref.lang.RefAware;
-import com.simiacryptus.ref.lang.ReferenceCounting;
 import com.simiacryptus.ref.lang.ReferenceCountingBase;
 import com.simiacryptus.ref.wrappers.RefAtomicReference;
 import com.simiacryptus.util.Util;
@@ -38,17 +37,6 @@ public class Promise<T> extends ReferenceCountingBase implements Future<T> {
   public final AtomicReference<Throwable> failure = new AtomicReference<Throwable>();
 
   @Override
-  public Promise<T> addRef() {
-    return (Promise<T>) super.addRef();
-  }
-
-  @Override
-  protected void _free() {
-    result.freeRef();
-    super._free();
-  }
-
-  @Override
   public boolean isCancelled() {
     return false;
   }
@@ -61,6 +49,11 @@ public class Promise<T> extends ReferenceCountingBase implements Future<T> {
     } else {
       return false;
     }
+  }
+
+  @Override
+  public Promise<T> addRef() {
+    return (Promise<T>) super.addRef();
   }
 
   public void set(@RefAware T obj) {
@@ -99,5 +92,11 @@ public class Promise<T> extends ReferenceCountingBase implements Future<T> {
     } else {
       throw new TimeoutException();
     }
+  }
+
+  @Override
+  protected void _free() {
+    result.freeRef();
+    super._free();
   }
 }

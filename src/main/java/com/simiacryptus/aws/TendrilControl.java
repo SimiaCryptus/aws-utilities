@@ -34,7 +34,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -67,7 +66,8 @@ public class TendrilControl implements AutoCloseable {
     return start(task, 10, UUID.randomUUID().toString());
   }
 
-  @Nullable @RefAware
+  @Nullable
+  @RefAware
   public <T> Future<T> start(@Nullable UncheckedSupplier<T> task, int retries, String key) {
     if (null == task)
       return null;
@@ -129,7 +129,8 @@ public class TendrilControl implements AutoCloseable {
 
   private class PollerTask<T> implements Runnable {
     private final String taskKey;
-    private final @RefIgnore Promise<T> localPromise;
+    private final @RefIgnore
+    Promise<T> localPromise;
     private final int maxRetries = 4;
     int failures = 0;
 
