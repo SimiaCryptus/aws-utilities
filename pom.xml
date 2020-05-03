@@ -188,6 +188,7 @@
     <url>http://code.simiacrypt.us/release/${project.version}/aws-utilities</url>
     <distributionManagement>
         <site>
+            <id>simiacryptus</id>
             <url>s3://code.simiacrypt.us/release/${project.version}/aws-utilities</url>
         </site>
     </distributionManagement>
