@@ -101,7 +101,6 @@ public class TendrilSettings implements Settings {
       String securityGroup = "sg-0ec421448a2748215";
       String keyName = "key_480a7";
       String iamName = "runpol-f1abd";
-      String subnet = "subnet-b2262eef";
       log.p("\n\n" +
           "```bash\n" +
           "aws ec2 run-instances \\\n" +
@@ -111,19 +110,21 @@ public class TendrilSettings implements Settings {
           " --instance-type " + type + " \\\n" +
           " --count 1 \\\n" +
           " --security-group-ids " + securityGroup + " \\\n" +
-          " --subnet-id " + subnet + " \\\n" +
           " --iam-instance-profile Name=\"" + iamName + "\" \\\n" +
           " --key-name " + keyName + " \\\n" +
           " --user-data \"$(cat <<- EOF \n" +
           "\t#!/bin/bash\n" +
-          "\texport CP=\"\";\n" +
-          "\tcd ~/;\n" +
-          "\tfor jar in " + jars.stream().reduce((a, b) -> a + " " + b).orElse("") + "; \n" +
-          "\tdo \n" +
-          "\t  export FILE=\"" + this.localcp + "\\$jar\"; \n" +
-          "\t  aws s3 cp \"" + new URI("s3://" + this.bucket + "/" + this.keyspace + "/").normalize().toString() + "\\$jar\" \\$FILE; \n" +
-          "\t  export CP=\"\\$CP:\\$FILE\"; \tdone\n" +
-          "\tjava " + getDefines() + " -cp \\$CP " + Tendril.class.getName() + " continue\n" +
+          "\tsudo -H -u ec2-user /bin/bash << UIS\n" +
+          "\t\texport CP=\"\";\n" +
+          "\t\tcd ~/;\n" +
+          "\t\tfor jar in " + jars.stream().reduce((a, b) -> a + " " + b).orElse("") + "; \n" +
+          "\t\tdo \n" +
+          "\t\t  export FILE=\"" + this.localcp + "\\\\\\$jar\"; \n" +
+          "\t\t  aws s3 cp \"" + new URI("s3://" + this.bucket + "/" + this.keyspace + "/").normalize().toString() + "\\\\\\$jar\" \\\\\\$FILE; \n" +
+          "\t\t  export CP=\"\\\\\\$CP:\\\\\\$FILE\"; \n" +
+          "\t\tdone\n" +
+          "\t\tjava " + getDefines() + " -cp \\\\\\$CP " + Tendril.class.getName() + " continue\n" +
+          "\tUIS\n" +
           "EOF\n" +
           ")\"\n" +
           "```\n\n");
