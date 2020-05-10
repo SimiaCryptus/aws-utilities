@@ -161,22 +161,6 @@ public class Tendril {
     } catch (Throwable e) {
       e.printStackTrace();
     }
-    if(Stream.of(args).filter(x->x.equalsIgnoreCase("continue")).findAny().isPresent()) {
-      UncheckedSupplier<?> appTask = TendrilSettings.INSTANCE.getAppTask();
-      if(null != appTask) {
-        try {
-          new Thread(()->{
-            try {
-              appTask.get();
-            } catch (Exception e) {
-              e.printStackTrace();
-            }
-          }).run();
-        } catch (Exception e) {
-          e.printStackTrace();
-        }
-      }
-    }
   }
 
   @Nonnull

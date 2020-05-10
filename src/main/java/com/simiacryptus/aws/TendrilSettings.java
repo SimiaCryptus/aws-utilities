@@ -19,6 +19,7 @@
 
 package com.simiacryptus.aws;
 
+import com.amazonaws.util.EC2MetadataUtils;
 import com.simiacryptus.lang.Settings;
 import com.simiacryptus.lang.UncheckedSupplier;
 import com.simiacryptus.notebook.NotebookOutput;
@@ -94,18 +95,50 @@ public class TendrilSettings implements Settings {
           .map(x -> new File(x))
           .map(x -> x.getAbsolutePath().startsWith(localCpDir.getAbsolutePath()) ? (localCpDir.toPath().relativize(x.toPath()).toString()) : (x.getName()))
           .collect(Collectors.toList());
-      // JAVA_ARGS
+//      String region = "us-east-1";
+//      String ami = "ami-04f94a03f151839d7";
+//      String type = "m5.large";
+//      String securityGroup = "sg-0ec421448a2748215";
+//      String keyName = "key_480a7";
+//      String iamName = "runpol-f1abd";
       String region = "us-east-1";
-      String ami = "ami-04f94a03f151839d7";
-      String type = "m5.large";
-      String securityGroup = "sg-0ec421448a2748215";
-      String keyName = "key_480a7";
-      String iamName = "runpol-f1abd";
-      log.p("\n\n" +
+      String ami = "ami-00000000000000000";
+      String type = "xyz1.large";
+      String securityGroup = "sg-00000000000000000";
+      String keyName = "SSHKEY";
+      String iamName = "IAM-POLICY";
+      String userdata = "#!/bin/bash\n" +
+          "sudo -H -u ec2-user /bin/bash << UIS\n" +
+          "\texport CP=\"\";\n" +
+          "\tcd ~/;\n" +
+          "\tfor jar in " + jars.stream().reduce((a, b) -> a + " " + b).orElse("") + "; \n" +
+          "\tdo \n" +
+          "\t  export FILE=\"" + this.localcp + "\\\\\\$jar\"; \n" +
+          "\t  aws s3 cp \"" + new URI("s3://" + this.bucket + "/" + this.keyspace + "/").normalize().toString() + "\\\\\\$jar\" \\\\\\$FILE; \n" +
+          "\t  export CP=\"\\\\\\$CP:\\\\\\$FILE\"; \n" +
+          "\tdone\n" +
+          "\tnohup java " + getDefines() + " -cp \\\\\\$CP " + S3TaskRunner.class.getName() + " &\n" +
+          "UIS\n";
+      try {
+        region = EC2MetadataUtils.getEC2InstanceRegion();
+        ami = EC2MetadataUtils.getAmiId();
+        type = EC2MetadataUtils.getInstanceType();
+        securityGroup = EC2MetadataUtils.getSecurityGroups().get(0);
+        keyName = EC2MetadataUtils.getPublicKey();
+        iamName = EC2MetadataUtils.getIAMInstanceProfileInfo().instanceProfileId;
+        String userData = EC2MetadataUtils.getUserData().trim();
+        if(!userData.isEmpty()) userdata = userData + "\n";
+      } catch (Throwable e) {
+        e.printStackTrace();
+      }
+      log.p("To run this notebook on AWS yourself, simply run this awc cli command or the equivalent. " +
+          "Note you will need to configure and specify your own _security group_, _iam profile_, and _ssh key_.");
+      log.out("\n\n" +
           "```bash\n" +
           "aws ec2 run-instances \\\n" +
           " --region " + region + " \\\n" +
           " --associate-public-ip-address \\\n" +
+          " --instance-initiated-shutdown-behavior terminate \\\n" +
           " --image-id " + ami + " \\\n" +
           " --instance-type " + type + " \\\n" +
           " --count 1 \\\n" +
@@ -113,19 +146,8 @@ public class TendrilSettings implements Settings {
           " --iam-instance-profile Name=\"" + iamName + "\" \\\n" +
           " --key-name " + keyName + " \\\n" +
           " --user-data \"$(cat <<- EOF \n" +
-          "\t#!/bin/bash\n" +
-          "\tsudo -H -u ec2-user /bin/bash << UIS\n" +
-          "\t\texport CP=\"\";\n" +
-          "\t\tcd ~/;\n" +
-          "\t\tfor jar in " + jars.stream().reduce((a, b) -> a + " " + b).orElse("") + "; \n" +
-          "\t\tdo \n" +
-          "\t\t  export FILE=\"" + this.localcp + "\\\\\\$jar\"; \n" +
-          "\t\t  aws s3 cp \"" + new URI("s3://" + this.bucket + "/" + this.keyspace + "/").normalize().toString() + "\\\\\\$jar\" \\\\\\$FILE; \n" +
-          "\t\t  export CP=\"\\\\\\$CP:\\\\\\$FILE\"; \n" +
-          "\t\tdone\n" +
-          "\t\tjava " + getDefines() + " -cp \\\\\\$CP " + Tendril.class.getName() + " continue\n" +
-          "\tUIS\n" +
-          "EOF\n" +
+          "\t" + userdata.replaceAll("\n","\n\t") +
+          "\nEOF\n" +
           ")\"\n" +
           "```\n\n");
     } catch (URISyntaxException e) {
