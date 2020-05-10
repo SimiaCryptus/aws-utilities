@@ -33,7 +33,6 @@ import com.simiacryptus.aws.*;
 import com.simiacryptus.lang.SerializableConsumer;
 import com.simiacryptus.notebook.MarkdownNotebookOutput;
 import com.simiacryptus.notebook.NotebookOutput;
-import com.simiacryptus.ref.wrappers.RefHashMap;
 import com.simiacryptus.ref.wrappers.RefSystem;
 import com.simiacryptus.util.JsonUtil;
 import com.simiacryptus.util.ReportingUtil;
@@ -64,9 +63,8 @@ public class EC2NotebookRunner {
   private final String emailAddress = UserSettings.load().emailAddress;
   SerializableConsumer<NotebookOutput>[] fns;
   private String s3bucket = "";
-  private boolean emailFiles = false;
 
-  public EC2NotebookRunner(final SerializableConsumer<NotebookOutput>... fns) {
+  private EC2NotebookRunner(final SerializableConsumer<NotebookOutput>... fns) {
     this.fns = fns;
   }
 
@@ -76,16 +74,6 @@ public class EC2NotebookRunner {
 
   public static AmazonIdentityManagement getIam() {
     return AmazonIdentityManagementClientBuilder.standard().withRegion(EC2Util.REGION).build();
-  }
-
-  public boolean isEmailFiles() {
-    return emailFiles;
-  }
-
-  @Nonnull
-  public EC2NotebookRunner setEmailFiles(boolean emailFiles) {
-    this.emailFiles = emailFiles;
-    return this;
   }
 
   public static AmazonS3 getS3(Regions region) {
@@ -121,6 +109,10 @@ public class EC2NotebookRunner {
     try {
       final File file = new File(String.format("report/%s_%s", testName, UUID.randomUUID().toString()));
       try (NotebookOutput log = new MarkdownNotebookOutput(file, true, file.getName(), UUID.randomUUID(), 1080)) {
+        log.subreport("To Run Again On EC2", "run_ec2", sublog->{
+          TendrilSettings.INSTANCE.howToRun(sublog);
+          return null;
+        });
         consumer.accept(log);
         logger.info("Finished " + testName);
       } catch (Throwable e) {
@@ -140,13 +132,8 @@ public class EC2NotebookRunner {
     runner.launch(nodeSettings, jvmSettings);
   }
 
-  public void launch(EC2NodeSettings nodeSettings) {
-    final AwsTendrilNodeSettings settings = initNodeSettings(nodeSettings, EC2NodeSettings.AMI_AMAZON_DEEP_LEARNING);
-    launch(settings, initJvmSettings(settings));
-  }
-
   public void launch(AwsTendrilNodeSettings nodeSettings, Tendril.JvmConfig jvmConfig) {
-    s3bucket = nodeSettings.bucket;
+    s3bucket = nodeSettings.getBucket();
     EC2Util.EC2Node node = start(nodeSettings, jvmConfig);
     open(node);
     join(node);
@@ -173,19 +160,19 @@ public class EC2NotebookRunner {
     EC2Util.EC2Node node = settings.startNode(getEc2(), localControlPort);
     try {
       assert node != null;
-      String bucket = settings.getServiceConfig(getEc2()).bucket;
       TendrilControl tendrilControl = Tendril.startRemoteJvm(
           node,
           jvmConfig,
           localControlPort,
           file -> Tendril.defaultClasspathFilter(file),
-          S3Uploader.buildClientForBucket(bucket),
-          new RefHashMap<String, String>(),
-          bucket);
-      tendrilControl.start(() -> {
+          S3Uploader.buildClientForBucket(settings.getBucket()),
+          new HashMap<String, String>(),
+          settings.getBucket());
+      tendrilControl.start(TendrilSettings.INSTANCE.setAppTask(() -> {
         this.nodeMain();
         return null;
-      });
+      }));
+      //tendrilControl.close();
     } catch (Throwable e) {
       assert node != null;
       node.close();
@@ -245,7 +232,7 @@ public class EC2NotebookRunner {
         } else {
           uploads = new HashMap<>();
         }
-        EmailUtil.sendCompleteEmail(log, startTime, emailAddress, uploads, emailFiles);
+        EmailUtil.sendCompleteEmail(log, startTime, emailAddress, uploads, false);
       });
       try {
         sendStartEmail(testName, fn);

@@ -48,8 +48,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
-import java.util.Arrays;
-import java.util.Optional;
+import java.util.*;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -466,7 +465,7 @@ public class EC2Util {
 
   @Nonnull
   public static Process execAsync(@Nonnull final Session session, final String script, final OutputStream outBuffer,
-                                  @Nullable RefHashMap<String, String> env) {
+                                  @Nullable Map<String, String> env) {
     try {
       return new Process(session, script, outBuffer, env);
     } catch (JSchException e) {
@@ -535,13 +534,6 @@ public class EC2Util {
           .get(0).getInstances().get(0);
     }
 
-    @Nonnull
-    public TendrilControl startJvm(@Nonnull final AmazonEC2 ec2, @Nonnull final AmazonS3 s3, @Nonnull final AwsTendrilNodeSettings settings,
-                                   final int localControlPort) {
-      return Tendril.startRemoteJvm(this, settings.newJvmConfig(), localControlPort, file -> Tendril.defaultClasspathFilter(file),
-          s3, new RefHashMap<String, String>(), settings.getServiceConfig(ec2).bucket);
-    }
-
     public <T> T runAndTerminate(@Nonnull final Function<Session, T> task) {
       try {
         return task.apply(getConnection());
@@ -591,13 +583,12 @@ public class EC2Util {
     private final OutputStream outBuffer;
 
     public Process(@Nonnull final Session session, final String script, final OutputStream outBuffer,
-                   @Nonnull RefHashMap<String, String> env) throws JSchException {
+                   @Nonnull Map<String, String> env) throws JSchException {
       channel = (ChannelExec) session.openChannel("exec");
       channel.setCommand(script);
       this.outBuffer = outBuffer;
       channel.setOutputStream(this.outBuffer);
       env.forEach((k, v) -> channel.setEnv(k, v));
-      env.freeRef();
       channel.setExtOutputStream(new CloseShieldOutputStream(System.err));
       channel.connect();
     }
@@ -633,27 +624,23 @@ public class EC2Util {
   }
 
   public static class ServiceConfig {
-    public String bucket;
     public InstanceProfile instanceProfile;
     public String groupId;
     public KeyPair keyPair;
 
-    public ServiceConfig(@Nonnull final AmazonEC2 ec2, final String roleArn, final String bucket) {
-      this(ec2, roleArn, EC2Util.newSecurityGroup(ec2, 22, 1080, 4040, 8080), bucket);
+    public ServiceConfig(@Nonnull final AmazonEC2 ec2, final String roleArn) {
+      this(ec2, roleArn, EC2Util.newSecurityGroup(ec2, 22, 1080, 4040, 8080));
     }
 
-    public ServiceConfig(@Nonnull final AmazonEC2 ec2, final String roleArn, final String groupId, final String bucket) {
-      this(ec2, groupId, new InstanceProfile().withArn(roleArn), bucket);
+    public ServiceConfig(@Nonnull final AmazonEC2 ec2, final String roleArn, final String groupId) {
+      this(ec2, groupId, new InstanceProfile().withArn(roleArn));
     }
 
-    public ServiceConfig(@Nonnull final AmazonEC2 ec2, final String groupId, final InstanceProfile instanceProfile,
-                         final String bucket) {
-      this(groupId, instanceProfile, EC2Util.getKeyPair(ec2), bucket);
+    public ServiceConfig(@Nonnull final AmazonEC2 ec2, final String groupId, final InstanceProfile instanceProfile) {
+      this(groupId, instanceProfile, EC2Util.getKeyPair(ec2));
     }
 
-    public ServiceConfig(final String groupId, final InstanceProfile instanceProfile, final KeyPair keyPair,
-                         final String bucket) {
-      this.bucket = bucket;
+    public ServiceConfig(final String groupId, final InstanceProfile instanceProfile, final KeyPair keyPair) {
       this.groupId = groupId;
       this.instanceProfile = instanceProfile;
       this.keyPair = keyPair;

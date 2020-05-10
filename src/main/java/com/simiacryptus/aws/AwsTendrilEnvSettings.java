@@ -37,13 +37,21 @@ public class AwsTendrilEnvSettings implements Serializable {
   public AwsTendrilEnvSettings(final String securityGroup, final String instanceProfileArn, final String bucket) {
     this.securityGroup = securityGroup;
     this.instanceProfileArn = instanceProfileArn;
-    this.bucket = bucket;
+    this.setBucket(bucket);
   }
 
   public AwsTendrilEnvSettings() {
     this.securityGroup = "";
     this.instanceProfileArn = "";
-    this.bucket = "";
+    this.setBucket("");
+  }
+
+  public String getBucket() {
+    return bucket;
+  }
+
+  public void setBucket(String bucket) {
+    this.bucket = bucket;
   }
 
   @Nonnull
@@ -51,7 +59,7 @@ public class AwsTendrilEnvSettings implements Serializable {
                                              final String securityGroup, final String instanceProfileArn, final String bucket) {
     AwsTendrilNodeSettings self = new AwsTendrilNodeSettings();
     self.securityGroup = securityGroup;
-    self.bucket = bucket;
+    self.setBucket(bucket);
     self.instanceProfileArn = instanceProfileArn;
     self.imageId = imageId;
     self.instanceType = instanceType;
@@ -65,7 +73,7 @@ public class AwsTendrilEnvSettings implements Serializable {
                                             final String bucket) {
     AwsTendrilEnvSettings self = new AwsTendrilEnvSettings();
     self.securityGroup = securityGroup;
-    self.bucket = bucket;
+    self.setBucket(bucket);
     self.instanceProfileArn = instanceProfileArn;
     sleep(30000); // Pause for objects to init
     return self;
@@ -79,7 +87,7 @@ public class AwsTendrilEnvSettings implements Serializable {
 
   @JsonIgnore
   public EC2Util.ServiceConfig getServiceConfig(@Nonnull final AmazonEC2 ec2) {
-    return new EC2Util.ServiceConfig(ec2, this.securityGroup, new InstanceProfile().withArn(this.instanceProfileArn),
-        this.bucket);
+    return new EC2Util.ServiceConfig(ec2, this.securityGroup, new InstanceProfile().withArn(this.instanceProfileArn)
+    );
   }
 }

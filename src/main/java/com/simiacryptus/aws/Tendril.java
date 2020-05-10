@@ -21,6 +21,8 @@ package com.simiacryptus.aws;
 
 import com.amazonaws.services.s3.AmazonS3;
 import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
 import com.esotericsoftware.kryo.serializers.ClosureSerializer;
 import com.esotericsoftware.kryo.serializers.JavaSerializer;
 import com.esotericsoftware.kryo.serializers.OptionalSerializers;
@@ -30,6 +32,7 @@ import com.esotericsoftware.minlog.Log;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.simiacryptus.lang.SerializableCallable;
 import com.simiacryptus.lang.SerializableConsumer;
+import com.simiacryptus.lang.UncheckedSupplier;
 import com.simiacryptus.ref.lang.RefIgnore;
 import com.simiacryptus.ref.lang.RefUtil;
 import com.simiacryptus.ref.wrappers.*;
@@ -52,14 +55,12 @@ import java.lang.Process;
 import java.lang.invoke.SerializedLambda;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
-import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.BooleanSupplier;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.simiacryptus.aws.EC2Util.*;
 
@@ -160,34 +161,59 @@ public class Tendril {
     } catch (Throwable e) {
       e.printStackTrace();
     }
+    if(Stream.of(args).filter(x->x.equalsIgnoreCase("continue")).findAny().isPresent()) {
+      UncheckedSupplier<?> appTask = TendrilSettings.INSTANCE.getAppTask();
+      if(null != appTask) {
+        try {
+          new Thread(()->{
+            try {
+              appTask.get();
+            } catch (Exception e) {
+              e.printStackTrace();
+            }
+          }).run();
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
+      }
+    }
   }
 
   @Nonnull
-  public static TendrilControl startRemoteJvm(@Nonnull final EC2Node node, final int localControlPort, final String javaOpts,
-                                              final String programArguments, final String libPrefix, final String keyspace,
-                                              @Nonnull final Predicate<String> classpathFilter, @Nonnull final AmazonS3 s3, @Nonnull final RefHashMap<String, String> env,
-                                              final String bucket) {
+  public static TendrilControl startRemoteJvm(@Nonnull final EC2Node node,
+                                              final int localControlPort,
+                                              @Nonnull final Map<String, String> env,
+                                              String javaOpts,
+                                              final String programArguments,
+                                              final String libPrefix,
+                                              @Nonnull final AmazonS3 s3,
+                                              final String bucket,
+                                              final String keyspace,
+                                              @Nonnull final Predicate<String> classpathFilter) {
     String localClasspath = System.getProperty("java.class.path");
-    RefArrays.stream(new File(".").listFiles()).filter(x -> x.getName().endsWith(".json")).forEach(file -> {
+    Arrays.stream(new File(".").listFiles()).filter(x -> x.getName().endsWith(".json")).forEach(file -> {
       logger.info("Deploy " + file.getAbsoluteFile());
       node.scp(file, file.getName());
     });
-    String remoteClasspath = stageRemoteClasspath(node, localClasspath, classpathFilter, libPrefix, s3, bucket, keyspace);
-    String commandLine = RefString.format("nohup java %s -cp %s %s %s", javaOpts, remoteClasspath,
-        Tendril.class.getCanonicalName(), programArguments);
+    TendrilSettings.INSTANCE.bucket = bucket;
+    RemoteClasspath remoteClasspath = stageRemoteClasspath(node, localClasspath, classpathFilter, libPrefix, s3, bucket, keyspace);
+    javaOpts += String.format(" -D%s=%s -D%s=%s -D%s=%s -D%s=%s",
+        TendrilSettings.KEY_BUCKET, TendrilSettings.INSTANCE.bucket,
+        TendrilSettings.KEY_KEYSPACE, TendrilSettings.INSTANCE.keyspace,
+        TendrilSettings.KEY_LOCALCP, TendrilSettings.INSTANCE.localcp,
+        TendrilSettings.KEY_SESSION_ID, TendrilSettings.INSTANCE.session);
+    String commandLine = RefString.format("nohup java %s -cp %s %s %s",
+        javaOpts, remoteClasspath.getEc2classpath(), Tendril.class.getCanonicalName(), programArguments);
     logger.info("Java Local Classpath: " + localClasspath);
-    logger.info("Java Remote Classpath: " + remoteClasspath);
-    RefHashSet<Map.Entry<String, String>> temp_05_0006 = env.entrySet();
-    logger.info("Java Environment: " + temp_05_0006.stream().map(e -> {
-      String temp_05_0001 = e.getKey() + " = " + e.getValue();
+    logger.info("Java Remote Classpath: " + remoteClasspath.getEc2classpath());
+    logger.info("Java Environment: " + env.entrySet().stream().map(e -> {
+      String s = e.getKey() + " = " + e.getValue();
       RefUtil.freeRef(e);
-      return temp_05_0001;
+      return s;
     }).reduce((a, b) -> a + "; " + b).orElse(""));
-    temp_05_0006.freeRef();
     logger.info("Java Command Line: " + commandLine);
     EC2Util.Process process = execAsync(node.getConnection(), commandLine,
-        new CloseShieldOutputStream(System.out), RefUtil.addRef(env));
-    env.freeRef();
+        new CloseShieldOutputStream(System.out), env);
     return new TendrilControl(getControl(localControlPort, process::isAlive));
   }
 
@@ -442,10 +468,40 @@ public class Tendril {
     }
   }
 
+  public static <T> byte[] getBytes(T task) {
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    try(Output output = new Output(outputStream)) {
+      getKryo().writeClassAndObject(output, task);
+    }
+    return outputStream.toByteArray();
+  }
+
+  public static <T> T fromBytes(byte[] data) {
+    try(Input input = new Input(new ByteArrayInputStream(data))) {
+      return (T) getKryo().readClassAndObject(input);
+    }
+  }
+
+  private static class RemoteClasspath {
+    private final List<String> remoteJars;
+
+    private RemoteClasspath(List<String> remoteJars) {
+      this.remoteJars = remoteJars;
+    }
+
+    public String getEc2classpath() {
+      return remoteJars.stream().reduce((a, b) -> a + ":" + b).get();
+    }
+  }
+
   @Nonnull
-  public static String stageRemoteClasspath(@Nonnull final EC2Node node, @Nonnull final String localClasspath,
-                                            @Nonnull final Predicate<String> classpathFilter, final String libPrefix, @Nonnull final AmazonS3 s3,
-                                            @Nullable final String bucket, final String keyspace) {
+  public static RemoteClasspath stageRemoteClasspath(@Nonnull final EC2Node node,
+                                            @Nonnull final String localClasspath,
+                                            @Nonnull final Predicate<String> classpathFilter,
+                                            final String libPrefix,
+                                            @Nonnull final AmazonS3 s3,
+                                            @Nullable final String bucket,
+                                            final String keyspace) {
     logger.info(RefString.format("Mkdir %s: %s", libPrefix, node.exec("mkdir -p " + libPrefix)));
     ExecutorService executorService = Executors.newFixedThreadPool(4);
     PrintStream out = SysOutInterceptor.INSTANCE.currentHandler();
@@ -453,67 +509,64 @@ public class Tendril {
       RefStream<String> stream = RefArrays.stream(localClasspath.split(File.pathSeparator)).filter(classpathFilter);
       if (null != bucket && !bucket.isEmpty())
         stream = stream.parallel();
-      return RefUtil.get(stream.map(entryPath -> {
+      return new RemoteClasspath(stream.map(entryPath -> {
         return executorService.submit(() -> {
           PrintStream prev = SysOutInterceptor.INSTANCE.setCurrentHandler(out);
-          RefList<String> classpathEntry = stageClasspathEntry(node, libPrefix, entryPath, s3, bucket, keyspace);
+          List<String> classpathEntry = stageClasspathEntry(node, libPrefix, entryPath, s3, bucket, keyspace);
           SysOutInterceptor.INSTANCE.setCurrentHandler(prev);
-          String temp_05_0003 = RefUtil.get(classpathEntry.stream().reduce((a, b) -> a + ":" + b));
-          classpathEntry.freeRef();
-          return temp_05_0003;
+          return classpathEntry;
         });
-      }).map(x -> {
+      }).flatMap(x -> {
         try {
-          return (String) ((Future) x).get();
+          return ((List<String>) ((Future) x).get()).stream();
         } catch (InterruptedException e) {
           throw Util.throwException(e);
         } catch (ExecutionException e) {
           throw Util.throwException(e);
         }
-      }).reduce((a, b) -> a + ":" + b));
+      }).distinct().collect(Collectors.toList()));
     } finally {
       executorService.shutdown();
     }
   }
 
   @Nonnull
-  public static RefList<String> stageClasspathEntry(@Nonnull final EC2Node node, final String libPrefix, @Nonnull final String entryPath,
+  public static List<String> stageClasspathEntry(@Nonnull final EC2Node node, final String libPrefix, @Nonnull final String entryPath,
                                                     @Nonnull final AmazonS3 s3, final String bucket, final String keyspace) {
     final File entryFile = new File(entryPath);
     try {
       if (entryFile.isFile()) {
         String remote = libPrefix + ClasspathUtil.hash(entryFile) + ".jar";
-        logger.info(RefString.format("Staging %s via %s", entryPath, remote));
         try {
+          logger.info(RefString.format("Staging %s via %s", entryPath, remote));
           stage(node, entryFile, remote, s3, bucket, keyspace);
+          return Arrays.asList(remote);
         } catch (Throwable e) {
           throw new IOException(RefString.format("Error staging %s to %s/%s", entryFile, bucket, remote), e);
-          //logger.warn(String.format("Error staging %s to %s/%s", entryFile, bucket, remote), e);
         }
-        return RefArrays.asList(remote);
       } else {
         logger.info(RefString.format("Processing %s", entryPath));
-        RefArrayList<String> list = new RefArrayList<>();
+        ArrayList<File> list = new ArrayList<>();
         if (entryFile.getName().equals("classes") && entryFile.getParentFile().getName().equals("target")) {
           File javaSrc = new File(new File(new File(entryFile.getParentFile().getParentFile(), "src"), "main"), "java");
           if (javaSrc.exists())
-            list.add(addDir(node, libPrefix, s3, bucket, keyspace, javaSrc));
+            list.add(javaSrc);
           File scalaSrc = new File(new File(new File(entryFile.getParentFile().getParentFile(), "src"), "main"),
               "scala");
           if (scalaSrc.exists())
-            list.add(addDir(node, libPrefix, s3, bucket, keyspace, scalaSrc));
+            list.add(scalaSrc);
         }
         if (entryFile.getName().equals("test-classes") && entryFile.getParentFile().getName().equals("target")) {
           File javaSrc = new File(new File(new File(entryFile.getParentFile().getParentFile(), "src"), "test"), "java");
           if (javaSrc.exists())
-            list.add(addDir(node, libPrefix, s3, bucket, keyspace, javaSrc));
+            list.add(javaSrc);
           File scalaSrc = new File(new File(new File(entryFile.getParentFile().getParentFile(), "src"), "test"),
               "scala");
           if (scalaSrc.exists())
-            list.add(addDir(node, libPrefix, s3, bucket, keyspace, scalaSrc));
+            list.add(scalaSrc);
         }
-        list.add(addDir(node, libPrefix, s3, bucket, keyspace, entryFile));
-        return list;
+        list.add(entryFile);
+        return list.stream().map(x->addDir(node, libPrefix, s3, bucket, keyspace, x)).collect(Collectors.toList());
       }
     } catch (Throwable e) {
       throw e instanceof RuntimeException ? (RuntimeException) e : new RuntimeException(e);
@@ -522,9 +575,10 @@ public class Tendril {
 
   @Nonnull
   public static String addDir(@Nonnull final EC2Node node, final String libPrefix, @Nonnull final AmazonS3 s3, final String bucket,
-                              final String keyspace, @Nonnull final File entryFile) throws IOException, NoSuchAlgorithmException {
-    File tempJar = ClasspathUtil.toJar(entryFile);
+                              final String keyspace, @Nonnull final File entryFile) {
+    File tempJar = null;
     try {
+      tempJar = ClasspathUtil.toJar(entryFile);
       String remote = libPrefix + ClasspathUtil.hash(tempJar) + ".jar";
       logger.info(RefString.format("Uploading %s to %s", tempJar, remote));
       try {
@@ -533,6 +587,8 @@ public class Tendril {
         throw new RuntimeException(RefString.format("Error staging %s to %s", entryFile, remote), e);
       }
       return remote;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     } finally {
       tempJar.delete();
     }
@@ -589,10 +645,10 @@ public class Tendril {
       final int localControlPort,
       @Nonnull final Predicate<String> shouldTransfer,
       @Nonnull final AmazonS3 s3,
-      @Nullable final RefHashMap<String, String> env,
+      @Nullable final Map<String, String> env,
       @Nonnull final String bucket) {
-    return startRemoteJvm(node, localControlPort, jvmConfig.javaOpts, jvmConfig.programArguments,
-        jvmConfig.libPrefix, jvmConfig.keyspace, shouldTransfer, s3, env, bucket);
+    return startRemoteJvm(node, localControlPort, env, jvmConfig.javaOpts, jvmConfig.programArguments,
+        jvmConfig.libPrefix, s3, bucket, jvmConfig.keyspace, shouldTransfer);
   }
 
   @Nonnull

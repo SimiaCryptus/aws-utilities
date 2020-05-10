@@ -37,7 +37,7 @@ public final class AwsTendrilNodeSettings extends AwsTendrilEnvSettings {
   }
 
   public AwsTendrilNodeSettings(@Nonnull AwsTendrilEnvSettings parent) {
-    super(parent.securityGroup, parent.instanceProfileArn, parent.bucket);
+    super(parent.securityGroup, parent.instanceProfileArn, parent.getBucket());
   }
 
   public Tendril.JvmConfig newJvmConfig() {
