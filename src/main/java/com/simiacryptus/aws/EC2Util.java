@@ -279,11 +279,22 @@ public class EC2Util {
 
   @Nonnull
   public static InstanceProfile newIamRole(@Nonnull final AmazonIdentityManagement iam, @Nonnull final String policyDocument) {
-    String initialDocument = "{\n" + "               \"Version\" : \"2012-10-17\",\n"
-        + "               \"Statement\": [ {\n" + "                  \"Effect\": \"Allow\",\n"
-        + "                  \"Principal\": {\n" + "                     \"Service\": [ \"ec2.amazonaws.com\" ]\n"
-        + "                  },\n" + "                  \"Action\": [ \"sts:AssumeRole\" ]\n" + "               } ]\n"
-        + "            }";
+    String initialDocument = "{\n" +
+        "               \"Version\" : \"2012-10-17\",\n" +
+        "               \"Statement\": [\n" +
+        "                 {\n" +
+        "                  \"Effect\": \"Allow\",\n" +
+        "                  \"Principal\": {\n" +
+        "                     \"Service\": [ \"ec2.amazonaws.com\" ]\n" +
+        "                  },\n" +
+        "                  \"Action\": [ \"sts:AssumeRole\" ]\n" +
+        "                 }, {\n" +
+        "                  \"Effect\": \"Allow\",\n" +
+        "                  \"Resource\": \"*\",\n" +
+        "                  \"Action\": \"ec2:DescribeInstances\"\n" +
+        "                 }\n" +
+        "               ]\n" +
+        "            }";
     String id = randomHex();
     Role role = iam
         .createRole(new CreateRoleRequest().withRoleName("role_" + id).withAssumeRolePolicyDocument(initialDocument))

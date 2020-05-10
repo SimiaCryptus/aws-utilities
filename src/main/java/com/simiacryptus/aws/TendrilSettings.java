@@ -19,6 +19,11 @@
 
 package com.simiacryptus.aws;
 
+import com.amazonaws.services.ec2.AmazonEC2ClientBuilder;
+import com.amazonaws.services.ec2.model.DescribeInstancesRequest;
+import com.amazonaws.services.ec2.model.DescribeInstancesResult;
+import com.amazonaws.services.ec2.model.Instance;
+import com.amazonaws.services.ec2.model.Reservation;
 import com.amazonaws.util.EC2MetadataUtils;
 import com.simiacryptus.lang.Settings;
 import com.simiacryptus.lang.UncheckedSupplier;
@@ -106,7 +111,7 @@ public class TendrilSettings implements Settings {
       String type = "xyz1.large";
       String securityGroup = "sg-00000000000000000";
       String keyName = "SSHKEY";
-      String iamName = "IAM-POLICY";
+      String iamName = "IAM-ARN";
       String userdata = "#!/bin/bash\n" +
           "sudo -H -u ec2-user /bin/bash << UIS\n" +
           "\texport CP=\"\";\n" +
@@ -118,16 +123,28 @@ public class TendrilSettings implements Settings {
           "\t  export CP=\"\\\\\\$CP:\\\\\\$FILE\"; \n" +
           "\tdone\n" +
           "\tnohup java " + getDefines() + " -cp \\\\\\$CP " + S3TaskRunner.class.getName() + " &\n" +
-          "UIS\n";
+          "UIS";
       try {
         region = EC2MetadataUtils.getEC2InstanceRegion();
         ami = EC2MetadataUtils.getAmiId();
         type = EC2MetadataUtils.getInstanceType();
         securityGroup = EC2MetadataUtils.getSecurityGroups().get(0);
-        keyName = EC2MetadataUtils.getPublicKey();
-        iamName = EC2MetadataUtils.getIAMInstanceProfileInfo().instanceProfileId;
+        iamName = EC2MetadataUtils.getIAMInstanceProfileInfo().instanceProfileArn;
+      } catch (Throwable e) {
+        e.printStackTrace();
+      }
+      try {
         String userData = EC2MetadataUtils.getUserData().trim();
         if(!userData.isEmpty()) userdata = userData + "\n";
+      } catch (Throwable e) {
+        e.printStackTrace();
+      }
+      try {
+        AmazonEC2ClientBuilder standard = AmazonEC2ClientBuilder.standard();
+        standard.setRegion(region);
+        DescribeInstancesResult result = standard.build().describeInstances(new DescribeInstancesRequest().withInstanceIds(EC2MetadataUtils.getInstanceId()));
+        Instance instance = result.getReservations().stream().flatMap(x->x.getInstances().stream()).findAny().get();
+        keyName = instance.getKeyName();
       } catch (Throwable e) {
         e.printStackTrace();
       }
@@ -137,18 +154,18 @@ public class TendrilSettings implements Settings {
           "```bash\n" +
           "aws ec2 run-instances \\\n" +
           " --region " + region + " \\\n" +
-          " --associate-public-ip-address \\\n" +
+          //" --associate-public-ip-address \\\n" +
           " --instance-initiated-shutdown-behavior terminate \\\n" +
           " --image-id " + ami + " \\\n" +
           " --instance-type " + type + " \\\n" +
           " --count 1 \\\n" +
-          " --security-group-ids " + securityGroup + " \\\n" +
-          " --iam-instance-profile Name=\"" + iamName + "\" \\\n" +
+          " --security-groups " + securityGroup + " \\\n" +
+          " --iam-instance-profile Arn=\"" + iamName + "\" \\\n" +
           " --key-name " + keyName + " \\\n" +
           " --user-data \"$(cat <<- EOF \n" +
           "\t" + userdata.replaceAll("\n","\n\t") +
           "\nEOF\n" +
-          ")\"\n" +
+          ")\"\n\n" +
           "```\n\n");
     } catch (URISyntaxException e) {
       throw new RuntimeException(e);
