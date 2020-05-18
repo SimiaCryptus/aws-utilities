@@ -109,7 +109,7 @@ public class EC2NotebookRunner {
     try {
       final File file = new File(String.format("report/%s_%s", testName, UUID.randomUUID().toString()));
       try (NotebookOutput log = new MarkdownNotebookOutput(file, true, file.getName(), UUID.randomUUID(), 1080)) {
-        log.subreport("To Run Again On EC2", "run_ec2", sublog->{
+        log.subreport("To Run Again On EC2", "run_ec2", sublog -> {
           TendrilSettings.INSTANCE.howToRun(sublog);
           return null;
         });

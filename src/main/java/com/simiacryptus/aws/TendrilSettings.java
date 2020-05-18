@@ -23,7 +23,6 @@ import com.amazonaws.services.ec2.AmazonEC2ClientBuilder;
 import com.amazonaws.services.ec2.model.DescribeInstancesRequest;
 import com.amazonaws.services.ec2.model.DescribeInstancesResult;
 import com.amazonaws.services.ec2.model.Instance;
-import com.amazonaws.services.ec2.model.Reservation;
 import com.amazonaws.util.EC2MetadataUtils;
 import com.simiacryptus.lang.Settings;
 import com.simiacryptus.lang.UncheckedSupplier;
@@ -50,10 +49,10 @@ public class TendrilSettings implements Settings {
   public static final String KEY_KEYSPACE = "tendril.keyspace";
   public static final String KEY_LOCALCP = "tendril.localcp";
   public static final String KEY_SESSION_ID = "tendril.sessionId";
-  public static String bucket = get(KEY_BUCKET, "simiacryptus");
-  public static final String keyspace = get(KEY_KEYSPACE, "lib/");
-  public static final String localcp = get(KEY_LOCALCP, "~/lib/");
-  public static final String session = get(KEY_SESSION_ID, UUID.randomUUID().toString());
+  public final String keyspace = get(KEY_KEYSPACE, "lib/");
+  public final String localcp = get(KEY_LOCALCP, "~/lib/");
+  public final String session = get(KEY_SESSION_ID, UUID.randomUUID().toString());
+  public String bucket = get(KEY_BUCKET, "simiacryptus");
 
   private TendrilSettings() {
   }
@@ -64,7 +63,7 @@ public class TendrilSettings implements Settings {
       URI appHome = getS3AppHome();
       logger.info("Downloading App Task: " + appHome);
       byte[] download = S3Uploader.download(appHome);
-      if(null != download) {
+      if (null != download) {
         logger.info("Downloaded: " + appHome);
         return Tendril.fromBytes(download);
       }
@@ -75,10 +74,38 @@ public class TendrilSettings implements Settings {
   }
 
   @NotNull
+  @RefIgnore
+  public String getDefines() {
+    return toDefineCli(set(systemProperties()));
+  }
+
+  @NotNull
   public URI getS3AppHome() throws URISyntaxException {
     String sessionFile = session.replace('-', '_').replaceAll("_", "");
     return new URI(String.format("s3://%s/%s/apps/%s.kryo",
         bucket, keyspace, sessionFile)).normalize();
+  }
+
+  @NotNull
+  public static HashMap<String, String> systemProperties() {
+    HashMap<String, String> defines = new HashMap<>();
+    System.getProperties().forEach((k, v) -> defines.put(k.toString(), v.toString()));
+    return defines;
+  }
+
+  @NotNull
+  @RefIgnore
+  public static String toDefineCli(HashMap<String, String> defines) {
+    return defines.entrySet().stream()
+        .filter(x -> !x.getKey().startsWith("java."))
+        .filter(x -> !x.getKey().startsWith("sun."))
+        .filter(x -> !x.getKey().startsWith("file."))
+        .filter(x -> !x.getKey().startsWith("os."))
+        .filter(x -> !x.getKey().startsWith("awt."))
+        .filter(x -> !x.getKey().startsWith("user."))
+        .filter(x -> !x.getKey().endsWith(".separator"))
+        .map(e -> "-D" + e.getKey() + "=" + e.getValue())
+        .reduce((a, b) -> a + " " + b).get();
   }
 
   public <T> UncheckedSupplier<T> setAppTask(UncheckedSupplier<T> task) {
@@ -131,22 +158,22 @@ public class TendrilSettings implements Settings {
         securityGroup = EC2MetadataUtils.getSecurityGroups().get(0);
         iamName = EC2MetadataUtils.getIAMInstanceProfileInfo().instanceProfileArn;
       } catch (Throwable e) {
-        e.printStackTrace();
+        //e.printStackTrace();
       }
       try {
         String userData = EC2MetadataUtils.getUserData().trim();
-        if(!userData.isEmpty()) userdata = userData + "\n";
+        if (!userData.isEmpty()) userdata = userData + "\n";
       } catch (Throwable e) {
-        e.printStackTrace();
+        //e.printStackTrace();
       }
       try {
         AmazonEC2ClientBuilder standard = AmazonEC2ClientBuilder.standard();
         standard.setRegion(region);
         DescribeInstancesResult result = standard.build().describeInstances(new DescribeInstancesRequest().withInstanceIds(EC2MetadataUtils.getInstanceId()));
-        Instance instance = result.getReservations().stream().flatMap(x->x.getInstances().stream()).findAny().get();
+        Instance instance = result.getReservations().stream().flatMap(x -> x.getInstances().stream()).findAny().get();
         keyName = instance.getKeyName();
       } catch (Throwable e) {
-        e.printStackTrace();
+        //e.printStackTrace();
       }
       log.p("To run this notebook on AWS yourself, simply run this awc cli command or the equivalent. " +
           "Note you will need to configure and specify your own _security group_, _iam profile_, and _ssh key_.");
@@ -163,7 +190,7 @@ public class TendrilSettings implements Settings {
           " --iam-instance-profile Arn=\"" + iamName + "\" \\\n" +
           " --key-name " + keyName + " \\\n" +
           " --user-data \"$(cat <<- EOF \n" +
-          "\t" + userdata.replaceAll("\n","\n\t") +
+          "\t" + userdata.replaceAll("\n", "\n\t") +
           "\nEOF\n" +
           ")\"\n\n" +
           "```\n\n");
@@ -172,39 +199,12 @@ public class TendrilSettings implements Settings {
     }
   }
 
-  @NotNull
-  @RefIgnore
-  public String getDefines() {
-    return toDefineCli(set(systemProperties()));
-  }
-
-  @NotNull
-  public static HashMap<String, String> systemProperties() {
-    HashMap<String, String> defines = new HashMap<>();
-    System.getProperties().forEach((k, v) -> defines.put(k.toString(), v.toString()));
-    return defines;
-  }
-
   public HashMap<String, String> set(HashMap<String, String> defines) {
     defines.put(TendrilSettings.KEY_BUCKET, TendrilSettings.INSTANCE.bucket);
     defines.put(TendrilSettings.KEY_KEYSPACE, TendrilSettings.INSTANCE.keyspace);
     defines.put(TendrilSettings.KEY_LOCALCP, TendrilSettings.INSTANCE.localcp);
     defines.put(TendrilSettings.KEY_SESSION_ID, TendrilSettings.INSTANCE.session);
     return defines;
-  }
-
-  @NotNull
-  public static String toDefineCli(HashMap<String, String> defines) {
-    return defines.entrySet().stream()
-        .filter(x -> !x.getKey().startsWith("java."))
-        .filter(x -> !x.getKey().startsWith("sun."))
-        .filter(x -> !x.getKey().startsWith("file."))
-        .filter(x -> !x.getKey().startsWith("os."))
-        .filter(x -> !x.getKey().startsWith("awt."))
-        .filter(x -> !x.getKey().startsWith("user."))
-        .filter(x -> !x.getKey().endsWith(".separator"))
-        .map(e -> "-D" + e.getKey() + "=" + e.getValue())
-        .reduce((a, b) -> a + " " + b).get();
   }
 
 }

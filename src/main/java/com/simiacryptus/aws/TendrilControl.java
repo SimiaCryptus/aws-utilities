@@ -66,9 +66,15 @@ public class TendrilControl implements AutoCloseable {
     return start(task, 10, UUID.randomUUID().toString());
   }
 
+  @Override
+  public void close() {
+    logger.info("Closing " + this);
+    inner.exit();
+  }
+
   @Nullable
   @RefAware
-  public <T> Future<T> start(@Nullable UncheckedSupplier<T> task, int retries, String key) {
+  private <T> Future<T> start(@Nullable UncheckedSupplier<T> task, int retries, String key) {
     if (null == task)
       return null;
     assert inner.isAlive();
@@ -106,7 +112,7 @@ public class TendrilControl implements AutoCloseable {
   }
 
   @RefIgnore
-  public <T> void start(@NotNull UncheckedSupplier<T> task, String key, Promise<T> promise) {
+  private <T> void start(@NotNull UncheckedSupplier<T> task, String key, Promise<T> promise) {
     new Thread(() -> {
       try {
         logger.warn(RefString.format("Task Start: %s", key));
@@ -119,12 +125,6 @@ public class TendrilControl implements AutoCloseable {
         logger.warn("Task Exit: " + key);
       }
     }).start();
-  }
-
-  @Override
-  public void close() {
-    logger.info("Closing " + this);
-    inner.exit();
   }
 
   private class PollerTask<T> implements Runnable {

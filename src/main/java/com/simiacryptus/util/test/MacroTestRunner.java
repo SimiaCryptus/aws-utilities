@@ -81,8 +81,8 @@ public class MacroTestRunner {
   }
 
   public static Map<File, String> getReports() {
-    Map<File, String> reports = new HashMap<>(NotebookReportBase.reports);
-    NotebookReportBase.reports.clear();
+    Map<File, String> reports = new HashMap<>(NotebookTestBase.reports);
+    NotebookTestBase.reports.clear();
     return reports;
   }
 
@@ -250,7 +250,7 @@ public class MacroTestRunner {
             }
           })
           .filter(c -> (c.getModifiers() & Modifier.ABSTRACT) == 0)
-          .filter(NotebookReportBase.class::isAssignableFrom)
+          .filter(NotebookTestBase.class::isAssignableFrom)
           .sorted(Comparator.comparing(c -> c.getCanonicalName()))
           .limit(MAX_TEST_CLASSES)
           .map(aClass -> {

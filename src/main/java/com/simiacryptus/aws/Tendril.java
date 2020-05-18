@@ -32,10 +32,11 @@ import com.esotericsoftware.minlog.Log;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.simiacryptus.lang.SerializableCallable;
 import com.simiacryptus.lang.SerializableConsumer;
-import com.simiacryptus.lang.UncheckedSupplier;
 import com.simiacryptus.ref.lang.RefIgnore;
 import com.simiacryptus.ref.lang.RefUtil;
-import com.simiacryptus.ref.wrappers.*;
+import com.simiacryptus.ref.wrappers.RefArrays;
+import com.simiacryptus.ref.wrappers.RefStream;
+import com.simiacryptus.ref.wrappers.RefString;
 import com.simiacryptus.util.Util;
 import com.simiacryptus.util.test.SysOutInterceptor;
 import com.twitter.chill.KryoInstantiator;
@@ -55,12 +56,14 @@ import java.lang.Process;
 import java.lang.invoke.SerializedLambda;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.*;
 import java.util.function.BooleanSupplier;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static com.simiacryptus.aws.EC2Util.*;
 
@@ -454,38 +457,26 @@ public class Tendril {
 
   public static <T> byte[] getBytes(T task) {
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-    try(Output output = new Output(outputStream)) {
+    try (Output output = new Output(outputStream)) {
       getKryo().writeClassAndObject(output, task);
     }
     return outputStream.toByteArray();
   }
 
   public static <T> T fromBytes(byte[] data) {
-    try(Input input = new Input(new ByteArrayInputStream(data))) {
+    try (Input input = new Input(new ByteArrayInputStream(data))) {
       return (T) getKryo().readClassAndObject(input);
-    }
-  }
-
-  private static class RemoteClasspath {
-    private final List<String> remoteJars;
-
-    private RemoteClasspath(List<String> remoteJars) {
-      this.remoteJars = remoteJars;
-    }
-
-    public String getEc2classpath() {
-      return remoteJars.stream().reduce((a, b) -> a + ":" + b).get();
     }
   }
 
   @Nonnull
   public static RemoteClasspath stageRemoteClasspath(@Nonnull final EC2Node node,
-                                            @Nonnull final String localClasspath,
-                                            @Nonnull final Predicate<String> classpathFilter,
-                                            final String libPrefix,
-                                            @Nonnull final AmazonS3 s3,
-                                            @Nullable final String bucket,
-                                            final String keyspace) {
+                                                     @Nonnull final String localClasspath,
+                                                     @Nonnull final Predicate<String> classpathFilter,
+                                                     final String libPrefix,
+                                                     @Nonnull final AmazonS3 s3,
+                                                     @Nullable final String bucket,
+                                                     final String keyspace) {
     logger.info(RefString.format("Mkdir %s: %s", libPrefix, node.exec("mkdir -p " + libPrefix)));
     ExecutorService executorService = Executors.newFixedThreadPool(4);
     PrintStream out = SysOutInterceptor.INSTANCE.currentHandler();
@@ -516,7 +507,7 @@ public class Tendril {
 
   @Nonnull
   public static List<String> stageClasspathEntry(@Nonnull final EC2Node node, final String libPrefix, @Nonnull final String entryPath,
-                                                    @Nonnull final AmazonS3 s3, final String bucket, final String keyspace) {
+                                                 @Nonnull final AmazonS3 s3, final String bucket, final String keyspace) {
     final File entryFile = new File(entryPath);
     try {
       if (entryFile.isFile()) {
@@ -550,7 +541,7 @@ public class Tendril {
             list.add(scalaSrc);
         }
         list.add(entryFile);
-        return list.stream().map(x->addDir(node, libPrefix, s3, bucket, keyspace, x)).collect(Collectors.toList());
+        return list.stream().map(x -> addDir(node, libPrefix, s3, bucket, keyspace, x)).collect(Collectors.toList());
       }
     } catch (Throwable e) {
       throw e instanceof RuntimeException ? (RuntimeException) e : new RuntimeException(e);
@@ -699,6 +690,18 @@ public class Tendril {
     public <T> T run(@Nonnull final SerializableCallable<T> task) throws Exception {
       contacted = true;
       return task.call();
+    }
+  }
+
+  private static class RemoteClasspath {
+    private final List<String> remoteJars;
+
+    private RemoteClasspath(List<String> remoteJars) {
+      this.remoteJars = remoteJars;
+    }
+
+    public String getEc2classpath() {
+      return remoteJars.stream().reduce((a, b) -> a + ":" + b).get();
     }
   }
 

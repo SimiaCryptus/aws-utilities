@@ -29,6 +29,7 @@ import com.amazonaws.services.identitymanagement.AmazonIdentityManagementClientB
 import com.amazonaws.services.identitymanagement.model.*;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.PutObjectRequest;
+import com.amazonaws.util.EC2MetadataUtils;
 import com.amazonaws.util.StringInputStream;
 import com.jcraft.jsch.*;
 import com.simiacryptus.ref.lang.RefUtil;
@@ -452,7 +453,7 @@ public class EC2Util {
   public static String exec(@Nonnull final Session session, final String script) {
     try {
       logger.debug("Executing: " + script);
-      Process process = execAsync(session, script, new RefHashMap<String, String>());
+      Process process = execAsync(session, script, new HashMap<String, String>());
       join(process.getChannel());
       String output = new String(process.getOutBuffer().toByteArray(), charset);
       int exitStatus = process.getChannel().getExitStatus();
@@ -467,11 +468,8 @@ public class EC2Util {
   }
 
   @Nonnull
-  public static Process execAsync(@Nonnull final Session session, final String script, @Nullable RefHashMap<String, String> env) {
-    EC2Util.Process temp_06_0001 = execAsync(session, script, new ByteArrayOutputStream(), RefUtil.addRef(env));
-    if (null != env)
-      env.freeRef();
-    return temp_06_0001;
+  public static Process execAsync(@Nonnull final Session session, final String script, @Nullable HashMap<String, String> env) {
+    return execAsync(session, script, new ByteArrayOutputStream(), env);
   }
 
   @Nonnull
@@ -512,13 +510,27 @@ public class EC2Util {
 
   @Nonnull
   public static AwsTendrilEnvSettings setup(@Nonnull AmazonEC2 ec2, @Nonnull final AmazonIdentityManagement iam, @Nonnull final AmazonS3 s3) {
-    return setup(ec2, iam, s3.createBucket("data-" + randomHex()).getName());
+    String bucket;
+    //bucket = s3.createBucket("data-" + randomHex()).getName();
+    bucket = TendrilSettings.INSTANCE.bucket;
+    return setup(ec2, iam, bucket);
   }
 
   @Nonnull
   public static AwsTendrilEnvSettings setup(@Nonnull AmazonEC2 ec2, @Nonnull final AmazonIdentityManagement iam, final String bucket) {
-    return AwsTendrilEnvSettings.setup(newSecurityGroup(ec2, 22, 1080, 4040, 8080),
-        newIamRole(iam, S3Util.defaultPolicy(bucket)).getArn(), bucket);
+    String securityGroup;
+    try {
+      securityGroup = EC2MetadataUtils.getSecurityGroups().get(0);
+    } catch (Exception e) {
+      securityGroup = newSecurityGroup(ec2, 22, 1080, 4040, 8080);
+    }
+    String profileArn;
+    try {
+      profileArn = EC2MetadataUtils.getIAMInstanceProfileInfo().instanceProfileArn;
+    } catch (Exception e) {
+      profileArn = newIamRole(iam, S3Util.defaultPolicy(bucket)).getArn();
+    }
+    return AwsTendrilEnvSettings.setup(securityGroup, profileArn, bucket);
   }
 
   public static class EC2Node implements AutoCloseable {
@@ -579,7 +591,7 @@ public class EC2Util {
 
     @Nonnull
     public Process execAsync(final String command) {
-      return EC2Util.execAsync(getConnection(), command, new RefHashMap<String, String>());
+      return EC2Util.execAsync(getConnection(), command, new HashMap<String, String>());
     }
 
     public void stage(final File entryFile, final String remote, final String bucket, final String keyspace,

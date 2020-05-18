@@ -21,6 +21,7 @@ package com.simiacryptus.aws;
 
 import com.esotericsoftware.minlog.Log;
 import com.simiacryptus.lang.UncheckedSupplier;
+import com.simiacryptus.ref.lang.RefUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,11 +80,11 @@ public class S3TaskRunner {
       e.printStackTrace();
     }
     UncheckedSupplier<?> appTask = TendrilSettings.INSTANCE.getAppTask();
-    if(null != appTask) {
+    if (null != appTask) {
       try {
-        new Thread(()->{
+        new Thread(() -> {
           try {
-            appTask.get();
+            RefUtil.freeRef(appTask.get());
           } catch (Exception e) {
             e.printStackTrace();
           }

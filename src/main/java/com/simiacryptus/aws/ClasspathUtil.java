@@ -24,7 +24,6 @@ import com.simiacryptus.util.CodeUtil;
 import com.simiacryptus.util.JsonUtil;
 import com.simiacryptus.util.Util;
 import com.simiacryptus.util.test.SysOutInterceptor;
-import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -193,7 +192,7 @@ public class ClasspathUtil {
         digest.update(buffer, 0, n);
       }
     }
-    return new String(Hex.encodeHex(digest.digest()));
+    return new String(Base64.getUrlEncoder().withoutPadding().encode(digest.digest())).substring(0, 6);
   }
 
   private static void summarize(@Nonnull String[] jarFiles, @Nonnull File summary) {
