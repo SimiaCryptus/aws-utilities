@@ -1,27 +1,27 @@
 
-aws-utilities.iml
 # BlueJ files
-*.class
 # Compiled class file
+# Log file
+# Mobile Tools for Java (J2ME)
+# Package Files #
+# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+*.class
 *.ctxt
 *.ear
-../.gitignore
-hs_err_pid*
-.idea/
+*.hprof
 *.iml
 *.jar
 *.log
-# Log file
-# Mobile Tools for Java (J2ME)
-.mtj.tmp/
-# Package Files #
 *.pem
 *.rar
-settings.json
-target/
 *.tar.gz
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 *.war
 *.zip
-*.hprof
-
+../.gitignore
+.idea/
+.mtj.tmp/
+aws-utilities.iml
+aws-utilities.iml
+hs_err_pid*
+settings.json
+target/
