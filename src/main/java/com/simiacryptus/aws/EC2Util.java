@@ -28,6 +28,7 @@ import com.amazonaws.services.identitymanagement.AmazonIdentityManagement;
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagementClientBuilder;
 import com.amazonaws.services.identitymanagement.model.*;
 import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.model.AmazonS3Exception;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.util.EC2MetadataUtils;
 import com.amazonaws.util.StringInputStream;
@@ -38,6 +39,7 @@ import com.simiacryptus.util.Util;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.CloseShieldOutputStream;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,6 +54,7 @@ import java.nio.charset.Charset;
 import java.util.*;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
@@ -88,12 +91,20 @@ public class EC2Util {
   public static void stage(@Nonnull final Session session, final File file, final String remote, final String bucket,
                            final String cacheNamespace, @Nonnull final AmazonS3 s3) {
     String key = cacheNamespace + remote;
-    if (!s3.doesObjectExist(bucket, key)) {
+    if (!doesObjectExist(s3, bucket, key)) {
       logger.info(RefString.format("Pushing to s3: %s/%s <= %s", bucket, key, file));
       s3.putObject(new PutObjectRequest(bucket, key, file));
     }
     logger.debug(RefString.format("Pulling from s3: %s/%s", bucket, key));
     exec(session, RefString.format("aws s3api get-object --bucket %s --key %s %s", bucket, key, remote));
+  }
+
+  private static boolean doesObjectExist(@NotNull AmazonS3 s3, String bucket, String key) {
+    try {
+      return s3.doesObjectExist(bucket, key);
+    } catch (AmazonS3Exception e) {
+      return false;
+    }
   }
 
   public static String publicHostname() {
@@ -289,10 +300,10 @@ public class EC2Util {
         "                     \"Service\": [ \"ec2.amazonaws.com\" ]\n" +
         "                  },\n" +
         "                  \"Action\": [ \"sts:AssumeRole\" ]\n" +
-        "                 }, {\n" +
-        "                  \"Effect\": \"Allow\",\n" +
-        "                  \"Resource\": \"*\",\n" +
-        "                  \"Action\": \"ec2:DescribeInstances\"\n" +
+//        "                 }, {\n" +
+//        "                  \"Effect\": \"Allow\",\n" +
+//        "                  \"Resource\": \"*\",\n" +
+//        "                  \"Action\": \"ec2:DescribeInstances\"\n" +
         "                 }\n" +
         "               ]\n" +
         "            }";
@@ -330,6 +341,7 @@ public class EC2Util {
       logger.info("Awaiting security group creation...");
       sleep(10000);
     }
+    sleep(1000);
     ec2.authorizeSecurityGroupIngress(
         new AuthorizeSecurityGroupIngressRequest().withGroupId(groupId)
             .withIpPermissions(
@@ -422,12 +434,7 @@ public class EC2Util {
   public static Instance start(@Nonnull final AmazonEC2 ec2, final String ami, final String instanceType, final String groupId,
                                @Nonnull final KeyPair keyPair, @Nonnull final InstanceProfile instanceProfile) {
     final AtomicReference<Instance> instance = new AtomicReference<>();
-
-    instance.set(ec2.runInstances(new RunInstancesRequest().withImageId(ami).withInstanceType(instanceType)
-        .withIamInstanceProfile(new IamInstanceProfileSpecification().withArn(instanceProfile.getArn())
-            //        .withName(role.getInstanceProfileName())
-        ).withInstanceInitiatedShutdownBehavior(ShutdownBehavior.Terminate).withMinCount(1).withMaxCount(1)
-        .withKeyName(keyPair.getKeyName()).withSecurityGroupIds(groupId)).getReservation().getInstances().get(0));
+    runInstance(ec2, ami, instanceType, groupId, keyPair, instanceProfile, instance);
     while (instance.get().getState().getName().equals("pending")) {
       logger.info("Awaiting instance startup...");
       sleep(10000);
@@ -437,6 +444,39 @@ public class EC2Util {
     logger.info(RefString.format("Instance started: %s @ http://%s:1080/ - %s", info.getInstanceId(),
         info.getPublicDnsName(), info));
     return info;
+  }
+
+  private static ThreadLocal<AtomicInteger> _runInstance = ThreadLocal.withInitial(()->new AtomicInteger(0));
+  private static void runInstance(@Nonnull AmazonEC2 ec2, String ami, String instanceType, String groupId, @Nonnull KeyPair keyPair, @Nonnull InstanceProfile instanceProfile, AtomicReference<Instance> instance) {
+    try {
+      instance.set(ec2.runInstances(new RunInstancesRequest().withImageId(ami).withInstanceType(instanceType)
+              .withIamInstanceProfile(new IamInstanceProfileSpecification().withArn(instanceProfile.getArn())
+                      //        .withName(role.getInstanceProfileName())
+              ).withInstanceInitiatedShutdownBehavior(ShutdownBehavior.Terminate).withMinCount(1).withMaxCount(1)
+              .withKeyName(keyPair.getKeyName()).withSecurityGroupIds(groupId)).getReservation().getInstances().get(0));
+    } catch (AmazonEC2Exception e) {
+      try {
+        if(_runInstance.get().incrementAndGet() > 3) {
+          throw e;
+        }
+        if(e.getMessage().contains("vdsfjuiovsfejnuovfs")) {
+          ec2.createDefaultVpc(new CreateDefaultVpcRequest());
+          runInstance(ec2, ami, instanceType, groupId, keyPair, instanceProfile, instance);
+        }
+        if(e.getMessage().contains("The security group")) {
+          //ec2.createSecurityGroup(new CreateSecurityGroupRequest());
+          try {
+            Thread.sleep(10000);
+          } catch (InterruptedException interruptedException) {
+            throw e;
+          }
+          runInstance(ec2, ami, instanceType, groupId, keyPair, instanceProfile, instance);
+        }
+      } finally {
+        _runInstance.get().decrementAndGet();
+      }
+    }
+
   }
 
   @Nonnull

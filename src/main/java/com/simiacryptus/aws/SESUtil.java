@@ -68,7 +68,7 @@ public class SESUtil {
                                        @Nonnull final MimeMultipart content) throws MessagingException {
     MimeMessage message = new MimeMessage(session);
     message.setSubject(subject, "UTF-8");
-    message.setFrom(new InternetAddress("acharneski@gmail.com"));
+    message.setFrom(new InternetAddress(to));
     message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(to));
     message.setContent(content);
     return message;

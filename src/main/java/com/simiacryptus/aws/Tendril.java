@@ -61,6 +61,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -365,20 +366,18 @@ public class Tendril {
       client.setTimeout((int) TimeUnit.SECONDS.toMillis(timeoutSeconds));
       client.setKeepAliveTCP((int) TimeUnit.SECONDS.toMillis(15));
       int connectTimeout = (int) TimeUnit.SECONDS.toMillis(90);
-      client.connect(connectTimeout, "127.0.0.1", localControlPort, -1);
       Object connectLock = new Object();
+      AtomicBoolean started = new AtomicBoolean(false);
       new Thread(() -> {
         try {
+          Thread.sleep(100);
           while (!Thread.interrupted()) {
             try {
-              if (client.isConnected()) {
+              synchronized (connectLock) {
                 client.update(10);
-              } else if (isAlive.getAsBoolean()) {
-                synchronized (connectLock) {
+                if (started.get() && !client.isConnected() && isAlive.getAsBoolean()) {
                   client.reconnect(connectTimeout);
                 }
-              } else {
-                break;
               }
             } catch (IOException e) {
               String message = e.getMessage();
@@ -386,11 +385,19 @@ public class Tendril {
               //e.printStackTrace();
               Thread.sleep(1000);
             }
+            if(!started.get()) {
+              Thread.sleep(100);
+            } else {
+              logger.info("Remote connection terminated");
+              break;
+            }
           }
         } catch (Throwable throwable) {
           throwable.printStackTrace();
         }
       }).start();
+      client.connect(connectTimeout, "127.0.0.1", localControlPort, -1);
+      started.set(true);
       TendrilLink remoteObject = ObjectSpace.getRemoteObject(client, 1318, TendrilLink.class);
       if (!remoteObject.isAlive())
         throw new RuntimeException("Not Alive");
@@ -400,16 +407,16 @@ public class Tendril {
           if (!isAlive.getAsBoolean()) {
             return false;
           }
-          if (!client.isConnected()) {
-            try {
-              synchronized (connectLock) {
+          synchronized (connectLock) {
+            if (!client.isConnected()) {
+              try {
                 client.reconnect(connectTimeout);
+              } catch (IOException e) {
+                return false;
               }
-            } catch (IOException e) {
-              return false;
             }
+            return remoteObject.isAlive();
           }
-          return remoteObject.isAlive();
         }
 
         @Override

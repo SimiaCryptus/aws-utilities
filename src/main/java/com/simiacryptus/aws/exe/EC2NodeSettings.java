@@ -60,9 +60,9 @@ public class EC2NodeSettings {
     // https://aws.amazon.com/marketplace/server/configuration?productId=a782650d-12cb-4a82-a284-b88e8670a16a
     switch (EC2Util.REGION) {
       case US_EAST_1:
-        return "ami-04f94a03f151839d7";
+        return "ami-00f44084952227ef0";
       case US_WEST_2:
-        return "ami-0c982a92eda808971";
+        return "ami-01a495658aa5f7930";
     }
     throw new IllegalArgumentException("EC2Util.REGION: " + EC2Util.REGION);
   }
