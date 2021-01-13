@@ -156,7 +156,7 @@ public class EC2NotebookRunner {
 
   public EC2Util.EC2Node start(AwsTendrilNodeSettings settings, Tendril.JvmConfig jvmConfig) {
     int localControlPort = new Random().nextInt(1024) + 1024;
-    SESUtil.setup(AmazonSimpleEmailServiceClientBuilder.defaultClient(), emailAddress);
+    SESUtil.setup(AmazonSimpleEmailServiceClientBuilder.standard().withRegion(EC2Util.REGION).build(), emailAddress);
     EC2Util.EC2Node node = settings.startNode(getEc2(), localControlPort);
     try {
       assert node != null;
