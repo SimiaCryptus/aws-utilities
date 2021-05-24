@@ -142,6 +142,7 @@ public class TendrilSettings implements Settings {
       String userdata = "#!/bin/bash\n" +
           "sudo -H -u ec2-user /bin/bash << UIS\n" +
           "\texport CP=\"\";\n" +
+          "\texport EMAIL=\"your@email.com\";\n" +
           "\tcd ~/;\n" +
           "\tfor jar in " + jars.stream().reduce((a, b) -> a + " " + b).orElse("") + "; \n" +
           "\tdo \n" +

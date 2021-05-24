@@ -27,7 +27,7 @@ import java.io.IOException;
 import java.util.Scanner;
 
 public class UserSettings {
-  public String emailAddress;
+  private String emailAddress;
 
   private UserSettings() {
   }
@@ -36,13 +36,31 @@ public class UserSettings {
     try {
       return JsonUtil.cache(new File("user-settings.json"), UserSettings.class, () -> {
         UserSettings userSettings = new UserSettings();
-        Scanner scanner = new Scanner(System.in);
-        System.out.print("Enter user email address: ");
-        userSettings.emailAddress = scanner.nextLine();
+
+        String email_env = System.getenv("EMAIL");
+        if (email_env != null) {
+          userSettings.setEmailAddress(email_env);
+        } else {
+          Scanner scanner = new Scanner(System.in);
+          System.out.print("Enter user email address: ");
+          userSettings.setEmailAddress(scanner.nextLine());
+        }
         return userSettings;
       });
     } catch (IOException e) {
       throw Util.throwException(e);
     }
+  }
+
+  public String getEmailAddress() {
+    String email_env = System.getenv("EMAIL");
+    if (email_env != null) {
+      return email_env;
+    }
+    return emailAddress;
+  }
+
+  public void setEmailAddress(String emailAddress) {
+    this.emailAddress = emailAddress;
   }
 }

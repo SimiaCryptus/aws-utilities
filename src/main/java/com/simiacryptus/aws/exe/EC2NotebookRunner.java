@@ -60,7 +60,7 @@ public class EC2NotebookRunner {
     SysOutInterceptor.INSTANCE.init();
   }
 
-  private final String emailAddress = UserSettings.load().emailAddress;
+  private final String emailAddress = UserSettings.load().getEmailAddress();
   SerializableConsumer<NotebookOutput>[] fns;
   private String s3bucket = "";
 
