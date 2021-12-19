@@ -53,6 +53,7 @@ import java.util.*;
 public class EC2NotebookRunner {
 
   private static final Logger logger = LoggerFactory.getLogger(EC2NotebookRunner.class);
+
   @Nonnull
   public static String JAVA_OPTS = " -Xmx50g";
 
@@ -235,6 +236,7 @@ public class EC2NotebookRunner {
         EmailUtil.sendCompleteEmail(log, startTime, emailAddress, uploads, false);
       });
       try {
+        ReminderEmailer.startReminderEmails(testName);
         sendStartEmail(testName, fn);
       } catch (@Nonnull IOException | URISyntaxException e) {
         throw Util.throwException(e);
@@ -245,16 +247,16 @@ public class EC2NotebookRunner {
   }
 
   private void sendStartEmail(final String testName, final SerializableConsumer<NotebookOutput> fn)
-      throws IOException, URISyntaxException {
+          throws IOException, URISyntaxException {
     String publicHostname = EC2Util.getPublicHostname();
     String instanceId = EC2Util.getInstanceId();
     String functionJson = new ObjectMapper().enableDefaultTyping(ObjectMapper.DefaultTyping.NON_FINAL)
-        .enable(SerializationFeature.INDENT_OUTPUT).writer().writeValueAsString(fn);
+            .enable(SerializationFeature.INDENT_OUTPUT).writer().writeValueAsString(fn);
     String html = "<html><body>" + "<p><a href=\"http://" + publicHostname
-        + ":1080/\">The " + testName + " report can be monitored at " + publicHostname + "</a></p><hr/>"
-        + "<p><a href=\"https://console.aws.amazon.com/ec2/v2/home?region=us-east-1#Instances:search=" + instanceId
-        + "\">View instance " + instanceId + " on AWS Console</a></p><hr/>" + "<p>Script Definition:" + "<pre>"
-        + functionJson + "</pre></p>" + "</body></html>";
+            + ":1080/\">The " + testName + " report can be monitored at " + publicHostname + "</a></p><hr/>"
+            + "<p><a href=\"https://console.aws.amazon.com/ec2/v2/home?region=us-east-1#Instances:search=" + instanceId
+            + "\">View instance " + instanceId + " on AWS Console</a></p><hr/>" + "<p>Script Definition:" + "<pre>"
+            + functionJson + "</pre></p>" + "</body></html>";
     String txtBody = "Process Started at " + new Date();
     String subject = testName + " Starting";
     SESUtil.send(AmazonSimpleEmailServiceClientBuilder.defaultClient(), subject, emailAddress, txtBody, html);

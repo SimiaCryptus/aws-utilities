@@ -19,6 +19,7 @@
 
 package com.simiacryptus.aws;
 
+import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.ListObjectsRequest;
@@ -78,11 +79,34 @@ public class S3Util {
     URI archiveHome = log.getArchiveHome();
     if (archiveHome != null && !archiveHome.getHost().isEmpty()) {
       synchronized (log) {
-        return upload(log, AmazonS3ClientBuilder.standard().withRegion(EC2Util.REGION).build());
+        return upload(log, getS3(archiveHome));
       }
     } else {
       return new HashMap<>();
     }
+  }
+
+  public static AmazonS3 getS3(URI archiveHome) {
+    AmazonS3 defaultS3 = AmazonS3ClientBuilder.standard().withRegion(Regions.DEFAULT_REGION).build();
+    if(null == defaultS3) {
+      logger.warn("defaultS3 is null");
+      return null;
+    }
+    if(null == archiveHome) {
+      logger.info("archiveHome is null");
+      return defaultS3;
+    }
+    String host = archiveHome.getHost();
+    if(null == host) {
+      logger.warn("archiveHome.getHost is null");
+      return defaultS3;
+    }
+    String bucketLocation = defaultS3.getBucketLocation(host);
+    if(null == bucketLocation) {
+      logger.warn("bucketLocation is null");
+      return defaultS3;
+    }
+    return AmazonS3ClientBuilder.standard().withRegion(bucketLocation).build();
   }
 
   @Nonnull

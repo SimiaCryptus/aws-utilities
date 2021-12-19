@@ -20,18 +20,18 @@
 package com.simiacryptus.aws.exe;
 
 import com.simiacryptus.aws.EC2Util;
+import com.simiacryptus.lang.Settings;
 import com.simiacryptus.ref.wrappers.RefSystem;
 
 import javax.annotation.Nonnull;
 
 public class EC2NodeSettings {
 
-  public static final String AMI_AMAZON_DEEP_LEARNING = RefSystem
-      .getProperty("AMI_AMAZON_DEEP_LEARNING", AMI_AMAZON_DEEP_LEARNING());
-  public static final String AMI_AMAZON_LINUX = RefSystem.getProperty("AMI_AMAZON_LINUX",
-      AMI_AMAZON_LINUX());
-  public static final String AMI_BUILD = RefSystem.getProperty("AMI_BUILD",
-      AMI_BUILD());
+  public static final String AMI_AMAZON_DEEP_LEARNING = Settings.get("AMI_AMAZON_DEEP_LEARNING", AMI_AMAZON_DEEP_LEARNING());
+  public static final String AMI_AMAZON_LINUX = Settings.get("AMI_AMAZON_LINUX", AMI_AMAZON_LINUX());
+  public static final String AMI_BUILD = Settings.get("AMI_BUILD", AMI_BUILD());
+  public static final int reminderTimeMinutes = Settings.get("reminderTimeMinutes",15);
+
   public static final EC2NodeSettings P3_2XL = new EC2NodeSettings("p3.2xlarge", AMI_AMAZON_DEEP_LEARNING, "ec2-user");
   public static final EC2NodeSettings P3_8XL = new EC2NodeSettings("p3.8xlarge", AMI_AMAZON_DEEP_LEARNING, "ec2-user");
   public static final EC2NodeSettings P2_XL = new EC2NodeSettings("p2.xlarge", AMI_AMAZON_DEEP_LEARNING, "ec2-user");
@@ -45,6 +45,7 @@ public class EC2NodeSettings {
   public static final EC2NodeSettings R5_L = new EC2NodeSettings("r5.large", AMI_AMAZON_LINUX, "ec2-user");
   public static final EC2NodeSettings R5_XL = new EC2NodeSettings("r5.xlarge", AMI_AMAZON_LINUX, "ec2-user");
   public static final EC2NodeSettings R5_2XL = new EC2NodeSettings("r5.2xlarge", AMI_AMAZON_LINUX, "ec2-user");
+
   public final String machineType;
   public final String imageId;
   public final String username;

@@ -299,10 +299,14 @@ public class EC2Util {
         "                     \"Service\": [ \"ec2.amazonaws.com\" ]\n" +
         "                  },\n" +
         "                  \"Action\": [ \"sts:AssumeRole\" ]\n" +
-//        "                 }, {\n" +
-//        "                  \"Effect\": \"Allow\",\n" +
-//        "                  \"Resource\": \"*\",\n" +
-//        "                  \"Action\": \"ec2:DescribeInstances\"\n" +
+        "                 }, {\n" +
+        "                  \"Effect\": \"Allow\",\n" +
+        "                  \"Resource\": \"*\",\n" +
+        "                  \"Action\": \"ec2:*\"\n" +
+        "                 }, {\n" +
+        "                  \"Effect\": \"Allow\",\n" +
+        "                  \"Resource\": \"*\",\n" +
+        "                  \"Action\": \"s3:*\"\n" +
         "                 }\n" +
         "               ]\n" +
         "            }";
@@ -402,8 +406,11 @@ public class EC2Util {
   @Nonnull
   public static String bucketGrantStr(@Nonnull String... bucket) {
     return RefUtil.get(RefArrays
-        .stream(bucket).map(b -> RefString.format("{\n" + "      \"Action\": \"s3:*\",\n"
-            + "      \"Effect\": \"Allow\",\n" + "      \"Resource\": \"arn:aws:s3:::%s*\"\n" + "    }", b))
+        .stream(bucket).map(b -> RefString.format("{\n" +
+          "      \"Action\": \"s3:*\",\n" +
+          "      \"Effect\": \"Allow\",\n" +
+          "      \"Resource\": \"arn:aws:s3:::%s*\"\n" +
+          "    }", b))
         .reduce((a, b) -> a + ", " + b));
   }
 
@@ -425,19 +432,27 @@ public class EC2Util {
     }
   }
 
-  public static Instance getInstance(@Nonnull final AmazonEC2 ec2, @Nonnull final Instance instance) {
-    return ec2.describeInstances(new DescribeInstancesRequest().withInstanceIds(instance.getInstanceId()))
+  public static Instance getInstance(@Nonnull final AmazonEC2 ec2, String instanceId) {
+    return ec2.describeInstances(new DescribeInstancesRequest().withInstanceIds(instanceId))
         .getReservations().get(0).getInstances().get(0);
   }
 
   public static Instance start(@Nonnull final AmazonEC2 ec2, final String ami, final String instanceType, final String groupId,
                                @Nonnull final KeyPair keyPair, @Nonnull final InstanceProfile instanceProfile) {
     final AtomicReference<Instance> instance = new AtomicReference<>();
-    runInstance(ec2, ami, instanceType, groupId, keyPair, instanceProfile, instance);
+    String presetId = System.getProperty("instanceId");
+    if(presetId != null) {
+      logger.info(String.format("Using instance ID %s", presetId));
+      instance.set(new Instance().withInstanceId(presetId)
+              .withState(new InstanceState().withName("pending")));
+    } else {
+      logger.info("Starting new EC2 instance");
+      runInstance(ec2, ami, instanceType, groupId, keyPair, instanceProfile, instance);
+    }
     while (instance.get().getState().getName().equals("pending")) {
       logger.info("Awaiting instance startup...");
       sleep(10000);
-      instance.set(getInstance(ec2, instance.get()));
+      instance.set(getInstance(ec2, instance.get().getInstanceId()));
     }
     Instance info = instance.get();
     logger.info(RefString.format("Instance started: %s @ http://%s:1080/ - %s", info.getInstanceId(),
@@ -592,8 +607,7 @@ public class EC2Util {
     }
 
     public Instance getStatus() {
-      return ec2.describeInstances(new DescribeInstancesRequest().withInstanceIds(getInstanceId())).getReservations()
-          .get(0).getInstances().get(0);
+      return getInstance(ec2, getInstanceId());
     }
 
     public <T> T runAndTerminate(@Nonnull final Function<Session, T> task) {
