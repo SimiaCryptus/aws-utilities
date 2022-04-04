@@ -127,8 +127,7 @@ public class SESUtil {
   public static void setup(@Nonnull final AmazonSimpleEmailService ses, final String emailAddress) {
     try {
       List<String> verifiedEmailAddresses = ses.listVerifiedEmailAddresses().getVerifiedEmailAddresses();
-      if (verifiedEmailAddresses.contains(emailAddress))
-        return;
+      if (verifiedEmailAddresses.contains(emailAddress)) return;
       ses.verifyEmailAddress(new VerifyEmailAddressRequest().withEmailAddress(emailAddress));
     } catch (Throwable e) {
       logger.warn("Error verifying " + emailAddress, e);
