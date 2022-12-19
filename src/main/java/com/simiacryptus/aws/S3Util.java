@@ -111,6 +111,7 @@ public class S3Util {
 
   @Nonnull
   public static Map<File, URL> upload(@Nonnull NotebookOutput log, @Nonnull AmazonS3 s3) {
+    logger.info("Uploading Log", new RuntimeException());
     try {
       log.write();
       File root = log.getRoot();

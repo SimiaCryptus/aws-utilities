@@ -89,6 +89,7 @@ public class LinuxUtil {
   }
 
   public static void writeLauncher(AppLaunchConfig appLaunchConfig) {
+    System.out.printf("Writing %s launcher to %s%n", appLaunchConfig.exeName, appLaunchConfig.homeDir);
     File home = new File(appLaunchConfig.homeDir);
     File binDir = new File(home, "bin");
     binDir.mkdirs();

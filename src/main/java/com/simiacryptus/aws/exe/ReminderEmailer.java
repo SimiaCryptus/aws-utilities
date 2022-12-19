@@ -1,6 +1,5 @@
 package com.simiacryptus.aws.exe;
 
-import com.amazonaws.services.simpleemail.AmazonSimpleEmailServiceClientBuilder;
 import com.simiacryptus.aws.EC2Util;
 import com.simiacryptus.aws.SESUtil;
 import org.slf4j.Logger;
@@ -47,7 +46,7 @@ public class ReminderEmailer {
                 "</body></html>", publicHostname, testName, publicHostname, instanceId, instanceId);
         String txtBody = "Process still running at " + new Date();
         String subject = testName + " Running";
-        SESUtil.send(AmazonSimpleEmailServiceClientBuilder.defaultClient(), subject, emailAddress, txtBody, html);
+        SESUtil.send(EmailUtil.getSimpleEmailService(), subject, emailAddress, txtBody, html);
       } catch (Throwable e) {
         logger.warn("Error sending reminder email", e);
       }

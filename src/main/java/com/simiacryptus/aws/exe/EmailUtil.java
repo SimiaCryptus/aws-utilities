@@ -19,7 +19,9 @@
 
 package com.simiacryptus.aws.exe;
 
+import com.amazonaws.services.simpleemail.AmazonSimpleEmailService;
 import com.amazonaws.services.simpleemail.AmazonSimpleEmailServiceClientBuilder;
+import com.simiacryptus.aws.EC2Util;
 import com.simiacryptus.aws.SESUtil;
 import com.simiacryptus.notebook.NotebookOutput;
 import org.apache.commons.io.FileUtils;
@@ -60,7 +62,7 @@ public class EmailUtil {
     }
     html = editLinks(html, workingDir, uploads);
     html = prepend(html, links(uploads, htmlFile, zipFile, pdfFile));
-    SESUtil.send(AmazonSimpleEmailServiceClientBuilder.defaultClient(),
+    SESUtil.send(EmailUtil.getSimpleEmailService(),
         String.format("%s Completed in %.3fmin", log.getDisplayName(), (System.currentTimeMillis() - startTime) / (1000.0 * 60)),
         emailAddress,
         html,
@@ -121,5 +123,9 @@ public class EmailUtil {
       uploads.forEach((k, v) -> logger.info(k + " uploaded to " + v));
     }
     return url;
+  }
+
+  public static AmazonSimpleEmailService getSimpleEmailService() {
+    return AmazonSimpleEmailServiceClientBuilder.standard().withRegion(EC2Util.REGION).build();
   }
 }

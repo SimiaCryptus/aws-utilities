@@ -67,15 +67,20 @@ public class EC2Util {
   @Nullable
   private static volatile KeyPair keyPair = null;
 
+  private static volatile String currentRegion = null;
   private static String getCurrentRegion() {
+    if (null != currentRegion) return currentRegion;
     try {
-      Region currentRegion = Regions.getCurrentRegion();
-      if (null == currentRegion)
-        return Regions.US_EAST_1.getName();
-      return currentRegion.getName();
+      Region region = Regions.getCurrentRegion();
+      if (null == region) {
+        currentRegion = Regions.US_EAST_1.getName();
+      } else {
+        currentRegion = region.getName();
+      }
     } catch (Throwable e) {
-      return Regions.US_EAST_1.getName();
+      currentRegion = Regions.US_EAST_1.getName();
     }
+    return currentRegion;
   }
 
   public static String getInstanceId() throws IOException, URISyntaxException {

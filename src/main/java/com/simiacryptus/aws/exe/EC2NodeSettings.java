@@ -40,6 +40,12 @@ public class EC2NodeSettings {
   public static final EC2NodeSettings T2_XL = new EC2NodeSettings("t2.xlarge", AMI_AMAZON_LINUX, "ec2-user");
   public static final EC2NodeSettings T2_2XL = new EC2NodeSettings("t2.2xlarge", AMI_AMAZON_LINUX, "ec2-user");
   public static final EC2NodeSettings M5_L = new EC2NodeSettings("m5.large", AMI_AMAZON_LINUX, "ec2-user");
+
+  /**
+   * User to prepare AMIs for ML applications; building on a cheaper host that can't actually run the applications
+   */
+  public static final EC2NodeSettings M5_XL_DL = new EC2NodeSettings("m5.xlarge", AMI_AMAZON_DEEP_LEARNING, "ec2-user");
+
   public static final EC2NodeSettings M5_XL = new EC2NodeSettings("m5.xlarge", AMI_AMAZON_LINUX, "ec2-user");
   public static final EC2NodeSettings M5_2XL = new EC2NodeSettings("m5.2xlarge", AMI_AMAZON_LINUX, "ec2-user");
   public static final EC2NodeSettings R5_L = new EC2NodeSettings("r5.large", AMI_AMAZON_LINUX, "ec2-user");

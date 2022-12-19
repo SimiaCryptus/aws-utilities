@@ -26,7 +26,6 @@ import com.amazonaws.services.identitymanagement.AmazonIdentityManagement;
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagementClientBuilder;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
-import com.amazonaws.services.simpleemail.AmazonSimpleEmailServiceClientBuilder;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.simiacryptus.aws.*;
@@ -157,7 +156,7 @@ public class EC2NotebookRunner {
 
   public EC2Util.EC2Node start(AwsTendrilNodeSettings settings, Tendril.JvmConfig jvmConfig) {
     int localControlPort = new Random().nextInt(1024) + 1024;
-    SESUtil.setup(AmazonSimpleEmailServiceClientBuilder.standard().withRegion(EC2Util.REGION).build(), emailAddress);
+    SESUtil.setup(EmailUtil.getSimpleEmailService(), emailAddress);
     EC2Util.EC2Node node = settings.startNode(getEc2(), localControlPort);
     try {
       assert node != null;
@@ -259,7 +258,7 @@ public class EC2NotebookRunner {
             + functionJson + "</pre></p>" + "</body></html>";
     String txtBody = "Process Started at " + new Date();
     String subject = testName + " Starting";
-    SESUtil.send(AmazonSimpleEmailServiceClientBuilder.defaultClient(), subject, emailAddress, txtBody, html);
+    SESUtil.send(EmailUtil.getSimpleEmailService(), subject, emailAddress, txtBody, html);
   }
 
 }
